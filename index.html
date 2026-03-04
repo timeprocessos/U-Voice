@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="pt-br">
+<html lang="pt-pt">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>U-Voice | Hub de Experiência</title>
+    <title>U-Voice | Hub de Operações</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -12,15 +12,29 @@
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
         body { font-family: 'Inter', sans-serif; background-color: #FDFDFE; margin: 0; padding: 0; }
-        .loading-shimmer {
-            background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
-            background-size: 200% 100%;
-            animation: shimmer 1.5s infinite;
+        
+        .overdue-pulse { animation: pulse-red 2s infinite; }
+        @keyframes pulse-red {
+            0%, 100% { color: #D22B2B; opacity: 1; }
+            50% { color: #7f1d1d; opacity: .5; }
         }
-        @keyframes shimmer {
-            0% { background-position: 200% 0; }
-            100% { background-position: -200% 0; }
+
+        .custom-scroll::-webkit-scrollbar { width: 6px; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #E2E8F0; border-radius: 10px; }
+        
+        .modal-animate { animation: slideUp 0.3s ease-out; }
+        @keyframes slideUp {
+            from { transform: translateY(20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
         }
+
+        .card-decision { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); border: 2px solid transparent; cursor: pointer; }
+        .card-decision.selected { border-color: #BED993; background-color: #FBFAF3; transform: scale(1.01); }
+
+        .impact-filter { background: white; border: 1px solid #F1F5F9; border-radius: 12px; padding: 8px 16px; font-size: 10px; font-weight: 900; text-transform: uppercase; color: #1e293b; outline: none; }
+        
+        /* Glow for target badge */
+        .shadow-glow { box-shadow: 0 0 15px rgba(52, 211, 153, 0.4); }
     </style>
 </head>
 <body>
@@ -28,243 +42,508 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, doc, onSnapshot, setDoc, deleteDoc, query, addDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, onAuthStateChanged, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, doc, onSnapshot, setDoc, deleteDoc, query, addDoc, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // Suas credenciais reais do Firebase
-        const firebaseConfig = {
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
             apiKey: "AIzaSyCRNpfVN3n_Ue9kocKSU7EGlp9ElBJWvRg",
             authDomain: "u-voice-82837.firebaseapp.com",
             projectId: "u-voice-82837",
             storageBucket: "u-voice-82837.firebasestorage.app",
             messagingSenderId: "363918476944",
-            appId: "1:363918476944:web:02fe7e523c4eed24abba15",
-            measurementId: "G-TM4FHKNXXG"
+            appId: "1:363918476944:web:02fe7e523c4eed24abba15"
         };
 
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
-        const appId = "u-voice-prod"; 
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'u-voice-prod-v11';
 
-        window.FirebaseInstance = { auth, db, appId, collection, doc, onSnapshot, setDoc, deleteDoc, addDoc, query, signInAnonymously, onAuthStateChanged };
+        window.FirebaseInstance = { 
+            auth, db, appId, firebaseConfig,
+            collection, doc, onSnapshot, setDoc, deleteDoc, addDoc, updateDoc, query, signInAnonymously, signInWithCustomToken, onAuthStateChanged 
+        };
     </script>
 
     <script type="text/babel">
-        const { useState, useEffect } = React;
-        const { auth, db, appId, collection, doc, onSnapshot, setDoc, deleteDoc, addDoc, query, signInAnonymously, onAuthStateChanged } = window.FirebaseInstance;
+        const { useState, useEffect, useMemo, useRef } = React;
 
         const BRAND = {
-            sand1: '#FBFAF3', sand2: '#F0EEE6', sand7: '#1F1D1A', white: '#FFFFFF',
-            black: '#000000', primaryButton: '#397394', teaGreen: '#BED993',
-            sunflower: '#FDC256', coral: '#F77D8D', sky: '#82B3D0', cherryRed: '#D22B2B'
+            sand1: '#FBFAF3', black: '#000000', primaryButton: '#397394',
+            teaGreen: '#BED993', sunflower: '#FDC256', coral: '#F77D8D'
         };
 
-        const Icon = ({ name, size = 20, className = "" }) => {
-            useEffect(() => { if (window.lucide) window.lucide.createIcons(); }, [name]);
-            return <i data-lucide={name} style={{ width: size, height: size }} className={className}></i>;
-        };
+        const EDITORIAS = ["Originais Unico", "Career Ops", "The Ops Playbook", "the ops story"];
+        const FORMATOS = ["Vídeo", "Imagem", "GIF", "Texto", "Slide", "PDF"];
 
-        const UnicoLogo = () => (
-            <svg width="34" height="34" viewBox="0 0 100 100" fill="none">
-                <path d="M20 20V55C20 71.5685 33.4315 85 50 85C66.5685 85 80 71.5685 80 55V20H65V55C65 63.2843 58.2843 70 50 70C41.7157 70 35 63.2843 35 55V20H20Z" fill="currentColor"/>
-            </svg>
+        const UnicoLogo = ({ size = 34 }) => (
+            <div className="bg-black rounded-xl flex items-center justify-center shadow-lg" style={{ width: size, height: size }}>
+                <svg width={size * 0.6} height={size * 0.6} viewBox="0 0 100 100" fill="none">
+                    <path d="M20 20V55C20 71.5685 33.4315 85 50 85C66.5685 85 80 71.5685 80 55V20H65V55C65 63.2843 58.2843 70 50 70C41.7157 70 35 63.2843 35 55V20H20Z" fill="white"/>
+                </svg>
+            </div>
         );
 
-        function StatCard({ title, value, iconName, color, loading }) {
-            const styles = {
-                blue: { bg: BRAND.white, accent: BRAND.sky, text: BRAND.black },
-                purple: { bg: BRAND.sand7, accent: '#A281CF', text: BRAND.white },
-                emerald: { bg: BRAND.sand1, accent: BRAND.teaGreen, text: BRAND.black },
-                rose: { bg: BRAND.white, accent: BRAND.coral, text: BRAND.black }
-            };
-            const current = styles[color] || styles.blue;
+        const Icon = ({ name, size = 18, className = "" }) => {
+            const iconRef = useRef(null);
+            useEffect(() => {
+                if (window.lucide && iconRef.current) {
+                    window.lucide.createIcons({
+                        attrs: { class: className, style: `width: ${size}px; height: ${size}px;` },
+                        name: name
+                    });
+                }
+            }, [name, size, className]);
+            return <span ref={iconRef} className="inline-flex items-center justify-center"><i data-lucide={name}></i></span>;
+        };
+
+        function SimpleBarChart({ data, title, color = "#397394" }) {
+            const maxVal = Math.max(...Object.values(data), 1);
             return (
-                <div className="p-6 rounded-[2.5rem] border border-slate-100 shadow-sm transition-all hover:scale-[1.02]" style={{ backgroundColor: current.bg }}>
-                    <div className="p-3 rounded-2xl border w-fit mb-4" style={{ borderColor: BRAND.sand2, color: current.accent }}>
-                        <Icon name={iconName} size={20} />
+                <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm flex-1">
+                    <h4 className="text-[10px] font-black uppercase text-slate-400 mb-6 tracking-widest">{title}</h4>
+                    <div className="space-y-4">
+                        {Object.entries(data).map(([key, val]) => (
+                            <div key={key} className="space-y-1">
+                                <div className="flex justify-between text-[8px] font-black uppercase text-slate-500">
+                                    <span>{key}</span>
+                                    <span>{val}</span>
+                                </div>
+                                <div className="h-2 bg-slate-50 rounded-full overflow-hidden">
+                                    <div className="h-full rounded-full transition-all duration-1000" style={{ width: `${(val/maxVal)*100}%`, backgroundColor: color }}></div>
+                                </div>
+                            </div>
+                        ))}
                     </div>
-                    {loading ? <div className="h-10 w-24 loading-shimmer rounded-lg mb-2"></div> : <h3 className="text-4xl font-black tracking-tighter" style={{ color: current.text }}>{value}</h3>}
-                    <div className="text-[10px] font-black uppercase tracking-widest mt-2 opacity-40" style={{ color: current.text }}>{title}</div>
                 </div>
             );
         }
 
         function App() {
+            const fb = window.FirebaseInstance || {};
+            const { auth, db, appId, collection, doc, onSnapshot, setDoc, deleteDoc, addDoc, updateDoc, signInAnonymously, signInWithCustomToken, onAuthStateChanged } = fb;
+
             const [user, setUser] = useState(null);
             const [activeTab, setActiveTab] = useState('comunicados');
-            const [isAdmin, setIsAdmin] = useState(false);
             const [comms, setComms] = useState([]);
-            const [stats, setStats] = useState({ posts: 0, interactions: 0, enps: 0, pulse: 0 });
-            const [loading, setLoading] = useState(true);
-
-            // Form states
-            const [newComm, setNewComm] = useState({ title: '', channel: 'Slack', engajamento: 0 });
+            const [agenda, setAgenda] = useState([]);
+            const [isModalCommOpen, setIsModalCommOpen] = useState(false);
+            const [isModalAgendaOpen, setIsModalAgendaOpen] = useState(false);
+            
+            const [editingComm, setEditingComm] = useState(null);
+            const [editingAgenda, setEditingAgenda] = useState(null);
+            const [vendorToggle, setVendorToggle] = useState(false);
+            const [selectedVendorIdx, setSelectedVendorIdx] = useState(null);
+            const [selectedFormats, setSelectedFormats] = useState([]);
 
             useEffect(() => {
-                signInAnonymously(auth).catch(console.error);
+                const startAuth = async () => {
+                    if (!auth) return;
+                    try {
+                        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                            try { await signInWithCustomToken(auth, __initial_auth_token); } catch (e) { await signInAnonymously(auth); }
+                        } else { await signInAnonymously(auth); }
+                    } catch (e) { console.error(e); }
+                };
+                startAuth();
                 return onAuthStateChanged(auth, setUser);
-            }, []);
+            }, [auth]);
 
             useEffect(() => {
-                if (!user) return;
+                if (!user || !db) return;
                 const unsubComms = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'comms'), (snap) => {
                     setComms(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-                    setLoading(false);
                 });
-                const unsubStats = onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'stats', 'main'), (snap) => {
-                    if (snap.exists()) setStats(snap.data());
+                const unsubAgenda = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'agenda'), (snap) => {
+                    setAgenda(snap.docs.map(d => ({ id: d.id, ...d.data() })));
                 });
-                return () => { unsubComms(); unsubStats(); };
-            }, [user]);
+                return () => { unsubComms(); unsubAgenda(); };
+            }, [user, db, appId]);
 
-            const handleAddComm = async (e) => {
+            const calculateScore = (reactions = 0, comments = 0, population = 126) => {
+                if (!population || population === 0) return 0;
+                return ((((Number(reactions) * 1) + (Number(comments) * 2)) / Number(population)) * 100).toFixed(1);
+            };
+
+            const toggleFormat = (f) => {
+                setSelectedFormats(prev => prev.includes(f) ? prev.filter(item => item !== f) : [...prev, f]);
+            };
+
+            const isOverdue = (date, status) => {
+                if (!date || status === 'Enviado' || status === 'Cancelado') return false;
+                const today = new Date().setHours(0,0,0,0);
+                return new Date(date) < today;
+            };
+
+            const handleSaveComm = async (e) => {
                 e.preventDefault();
-                if (!newComm.title) return;
-                await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'comms'), {
-                    ...newComm,
-                    date: new Date().toISOString()
-                });
-                setNewComm({ title: '', channel: 'Slack', engajamento: 0 });
+                const fd = new FormData(e.target);
+                const data = {
+                    title: fd.get('title'),
+                    channelName: fd.get('channelName'),
+                    link: fd.get('link'),
+                    date: fd.get('date'),
+                    postTime: fd.get('postTime'),
+                    editoria: fd.get('editoria'),
+                    formats: selectedFormats,
+                    medium: fd.get('medium'),
+                    status: fd.get('status'),
+                    population: Number(fd.get('population') || 126),
+                    views: Number(fd.get('views') || 0),
+                    reactions: Number(fd.get('reactions') || 0),
+                    comments: Number(fd.get('comments') || 0),
+                    updatedAt: new Date().toISOString()
+                };
+
+                try {
+                    if (editingComm) {
+                        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'comms', editingComm.id), data);
+                    } else {
+                        await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'comms'), data);
+                    }
+                    setIsModalCommOpen(false);
+                    setEditingComm(null);
+                    setSelectedFormats([]);
+                } catch (error) { console.error("Erro ao guardar comunicado:", error); }
             };
 
-            const handleDeleteComm = async (id) => {
-                await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'comms', id));
+            const handleSaveAgenda = async (e) => {
+                e.preventDefault();
+                const fd = new FormData(e.target);
+                const data = {
+                    title: fd.get('atividade'),
+                    date: fd.get('date'),
+                    sponsor: fd.get('sponsor'),
+                    description: fd.get('description'),
+                    inviteLink: fd.get('inviteLink'),
+                    status: fd.get('status'),
+                    hasVendor: vendorToggle,
+                    selectedVendorIdx: selectedVendorIdx !== null ? selectedVendorIdx : -1,
+                    vendor1: fd.get('v1') || '',
+                    vendor2: fd.get('v2') || '',
+                    vendor3: fd.get('v3') || '',
+                    updatedAt: new Date().toISOString()
+                };
+
+                try {
+                    if (editingAgenda) {
+                        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'agenda', editingAgenda.id), data);
+                    } else {
+                        await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'agenda'), data);
+                    }
+                    setIsModalAgendaOpen(false);
+                    setEditingAgenda(null);
+                } catch (error) { console.error("Erro ao guardar agenda:", error); }
             };
 
-            const updateStat = async (field, value) => {
-                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'stats', 'main'), {
-                    ...stats,
-                    [field]: Number(value)
-                }, { merge: true });
+            const statsImpacto = useMemo(() => {
+                const totalPosts = comms.filter(c => c.status === 'Enviado').length;
+                const interactions = comms.reduce((acc, c) => acc + (Number(c.reactions) || 0) + (Number(c.comments) || 0), 0);
+                const totalComments = comms.reduce((acc, c) => acc + (Number(c.comments) || 0), 0);
+                const avgScore = totalPosts > 0 
+                    ? (comms.reduce((acc, c) => acc + Number(calculateScore(c.reactions, c.comments, c.population)), 0) / (comms.length || 1)).toFixed(1)
+                    : "0.0";
+
+                const formatDistribution = FORMATOS.reduce((acc, f) => {
+                    acc[f] = comms.filter(c => c.formats?.includes(f)).length;
+                    return acc;
+                }, {});
+
+                const editoriaDistribution = EDITORIAS.reduce((acc, ed) => {
+                    acc[ed] = comms.filter(c => c.editoria === ed).length;
+                    return acc;
+                }, {});
+
+                return { totalPosts, interactions, totalComments, avgScore, formatDistribution, editoriaDistribution };
+            }, [comms]);
+
+            const openEditComm = (c) => {
+                setEditingComm(c);
+                setSelectedFormats(c.formats || []);
+                setIsModalCommOpen(true);
             };
+
+            if (!user) return <div className="h-screen flex items-center justify-center font-black uppercase text-slate-200 animate-pulse italic">A estabelecer ligação Cloud...</div>;
 
             return (
                 <div className="min-h-screen pb-24">
-                    <nav className="bg-white border-b px-6 md:px-10 py-6 flex justify-between items-center sticky top-0 z-50">
-                        <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 bg-black rounded-2xl flex items-center justify-center text-white cursor-pointer active:scale-95 transition-transform" onClick={() => setIsAdmin(!isAdmin)}>
-                                <UnicoLogo />
+                    <nav className="bg-white border-b px-8 py-5 flex justify-between items-center sticky top-0 z-50 shadow-sm">
+                        <div className="flex items-center gap-10">
+                            <div className="flex items-center gap-4">
+                                <UnicoLogo size={42} />
+                                <h1 className="text-2xl font-black italic uppercase tracking-tighter leading-none">U-Voice</h1>
                             </div>
-                            <div>
-                                <h1 className="text-xl md:text-2xl font-black italic uppercase leading-none">U - Voice</h1>
-                                <p className="text-[8px] font-black uppercase text-slate-400 tracking-[0.4em] mt-1">Experience Hub</p>
+                            <div className="flex bg-slate-100 p-1 rounded-full gap-2">
+                                {['comunicados', 'agenda', 'impacto'].map(tab => (
+                                    <button key={tab} onClick={() => setActiveTab(tab)} className={`px-8 py-2.5 rounded-full text-[10px] font-black uppercase transition-all ${activeTab === tab ? 'bg-black text-white shadow-lg' : 'text-slate-400 hover:text-slate-600'}`}>{tab}</button>
+                                ))}
                             </div>
-                        </div>
-                        <div className="flex bg-slate-100 p-1 rounded-full gap-1 md:gap-2">
-                            {['comunicados', 'impacto', 'agenda'].map(tab => (
-                                <button key={tab} onClick={() => setActiveTab(tab)} className={`px-4 md:px-6 py-2 rounded-full text-[9px] md:text-[10px] font-black uppercase transition-all ${activeTab === tab ? 'bg-black text-white' : 'text-slate-400 hover:text-slate-600'}`}>
-                                    {tab}
-                                </button>
-                            ))}
                         </div>
                     </nav>
 
-                    <main className="max-w-7xl mx-auto px-6 md:px-10 py-16">
-                        {isAdmin && (
-                            <div className="mb-12 p-8 bg-yellow-50 border-2 border-yellow-200 rounded-[2rem] animate-in fade-in zoom-in duration-300">
-                                <div className="flex justify-between items-center mb-6">
-                                    <h3 className="text-xl font-black uppercase italic text-yellow-700">Painel de Edição</h3>
-                                    <button onClick={() => setIsAdmin(false)} className="text-[10px] font-black uppercase bg-yellow-200 px-4 py-2 rounded-full">Sair</button>
-                                </div>
-                                
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                    <form onSubmit={handleAddComm} className="space-y-4">
-                                        <p className="text-[10px] font-black uppercase text-yellow-600">Postar Novo Comunicado</p>
-                                        <input value={newComm.title} onChange={e => setNewComm({...newComm, title: e.target.value})} placeholder="Título do Post" className="w-full p-4 rounded-2xl border-none focus:ring-2 ring-yellow-400 outline-none shadow-sm" />
-                                        <div className="flex gap-4">
-                                            <select value={newComm.channel} onChange={e => setNewComm({...newComm, channel: e.target.value})} className="flex-1 p-4 rounded-2xl border-none outline-none shadow-sm">
-                                                <option>Slack</option>
-                                                <option>E-mail</option>
-                                                <option>Teams</option>
-                                                <option>WhatsApp</option>
-                                            </select>
-                                            <input type="number" value={newComm.engajamento} onChange={e => setNewComm({...newComm, engajamento: e.target.value})} placeholder="%" className="w-24 p-4 rounded-2xl border-none outline-none shadow-sm" />
-                                        </div>
-                                        <button type="submit" className="w-full bg-black text-white py-4 rounded-2xl font-black uppercase text-[10px] hover:bg-slate-800 transition-colors">Adicionar ao Hub</button>
-                                    </form>
-
-                                    <div className="space-y-4">
-                                        <p className="text-[10px] font-black uppercase text-yellow-600">Métricas de Impacto</p>
-                                        <div className="grid grid-cols-2 gap-4">
-                                            {Object.keys(stats).map(key => (
-                                                <div key={key}>
-                                                    <label className="text-[8px] font-black uppercase text-slate-400 block mb-1">{key}</label>
-                                                    <input type="number" value={stats[key]} onChange={e => updateStat(key, e.target.value)} className="w-full p-3 rounded-xl border-none outline-none shadow-sm" />
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        <header className="mb-16">
-                            <h2 className="text-6xl md:text-8xl font-black tracking-tighter italic leading-none">by the numbers.</h2>
-                            <p className="text-slate-400 font-black uppercase text-xs md:text-sm tracking-[0.4em] mt-4">Unico Operações • Inteligência Estratégica</p>
+                    <main className="max-w-7xl mx-auto px-8 py-12">
+                        <header className="mb-12">
+                            <h2 className="text-8xl font-black italic tracking-tighter leading-none">by the numbers.</h2>
+                            <p className="text-slate-400 font-black uppercase text-xs tracking-[0.4em] mt-4 ml-2 italic">Dashboard de Insights e Operações</p>
                         </header>
 
-                        {activeTab === 'impacto' && (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
-                                <StatCard title="Posts no Mês" value={stats.posts} iconName="file-text" color="blue" loading={loading} />
-                                <StatCard title="Total Interações" value={stats.interactions.toLocaleString('pt-PT')} iconName="trending-up" color="purple" loading={loading} />
-                                <StatCard title="Score eNPS" value={stats.enps} iconName="smile" color="rose" loading={loading} />
-                                <StatCard title="Clima & Pulso" value={`${stats.pulse}%`} iconName="zap" color="emerald" loading={loading} />
-                            </div>
-                        )}
-
                         {activeTab === 'comunicados' && (
-                            <div className="bg-white rounded-[2.5rem] border shadow-sm overflow-hidden">
-                                <div className="overflow-x-auto">
+                            <section className="animate-in fade-in duration-500">
+                                <div className="flex justify-between items-center mb-8">
+                                    <h3 className="text-2xl font-black uppercase italic text-slate-800 tracking-tighter">Fluxo de Mensagens</h3>
+                                    <button onClick={() => { setEditingComm(null); setSelectedFormats([]); setIsModalCommOpen(true); }} className="bg-[#397394] text-white px-8 py-4 rounded-2xl text-[10px] font-black uppercase flex items-center gap-2 shadow-xl active:scale-95 transition-all"><Icon name="plus" size={14} /> Adicionar Comunicado</button>
+                                </div>
+
+                                <div className="bg-white rounded-[3rem] border border-slate-100 overflow-hidden shadow-sm">
                                     <table className="w-full text-left">
-                                        <thead>
-                                            <tr className="text-slate-400 text-[10px] uppercase font-black border-b bg-slate-50">
-                                                <th className="px-8 py-6">Título</th>
-                                                <th className="px-8 py-6">Canal</th>
-                                                <th className="px-8 py-6 text-right">Score</th>
-                                                {isAdmin && <th className="px-8 py-6"></th>}
+                                        <thead className="bg-slate-50/50 border-b border-slate-100">
+                                            <tr className="text-[10px] font-black uppercase text-slate-400 tracking-widest">
+                                                <th className="px-10 py-6">Item / Editoria</th>
+                                                <th className="px-10 py-6 text-center">Informações / STATUS</th>
+                                                <th className="px-10 py-6 text-right">Métricas Lado a Lado</th>
+                                                <th className="px-10 py-6 w-44"></th>
                                             </tr>
                                         </thead>
-                                        <tbody>
-                                            {comms.length === 0 && !loading && (
-                                                <tr><td colSpan="4" className="px-8 py-12 text-center text-slate-300 italic">Nenhum comunicado encontrado.</td></tr>
-                                            )}
-                                            {comms.map(c => (
-                                                <tr key={c.id} className="border-b last:border-none group hover:bg-slate-50 transition-colors">
-                                                    <td className="px-8 py-6 font-black uppercase italic text-lg">{c.title}</td>
-                                                    <td className="px-8 py-6 text-[10px] font-black text-slate-400">
-                                                        <span className="bg-slate-100 px-3 py-1 rounded-full">{c.channel}</span>
+                                        <tbody className="divide-y divide-slate-50">
+                                            {comms.length === 0 ? (
+                                                <tr><td colSpan="4" className="p-32 text-center text-slate-200 font-black uppercase tracking-widest text-xs italic">Aguardando novos registos...</td></tr>
+                                            ) : comms.map(c => (
+                                                <tr key={c.id} className="hover:bg-slate-50/50 transition-colors group">
+                                                    <td className="px-10 py-8">
+                                                        <div className="flex items-center gap-5">
+                                                            <div className="p-3 bg-slate-50 rounded-xl text-slate-300">
+                                                                {c.medium === 'Slack' ? <Icon name="slack" size={20} /> : <Icon name="mail" size={20} />}
+                                                            </div>
+                                                            <div>
+                                                                <div className="font-black uppercase italic text-xl text-slate-800 leading-none">{c.title}</div>
+                                                                <div className="flex items-center gap-2 mt-2">
+                                                                    <span className="text-[9px] font-black text-[#397394] bg-blue-50 px-2 py-0.5 rounded-md uppercase tracking-tighter italic">{c.editoria || 'Geral'}</span>
+                                                                    <span className="text-[9px] font-bold text-slate-300 uppercase tracking-tighter">{c.postTime}</span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
                                                     </td>
-                                                    <td className="px-8 py-6 text-right font-black text-[#397394]">{c.engajamento}%</td>
-                                                    {isAdmin && (
-                                                        <td className="px-8 py-6 text-right">
-                                                            <button onClick={() => handleDeleteComm(c.id)} className="text-red-400 hover:text-red-600 p-2">
-                                                                <Icon name="trash-2" size={16} />
+                                                    <td className="px-10 py-8 text-center">
+                                                        <div className="flex items-center justify-center gap-6">
+                                                            <div className="flex flex-col items-end gap-1">
+                                                                <span className="text-[9px] font-black text-slate-400 bg-slate-100 px-3 py-0.5 rounded-full uppercase italic tracking-tighter">{c.channelName || '--'}</span>
+                                                                <span className="text-[9px] font-bold text-slate-400">{c.date ? new Date(c.date).toLocaleDateString('pt-BR') : '--'}</span>
+                                                            </div>
+                                                            <span className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase ${c.status === 'Enviado' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>{c.status || 'STATUS'}</span>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-10 py-8 text-right">
+                                                        <div className="font-black text-3xl text-slate-900 tracking-tighter leading-none">{calculateScore(c.reactions, c.comments, c.population)}%</div>
+                                                        <div className="flex justify-end items-center gap-4 mt-2.5 opacity-80 italic border-t border-slate-50 pt-2">
+                                                            <span className="flex items-center gap-1 text-[9px] font-black uppercase tracking-widest"><Icon name="eye" size={10}/> {c.views || 0}</span>
+                                                            <span className="flex items-center gap-1 text-[9px] font-black uppercase tracking-widest"><Icon name="thumbs-up" size={10}/> {c.reactions || 0}</span>
+                                                            <span className="flex items-center gap-1 text-[9px] font-black uppercase tracking-widest"><Icon name="message-square" size={10}/> {c.comments || 0}</span>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-10 py-8 text-right">
+                                                        <div className="flex items-center justify-end gap-2">
+                                                            {c.link && (
+                                                                <a href={c.link} target="_blank" className="p-3 text-slate-300 hover:text-[#397394] hover:bg-blue-50 rounded-2xl transition-all shadow-sm">
+                                                                    <Icon name="link" size={18} />
+                                                                </a>
+                                                            )}
+                                                            <button onClick={() => openEditComm(c)} className="p-3 text-slate-600 hover:text-blue-500 hover:bg-white rounded-2xl shadow-sm transition-all border border-transparent hover:border-slate-100">
+                                                                <Icon name="pencil" size={18} />
                                                             </button>
-                                                        </td>
-                                                    )}
+                                                            <button onClick={() => deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'comms', c.id))} className="p-3 text-slate-200 hover:text-red-500 hover:bg-red-50 rounded-2xl transition-all">
+                                                                <Icon name="trash-2" size={18} />
+                                                            </button>
+                                                        </div>
+                                                    </td>
                                                 </tr>
                                             ))}
                                         </tbody>
                                     </table>
                                 </div>
-                            </div>
+                            </section>
                         )}
 
                         {activeTab === 'agenda' && (
-                            <div className="p-20 border-4 border-dashed rounded-[3rem] text-center text-slate-200">
-                                <Icon name="calendar" size={48} className="mx-auto mb-4 opacity-10" />
-                                <p className="font-black uppercase tracking-widest text-[10px]">Agenda sincronizada com calendário global</p>
-                            </div>
+                            <section className="animate-in fade-in duration-500">
+                                <div className="flex justify-between items-center mb-10">
+                                    <h3 className="text-2xl font-black uppercase italic text-slate-800 tracking-tighter">Eventos Corporativos</h3>
+                                    <button onClick={() => { setEditingAgenda(null); setVendorToggle(false); setSelectedVendorIdx(null); setIsModalAgendaOpen(true); }} className="bg-[#397394] text-white px-8 py-4 rounded-2xl text-[10px] font-black uppercase flex items-center gap-2 shadow-xl active:scale-95 transition-all"><Icon name="calendar" size={14} /> Novo Planeamento</button>
+                                </div>
+                                <div className="bg-white rounded-[3rem] border border-slate-100 overflow-hidden shadow-sm">
+                                    <table className="w-full text-left">
+                                        <thead className="bg-slate-50 border-b">
+                                            <tr className="text-[10px] font-black uppercase text-slate-400 tracking-widest"><th className="px-10 py-6">Atividade / Sponsor</th><th className="px-10 py-6 text-center">Data</th><th className="px-10 py-6 text-center">STATUS</th><th className="px-10 py-6 w-24"></th></tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-50">
+                                            {agenda.map(ev => (
+                                                <tr key={ev.id} className="hover:bg-slate-50 transition-colors">
+                                                    <td className="px-10 py-8">
+                                                        <div className="font-black uppercase italic text-xl text-slate-800 leading-none">{ev.title}</div>
+                                                        <div className="text-[9px] font-bold text-slate-400 uppercase mt-2 tracking-widest italic">{ev.sponsor} • {ev.hasVendor && ev.selectedVendorIdx >= 0 ? `FORNECEDOR ELEITO: ${ev['vendor'+(ev.selectedVendorIdx+1)]}` : 'EQUIPA INTERNA'}</div>
+                                                    </td>
+                                                    <td className="px-10 py-8 text-center text-xs font-bold text-slate-500">{ev.date ? new Date(ev.date).toLocaleDateString('pt-BR') : '--'}</td>
+                                                    <td className="px-10 py-8 text-center"><span className="px-4 py-1.5 bg-blue-50 text-blue-700 text-[9px] font-black uppercase rounded-full">{ev.status || 'STATUS'}</span></td>
+                                                    <td className="px-10 py-8 text-right">
+                                                        <div className="flex items-center justify-end gap-2">
+                                                            <button onClick={() => { setEditingAgenda(ev); setVendorToggle(ev.hasVendor); setSelectedVendorIdx(ev.selectedVendorIdx >= 0 ? ev.selectedVendorIdx : null); setIsModalAgendaOpen(true); }} className="p-3 text-slate-600 hover:text-blue-500 hover:bg-white rounded-2xl shadow-sm transition-all border border-transparent hover:border-slate-100"><Icon name="pencil" size={18} /></button>
+                                                            <button onClick={() => deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'agenda', ev.id))} className="p-3 text-slate-200 hover:text-red-500 hover:bg-red-50 rounded-2xl transition-all"><Icon name="trash-2" size={18} /></button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </section>
+                        )}
+
+                        {activeTab === 'impacto' && (
+                            <section className="animate-in fade-in duration-500 space-y-10">
+                                <div className="flex items-center gap-4 bg-white p-3 rounded-[1.5rem] border border-slate-100 shadow-sm w-fit">
+                                    <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 rounded-xl border border-slate-100">
+                                        <Icon name="filter" size={12} className="text-slate-400" />
+                                        <span className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Filtrar Ciclo</span>
+                                    </div>
+                                    <select className="impact-filter"><option>2025</option><option>2026</option></select>
+                                    <select className="impact-filter"><option>Todos os Canais</option><option>Slack</option><option>E-mail</option></select>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                                    <div className="p-10 bg-white rounded-[3rem] border border-slate-100 shadow-sm relative group hover:scale-[1.02] transition-all">
+                                        <div className="p-3 bg-slate-50 rounded-xl w-fit mb-6 text-slate-300"><Icon name="file-text" size={24} /></div>
+                                        <div className="text-6xl font-black text-slate-900 tracking-tighter">{statsImpacto.totalPosts}</div>
+                                        <div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-2">Total Posts</div>
+                                    </div>
+                                    
+                                    <div className="p-10 bg-slate-900 rounded-[3rem] shadow-2xl relative overflow-hidden group hover:scale-[1.02] transition-all">
+                                        <div className="absolute top-8 right-8 bg-emerald-400 text-slate-950 text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter shadow-glow">Target</div>
+                                        <div className="p-3 bg-white/10 rounded-xl w-fit mb-6 text-white"><Icon name="trending-up" size={24} /></div>
+                                        <div className="text-6xl font-black text-white tracking-tighter">{statsImpacto.interactions}</div>
+                                        <div className="text-[9px] font-black uppercase text-slate-500 tracking-widest mt-2">Interações Totais</div>
+                                    </div>
+
+                                    <div className="p-10 bg-white rounded-[3rem] border border-slate-100 shadow-sm hover:scale-[1.02] transition-all">
+                                        <div className="p-3 bg-red-50 rounded-xl w-fit mb-6 text-red-300"><Icon name="message-circle" size={24} /></div>
+                                        <div className="text-6xl font-black text-slate-900 tracking-tighter">{statsImpacto.totalComments}</div>
+                                        <div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-2">Comments Total</div>
+                                    </div>
+
+                                    <div className="p-10 bg-[#FBFAF3] rounded-[3rem] border border-[#F0EEE6] shadow-sm hover:scale-[1.02] transition-all">
+                                        <div className="p-3 bg-slate-900 text-white rounded-xl w-fit mb-6"><Icon name="zap" size={24} /></div>
+                                        <div className="text-6xl font-black text-slate-900 tracking-tighter">{statsImpacto.avgScore}%</div>
+                                        <div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-2">Score Engaja</div>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                    <SimpleBarChart title="Distribuição por Formato" data={statsImpacto.formatDistribution} color="#397394" />
+                                    <SimpleBarChart title="Performance por Editoria" data={statsImpacto.editoriaDistribution} color="#BED993" />
+                                </div>
+                            </section>
                         )}
                     </main>
 
-                    <footer className="fixed bottom-0 w-full bg-white/80 backdrop-blur border-t px-6 md:px-10 py-3 flex justify-between items-center text-[8px] text-slate-300 font-black uppercase tracking-widest">
-                        <span className="hidden md:inline">Projeto: u-voice-82837</span>
-                        <div className="flex items-center gap-2 mx-auto md:mx-0">
-                            <div className={`w-1.5 h-1.5 rounded-full ${user ? 'bg-green-500' : 'bg-red-500 animate-pulse'}`}></div>
-                            <span>{user ? `Cloud Sync: Ativo` : 'Offline'}</span>
+                    {/* MODAL COMUNICADO (V11) */}
+                    {isModalCommOpen && (
+                        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+                            <div className="bg-white w-full max-w-4xl rounded-[4rem] p-12 shadow-2xl modal-animate relative max-h-[92vh] overflow-y-auto custom-scroll text-left">
+                                <div className="flex justify-between items-center mb-10"><h3 className="text-3xl font-black italic uppercase leading-none tracking-tighter">Registo de Comunicado</h3><button onClick={() => setIsModalCommOpen(false)} className="p-3 bg-slate-50 rounded-full hover:text-red-500 transition-all active:scale-90"><Icon name="x" size={24} /></button></div>
+                                <form onSubmit={handleSaveComm} className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                                    <div className="space-y-8">
+                                        <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-widest italic font-bold">Título do Post</label><input name="title" defaultValue={editingComm?.title} required className="w-full bg-slate-50 border-none rounded-2xl p-5 font-bold text-lg text-slate-800 outline-none focus:ring-4 ring-blue-50 shadow-sm" /></div>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-widest italic font-bold">Data Prevista</label><input name="date" type="date" defaultValue={editingComm?.date} required className="w-full bg-slate-50 border-none rounded-2xl p-5 font-bold outline-none" /></div>
+                                            <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-widest italic font-bold">Horário</label><input name="postTime" type="time" defaultValue={editingComm?.postTime} className="w-full bg-slate-50 border-none rounded-2xl p-5 font-bold outline-none text-slate-500" /></div>
+                                        </div>
+                                        <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-widest italic font-bold">Editoria</label><select name="editoria" defaultValue={editingComm?.editoria || EDITORIAS[0]} className="w-full bg-slate-50 border-none rounded-2xl p-5 font-bold outline-none cursor-pointer">{EDITORIAS.map(e => <option key={e}>{e}</option>)}</select></div>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-widest italic font-bold">Canal</label><input name="channelName" defaultValue={editingComm?.channelName} required className="w-full bg-slate-50 border-none rounded-2xl p-5 font-bold outline-none" placeholder="#geral" /></div>
+                                            <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-widest italic font-bold">Meio</label><select name="medium" defaultValue={editingComm?.medium || 'Slack'} className="w-full bg-slate-50 border-none rounded-2xl p-5 font-bold outline-none cursor-pointer"><option>Slack</option><option>E-mail</option></select></div>
+                                        </div>
+                                        <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-widest italic font-bold">Hyperlink</label><input name="link" defaultValue={editingComm?.link} className="w-full bg-slate-50 border-none rounded-2xl p-5 font-bold outline-none text-xs text-blue-500" placeholder="https://..." /></div>
+                                        <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-widest italic font-bold">STATUS</label><select name="status" defaultValue={editingComm?.status || 'Aguardando Envio'} className="w-full bg-slate-50 border-none rounded-2xl p-5 font-bold outline-none"><option>Aguardando Envio</option><option>Enviado</option><option>Cancelado</option></select></div>
+                                    </div>
+
+                                    <div className="space-y-8">
+                                        <div className="bg-[#FBFAF3] p-10 rounded-[3rem] border border-[#F0EEE6] space-y-8 shadow-inner text-center">
+                                            <div className="text-[10px] font-black uppercase text-[#397394] tracking-widest flex items-center justify-center gap-2 italic"><Icon name="bar-chart-3" size={14} /> Consolidação de Impacto</div>
+                                            <div className="grid grid-cols-3 gap-4">
+                                                <div className="space-y-2"><label className="text-[8px] font-black uppercase text-[#8E97B0] block italic tracking-widest text-center">Reach 👁️</label><input name="views" type="number" defaultValue={editingComm?.views || 0} className="w-full bg-white border border-slate-100 rounded-xl p-4 font-black text-xl text-center outline-none" /></div>
+                                                <div className="space-y-2"><label className="text-[8px] font-black uppercase text-[#8E97B0] block italic tracking-widest text-center">Reações 👍</label><input name="reactions" type="number" defaultValue={editingComm?.reactions || 0} className="w-full bg-white border border-slate-100 rounded-xl p-4 font-black text-xl text-center outline-none" /></div>
+                                                <div className="space-y-2"><label className="text-[8px] font-black uppercase text-[#8E97B0] block italic tracking-widest text-center">Coments 💬</label><input name="comments" type="number" defaultValue={editingComm?.comments || 0} className="w-full bg-white border border-slate-100 rounded-xl p-4 font-black text-xl text-center outline-none" /></div>
+                                            </div>
+                                            <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-widest italic">População Base (Cálculo Score)</label><input name="population" type="number" defaultValue={editingComm?.population || 126} className="w-full bg-white border-none rounded-2xl p-4 font-black text-center outline-none" /></div>
+                                        </div>
+
+                                        <div className="space-y-4">
+                                            <label className="text-[10px] font-black uppercase text-slate-400 block tracking-widest italic font-bold">Formato (Seleção Múltipla)</label>
+                                            <div className="grid grid-cols-3 gap-3">
+                                                {FORMATOS.map(f => (
+                                                    <div key={f} onClick={() => toggleFormat(f)} className={`p-4 rounded-xl border-2 text-center text-[10px] font-black uppercase cursor-pointer transition-all ${selectedFormats.includes(f) ? 'bg-[#397394] border-[#397394] text-white shadow-lg' : 'bg-white border-slate-50 text-slate-400 hover:border-slate-200'}`}>{f}</div>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        <button type="submit" className="w-full py-6 bg-black text-white rounded-[2rem] font-black uppercase text-xs tracking-[0.3em] active:scale-[0.98] transition-all shadow-2xl shadow-black/20">SALVAR E FECHAR</button>
+                                    </div>
+                                </form>
+                            </div>
                         </div>
+                    )}
+
+                    {/* MODAL AGENDA */}
+                    {isModalAgendaOpen && (
+                        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+                            <div className="bg-white w-full max-w-6xl rounded-[4rem] p-12 shadow-2xl modal-animate relative max-h-[92vh] overflow-y-auto custom-scroll text-left">
+                                <header className="mb-10 flex justify-between items-start border-b border-slate-50 pb-8">
+                                    <div><h3 className="text-5xl font-black italic uppercase tracking-tighter leading-none">{editingAgenda ? 'Ajustar' : 'Novo'} Planeamento</h3><p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-2 ml-1 italic leading-loose">Mesa de Decisão Técnica e Operacional</p></div>
+                                    <button onClick={() => setIsModalAgendaOpen(false)} className="p-3 bg-slate-50 rounded-full hover:text-red-500 transition-all active:scale-90"><Icon name="x" size={28} /></button>
+                                </header>
+
+                                <form onSubmit={handleSaveAgenda} className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
+                                    <div className="lg:col-span-5 space-y-6 bg-slate-50 p-10 rounded-[3rem] border border-slate-100 shadow-inner">
+                                        <div className="space-y-2"><label className="text-[10px] font-black uppercase text-slate-400 block tracking-widest italic font-bold">Atividade</label><input name="atividade" defaultValue={editingAgenda?.title} required className="w-full h-16 bg-white border-none rounded-xl px-6 font-bold text-slate-800 outline-none shadow-sm" /></div>
+                                        <div className="space-y-2"><label className="text-[10px] font-black uppercase text-slate-400 block tracking-widest italic font-bold">Data Prevista</label><input name="date" type="date" defaultValue={editingAgenda?.date} required className="w-full h-16 bg-white border-none rounded-xl px-6 font-bold outline-none text-slate-500" /></div>
+                                        <div className="space-y-2"><label className="text-[10px] font-black uppercase text-slate-400 block tracking-widest italic font-bold">STATUS</label><select name="status" defaultValue={editingAgenda?.status || 'Agendado'} className="w-full h-16 bg-white border-none rounded-xl px-6 font-bold outline-none cursor-pointer shadow-sm"><option>Agendado</option><option>Realizado</option><option>Cancelado</option></select></div>
+                                        <div className="space-y-2"><label className="text-[10px] font-black uppercase text-slate-400 block tracking-widest italic font-bold">Sponsor</label><input name="sponsor" defaultValue={editingAgenda?.sponsor} required className="w-full h-16 bg-white border-none rounded-xl px-6 font-bold outline-none shadow-sm" /></div>
+                                        <div className="space-y-2"><label className="text-[10px] font-black uppercase text-slate-400 block tracking-widest italic font-bold">Link Invite</label><input name="inviteLink" defaultValue={editingAgenda?.inviteLink} className="w-full h-16 bg-white border-none rounded-xl px-6 font-bold outline-none text-xs italic text-blue-500" /></div>
+                                        <div className="space-y-2"><label className="text-[10px] font-black uppercase text-slate-400 block tracking-widest italic font-bold">Pauta Técnica</label><textarea name="description" defaultValue={editingAgenda?.description} className="w-full h-40 bg-white border-none rounded-xl p-6 font-medium text-slate-600 outline-none resize-none leading-relaxed text-sm shadow-sm"></textarea></div>
+                                    </div>
+
+                                    <div className="lg:col-span-7 bg-slate-900 rounded-[4rem] p-12 shadow-2xl flex flex-col justify-between self-stretch min-h-[700px]">
+                                        <div>
+                                            <div className="flex justify-between items-center mb-10 border-b border-white/5 pb-8">
+                                                <div className="text-[10px] font-black uppercase text-white tracking-[0.3em] flex items-center gap-3 italic"><div className="w-2.5 h-2.5 rounded-full bg-amber-400"></div> MESA DE DECISÃO</div>
+                                                <div className="flex items-center gap-4 bg-white/5 p-3 rounded-full border border-white/10 px-6">
+                                                    <span className="text-[9px] font-black text-slate-500 uppercase tracking-tighter italic">Com Fornecedor?</span>
+                                                    <button type="button" onClick={() => setVendorToggle(!vendorToggle)} className={`w-14 h-7 rounded-full relative transition-all duration-500 ${vendorToggle ? 'bg-[#BED993]' : 'bg-slate-700'}`}><div className={`absolute top-1 left-1 w-5 h-5 rounded-full bg-white shadow-lg transition-all duration-500 ${vendorToggle ? 'translate-x-7' : ''}`}></div></button>
+                                                </div>
+                                            </div>
+
+                                            {vendorToggle ? (
+                                                <div className="space-y-6 animate-in fade-in zoom-in duration-500">
+                                                    {[0, 1, 2].map(i => (
+                                                        <div key={i} onClick={() => setSelectedVendorIdx(i)} className={`card-decision p-6 rounded-[2rem] bg-white/5 border-2 flex items-center gap-6 ${selectedVendorIdx === i ? 'border-[#BED993] bg-white/10' : 'border-white/5 hover:border-white/10'}`}>
+                                                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black text-xs ${selectedVendorIdx === i ? 'bg-[#BED993] text-emerald-950' : 'bg-white/10 text-white/20'}`}>0{i+1}</div>
+                                                            <input name={`v${i+1}`} defaultValue={editingAgenda?.[`vendor${i+1}`]} placeholder={`Fornecedor Opção ${i+1}`} className="flex-1 bg-transparent border-none text-base font-extrabold outline-none text-white placeholder:text-white/10" onClick={(e) => e.stopPropagation()} />
+                                                            <div className={`px-5 py-2.5 rounded-xl font-black uppercase text-[8px] transition-all tracking-widest ${selectedVendorIdx === i ? 'bg-[#BED993] text-emerald-950 shadow-lg' : 'bg-white/10 text-slate-400'}`}>{selectedVendorIdx === i ? 'ELEITO' : 'ELEGER'}</div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <div className="h-[450px] flex flex-col items-center justify-center text-center opacity-20 border border-dashed border-white/20 rounded-[3rem]"><Icon name="users" size={64} className="mb-8 text-white" /><h4 className="font-black uppercase text-sm text-white tracking-[0.4em]">EQUIPA INTERNA</h4><p className="text-[9px] font-bold text-white uppercase mt-4 tracking-widest italic leading-loose text-center px-10">Execução exclusiva por recursos próprios.</p></div>
+                                            )}
+                                        </div>
+                                        <div className="mt-12"><button type="submit" className="w-full h-24 bg-white text-black hover:bg-slate-100 rounded-[2.5rem] font-black uppercase text-xs tracking-[0.4em] shadow-2xl active:scale-[0.98] transition-all flex items-center justify-center gap-5 italic shadow-white/5">CONFIRMAR E SALVAR REGISTO</button></div>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    )}
+
+                    <footer className="fixed bottom-0 w-full bg-white/95 backdrop-blur-md border-t border-slate-100 px-10 py-5 flex justify-between items-center text-[9px] text-slate-300 font-black uppercase tracking-[0.4em] z-40 shadow-inner">
+                        <div className="flex items-center gap-4"><div className={`w-2.5 h-2.5 rounded-full ${user ? 'bg-green-500 shadow-[0_0_12px_rgba(34,197,94,0.3)]' : 'bg-red-500 animate-pulse'}`}></div><span>HUB V11.0 ENTERPRISE OK</span></div>
+                        <div className="flex gap-10 items-center italic">{fb.firebaseConfig && <span className="opacity-40 uppercase tracking-tighter">Instância: {fb.firebaseConfig.projectId}</span>}<span>Realtime Cloud Active</span></div>
                     </footer>
                 </div>
             );
