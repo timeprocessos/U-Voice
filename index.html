@@ -11,73 +11,31 @@
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
-        body { font-family: 'Inter', sans-serif; background-color: #FDFDFE; margin: 0; padding: 0; }
-        
+        body { font-family: 'Inter', sans-serif; background-color: #FDFDFE; margin: 0; padding: 0; overflow-x: hidden; }
         .custom-scroll::-webkit-scrollbar { width: 4px; height: 4px; }
         .custom-scroll::-webkit-scrollbar-thumb { background: #E2E8F0; border-radius: 10px; }
-        
-        .modal-animate { animation: slideUp 0.3s ease-out; }
-        @keyframes slideUp {
-            from { transform: translateY(20px); opacity: 0; }
-            to { transform: translateY(0); opacity: 1; }
-        }
-
+        .modal-animate { animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
         .impact-filter { background: white; border: 1px solid #F1F5F9; border-radius: 12px; padding: 8px 16px; font-size: 10px; font-weight: 900; text-transform: uppercase; color: #1e293b; outline: none; transition: all 0.2s; cursor: pointer; }
-        .impact-filter:hover { border-color: #CBD5E1; }
-        
-        .shadow-glow { box-shadow: 0 0 15px rgba(52, 211, 153, 0.2); }
-        .shadow-glow-green { box-shadow: 0 0 15px rgba(190, 217, 147, 0.4); }
-
-        .checkbox-flag {
-            display: flex;
-            align-items: center; gap: 8px; padding: 8px 16px; background: #f8fafc;
-            border: 1px solid #e2e8f0; border-radius: 12px; cursor: pointer;
-            transition: all 0.2s; font-size: 11px; font-weight: 700; text-transform: uppercase;
-        }
-        .checkbox-flag.active { background: #397394; color: white; border-color: #397394; }
-
-        .row-green-effect {
-            border-left: 4px solid #BED993 !important;
-            background: linear-gradient(90deg, rgba(190, 217, 147, 0.05) 0%, rgba(255, 255, 255, 0) 100%);
-        }
-
-        input[type=number]::-webkit-inner-spin-button, 
-        input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
-        
-        .card-decision { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); border: 2px solid transparent; cursor: pointer; }
-        
-        /* Botão de Fechar Refinado para Visibilidade Absoluta */
-        .btn-close-modal { 
-            position: absolute; 
-            top: 1.5rem; 
-            right: 1.5rem; 
-            background: #000; 
-            color: #fff; 
-            width: 48px; 
-            height: 48px; 
-            border-radius: 50%; 
-            display: flex; 
-            align-items: center; 
-            justify-content: center; 
-            z-index: 160; 
-            transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
-            border: 2px solid rgba(255,255,255,0.1);
-            cursor: pointer;
-        }
+        .row-green-effect { border-left: 4px solid #BED993 !important; background: linear-gradient(90deg, rgba(190, 217, 147, 0.05) 0%, rgba(255, 255, 255, 0) 100%); }
+        input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+        .btn-close-modal { position: absolute; top: 1.5rem; right: 1.5rem; background: #000; color: #fff; width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center; z-index: 160; transition: all 0.2s; box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2); border: none; cursor: pointer; }
         .btn-close-modal:hover { transform: scale(1.1) rotate(90deg); background: #ef4444; }
-        .btn-close-modal:active { transform: scale(0.9); }
+        .checkbox-flag { display: flex; align-items: center; gap: 8px; padding: 8px 16px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; cursor: pointer; transition: all 0.2s; font-size: 11px; font-weight: 700; text-transform: uppercase; }
+        .checkbox-flag.active { background: #397394; color: white; border-color: #397394; }
+        .card-decision { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); border: 2px solid transparent; cursor: pointer; }
+        .message-box { position: fixed; bottom: 85px; left: 50%; transform: translateX(-50%); background: #000; color: white; padding: 12px 24px; border-radius: 12px; z-index: 200; font-weight: 900; font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; box-shadow: 0 20px 40px rgba(0,0,0,0.3); }
     </style>
 </head>
 <body>
     <div id="root"></div>
 
-    <script type="module">
+    <script type="text/babel" data-type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, onAuthStateChanged, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, doc, onSnapshot, deleteDoc, addDoc, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
+        const firebaseConfig = {
             apiKey: "AIzaSyCRNpfVN3n_Ue9kocKSU7EGlp9ElBJWvRg",
             authDomain: "u-voice-82837.firebaseapp.com",
             projectId: "u-voice-82837",
@@ -89,23 +47,26 @@
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
-        // appId RESTAURADO PARA O ORIGINAL PARA NÃO PERDER DADOS NA ATUALIZAÇÃO
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'u-voice-v26-gold';
+        // ID GOLD - ESSENCIAL PARA PERSISTÊNCIA COMPARTILHADA
+        const APP_ID_ROOT = 'u-voice-v26-gold';
 
-        window.FirebaseInstance = { 
-            auth, db, appId, firebaseConfig,
-            collection, doc, onSnapshot, deleteDoc, addDoc, updateDoc, signInAnonymously, signInWithCustomToken, onAuthStateChanged 
-        };
-    </script>
-
-    <script type="text/babel">
         const { useState, useEffect, useMemo, useRef } = React;
 
         const EDITORIAS = ["Originais Unico", "Career Ops", "The Ops Playbook", "the ops story"];
         const FORMATOS = ["Vídeo", "Imagem", "GIF", "Texto", "Slide", "PDF"];
         const MESES_ABREV = ["JAN", "FEV", "MAR", "ABR", "MAI", "JUN", "JUL", "AGO", "SET", "OUT", "NOV", "DEZ"];
-        const INITIAL_ANALYSTS = ["Ariel Mori Dell Aringa", "Diego Francisco Rocha"];
+        const INITIAL_ANALYSTS = ["Aria Mori Dell Aringa", "Diego Francisco Rocha"];
         const INITIAL_CHANNELS = ["#news-ops-all-team", "#news-cx-team", "#news-analysis-team", "#news-onboarding-team", "#news-ops-leaders"];
+
+        const Icon = ({ name, size = 18, className = "" }) => {
+            const iconRef = useRef(null);
+            useEffect(() => {
+                if (window.lucide && iconRef.current) {
+                    window.lucide.createIcons({ attrs: { class: className, style: `width: ${size}px; height: ${size}px;` }, name: name });
+                }
+            }, [name, size, className]);
+            return <span ref={iconRef} className="inline-flex items-center justify-center"><i data-lucide={name}></i></span>;
+        };
 
         const UnicoLogo = ({ size = 34 }) => (
             <div className="bg-black rounded-xl flex items-center justify-center shadow-lg" style={{ width: size, height: size }}>
@@ -115,20 +76,7 @@
             </div>
         );
 
-        const Icon = ({ name, size = 18, className = "" }) => {
-            const iconRef = useRef(null);
-            useEffect(() => {
-                if (window.lucide && iconRef.current) {
-                    window.lucide.createIcons({
-                        attrs: { class: className, style: `width: ${size}px; height: ${size}px;` },
-                        name: name
-                    });
-                }
-            }, [name, size, className]);
-            return <span ref={iconRef} className="inline-flex items-center justify-center"><i data-lucide={name}></i></span>;
-        };
-
-        function LineAreaChart({ data, title, color = "#F77D8D", valueSuffix = "" }) {
+        function LineAreaChart({ data, title, color = "#397394", valueSuffix = "" }) {
             const chartHeight = 220; const chartWidth = 800;
             const paddingX = 40; const paddingY = 60;
             const values = Object.values(data);
@@ -141,9 +89,8 @@
             });
             const linePath = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
             const areaPath = `${linePath} L ${points[points.length-1].x} ${chartHeight - paddingY} L ${points[0].x} ${chartHeight - paddingY} Z`;
-
             return (
-                <div className="bg-white p-8 rounded-[3rem] border border-slate-100 shadow-sm w-full transition-all hover:shadow-md">
+                <div className="bg-white p-8 rounded-[3rem] border border-slate-100 shadow-sm w-full transition-all">
                     <h4 className="text-[11px] font-black uppercase text-slate-400 mb-8 tracking-[0.2em] italic">{title}</h4>
                     <div className="relative w-full overflow-x-auto custom-scroll pb-4">
                         <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} className="w-full min-w-[600px] h-auto overflow-visible">
@@ -180,72 +127,50 @@
         }
 
         function App() {
-            const fb = window.FirebaseInstance || {};
-            const { auth, db, appId, collection, doc, onSnapshot, deleteDoc, addDoc, updateDoc, signInAnonymously, signInWithCustomToken, onAuthStateChanged } = fb;
-
             const [user, setUser] = useState(null);
             const [activeTab, setActiveTab] = useState('comunicados');
             const [comms, setComms] = useState([]);
             const [agenda, setAgenda] = useState([]);
-            
             const [isModalCommOpen, setIsModalCommOpen] = useState(false);
             const [isModalAgendaOpen, setIsModalAgendaOpen] = useState(false);
             const [editingComm, setEditingComm] = useState(null);
             const [editingAgenda, setEditingAgenda] = useState(null);
-            
-            const [vendorToggle, setVendorToggle] = useState(false);
-            const [selectedVendorIdx, setSelectedVendorIdx] = useState(null);
-            const [selectedFormats, setSelectedFormats] = useState([]);
-            const [selectedAnalysts, setSelectedAnalysts] = useState([]);
+            const [message, setMessage] = useState("");
             const [channelsList, setChannelsList] = useState(INITIAL_CHANNELS);
-
-            const [filterYear, setFilterYear] = useState("2026");
-            const [filterChannel, setFilterChannel] = useState("Todos Canais");
-
+            const [selectedAnalysts, setSelectedAnalysts] = useState([]);
+            const [selectedFormats, setSelectedFormats] = useState([]);
             const [localBudget, setLocalBudget] = useState(0);
             const [hasCoffee, setHasCoffee] = useState(false);
             const [localVendors, setLocalVendors] = useState([{ name: '', value: 0 }, { name: '', value: 0 }, { name: '', value: 0 }]);
+            const [vendorToggle, setVendorToggle] = useState(false);
+            const [selectedVendorIdx, setSelectedVendorIdx] = useState(null);
+            const [filterYear, setFilterYear] = useState("2026");
+            const [filterChannel, setFilterChannel] = useState("Todos Canais");
 
             useEffect(() => {
-                const startAuth = async () => {
-                    if (!auth) return;
-                    try {
-                        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                            try { await signInWithCustomToken(auth, __initial_auth_token); } catch (e) { await signInAnonymously(auth); }
-                        } else { await signInAnonymously(auth); }
-                    } catch (e) { console.error("Erro de Autenticação:", e); }
-                };
-                startAuth();
-                const unsubscribe = onAuthStateChanged(auth, (u) => {
-                    setUser(u);
-                    if (!u) console.warn("Aguardando autenticação na rede...");
-                });
-                return () => unsubscribe();
-            }, [auth]);
+                signInAnonymously(auth).catch(console.error);
+                return onAuthStateChanged(auth, (u) => { setUser(u); if(!u) setMessage("Conectando rede..."); else setMessage("Rede Sincronizada!"); });
+            }, []);
 
             useEffect(() => {
-                if (!user || !db) return;
-                const unsubComms = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'comms'), (snap) => {
+                if (!user) return;
+                const unsubComms = onSnapshot(collection(db, 'artifacts', APP_ID_ROOT, 'public', 'data', 'comms'), (snap) => {
                     setComms(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-                }, (err) => console.error("Erro ao ler Comunicados:", err));
-
-                const unsubAgenda = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'agenda'), (snap) => {
+                });
+                const unsubAgenda = onSnapshot(collection(db, 'artifacts', APP_ID_ROOT, 'public', 'data', 'agenda'), (snap) => {
                     setAgenda(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-                }, (err) => console.error("Erro ao ler Agenda:", err));
-
+                });
                 return () => { unsubComms(); unsubAgenda(); };
-            }, [user, db, appId]);
+            }, [user]);
 
-            const calculateScore = (reactions = 0, comments = 0, population = 126, posts = 1) => {
+            const calculateScore = (reactions = 0, comments = 0, population = 126) => {
                 if (!population || population === 0) return 0;
-                return ((((Number(reactions) * 1) + (Number(comments) * 2)) / (Number(population) * Number(posts))) * 100).toFixed(1);
+                return ((((Number(reactions) * 1) + (Number(comments) * 2)) / Number(population)) * 100).toFixed(1);
             };
-
-            const toggleAnalyst = (name) => setSelectedAnalysts(prev => prev.includes(name) ? prev.filter(n => n !== name) : [...prev, name]);
-            const toggleFormat = (f) => setSelectedFormats(prev => prev.includes(f) ? prev.filter(item => item !== f) : [...prev, f]);
 
             const handleSaveComm = async (e) => {
                 e.preventDefault();
+                if (!user) return;
                 const fd = new FormData(e.target);
                 const data = {
                     title: fd.get('title'), channelName: fd.get('channelName'),
@@ -254,33 +179,18 @@
                     population: Number(fd.get('population') || 126), views: Number(fd.get('views') || 0),
                     reactions: Number(fd.get('reactions') || 0), comments: Number(fd.get('comments') || 0), updatedAt: new Date().toISOString()
                 };
-                
-                // FECHAR E LIMPAR IMEDIATAMENTE PARA EVITAR DELAY VISUAL
+                // Resposta Imediata UI
                 setIsModalCommOpen(false);
-                setEditingComm(null);
-                setSelectedFormats([]);
-                setSelectedAnalysts([]);
-
                 try {
-                    if (editingComm) await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'comms', editingComm.id), data);
-                    else await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'comms'), data);
-                } catch (error) { console.error("Erro ao salvar no banco:", error); }
-            };
-
-            const openAgendaModal = (ev = null) => {
-                if (ev) {
-                    setEditingAgenda(ev); setLocalBudget(Number(ev.budget || 0)); setHasCoffee(ev.hasCoffee || false);
-                    setVendorToggle(ev.hasVendor); setSelectedVendorIdx(ev.selectedVendorIdx >= 0 ? ev.selectedVendorIdx : null);
-                    setLocalVendors([{ name: ev.vendor1 || '', value: Number(ev.vendorValue1 || 0) }, { name: ev.vendor2 || '', value: Number(ev.vendorValue2 || 0) }, { name: ev.vendor3 || '', value: Number(ev.vendorValue3 || 0) }]);
-                } else {
-                    setEditingAgenda(null); setLocalBudget(0); setHasCoffee(false); setVendorToggle(false); setSelectedVendorIdx(null);
-                    setLocalVendors([{ name: '', value: 0 }, { name: '', value: 0 }, { name: '', value: 0 }]);
-                }
-                setIsModalAgendaOpen(true);
+                    if (editingComm) await updateDoc(doc(db, 'artifacts', APP_ID_ROOT, 'public', 'data', 'comms', editingComm.id), data);
+                    else await addDoc(collection(db, 'artifacts', APP_ID_ROOT, 'public', 'data', 'comms'), data);
+                    setMessage("Post salvo com sucesso!");
+                } catch (e) { setMessage("Erro ao salvar."); }
             };
 
             const handleSaveAgenda = async (e) => {
                 e.preventDefault();
+                if (!user) return;
                 const fd = new FormData(e.target);
                 const data = {
                     title: fd.get('atividade'), date: fd.get('date'), sponsor: fd.get('sponsor'), description: fd.get('description'),
@@ -290,68 +200,60 @@
                     vendor2: localVendors[1].name, vendorValue2: localVendors[1].value,
                     vendor3: localVendors[2].name, vendorValue3: localVendors[2].value, updatedAt: new Date().toISOString()
                 };
-
-                // FECHAR IMEDIATAMENTE
                 setIsModalAgendaOpen(false);
-
                 try {
-                    if (editingAgenda) await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'agenda', editingAgenda.id), data);
-                    else await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'agenda'), data);
-                } catch (error) { console.error("Erro ao salvar agenda:", error); }
+                    if (editingAgenda) await updateDoc(doc(db, 'artifacts', APP_ID_ROOT, 'public', 'data', 'agenda', editingAgenda.id), data);
+                    else await addDoc(collection(db, 'artifacts', APP_ID_ROOT, 'public', 'data', 'agenda'), data);
+                    setMessage("Agenda atualizada!");
+                } catch (e) { setMessage("Erro ao salvar."); }
             };
 
             const statsImpacto = useMemo(() => {
-                const sentComms = comms.filter(c => {
-                    const postDate = new Date(c.date);
-                    const yearMatch = postDate.getFullYear().toString() === filterYear;
-                    const channelMatch = filterChannel === "Todos Canais" || c.medium === filterChannel;
-                    return c.status === 'Enviado' && yearMatch && channelMatch;
+                const sent = comms.filter(c => {
+                    const d = new Date(c.date);
+                    return c.status === 'Enviado' && d.getFullYear().toString() === filterYear && (filterChannel === "Todos Canais" || c.medium === filterChannel);
                 });
-                const totalPosts = sentComms.length;
-                const interactions = sentComms.reduce((acc, c) => acc + (Number(c.reactions) || 0) + (Number(c.comments) || 0), 0);
-                const totalComments = sentComms.reduce((acc, c) => acc + (Number(c.comments) || 0), 0);
-                const scoreSum = sentComms.reduce((acc, c) => acc + Number(calculateScore(c.reactions, c.comments, c.population)), 0);
-                const avgScore = totalPosts > 0 ? (scoreSum / totalPosts).toFixed(1) : "0.0";
-                const formatDist = FORMATOS.reduce((acc, f) => { acc[f] = sentComms.filter(c => c.formats?.includes(f)).length; return acc; }, {});
-                const editoriaDist = EDITORIAS.reduce((acc, ed) => { acc[ed] = sentComms.filter(c => c.editoria === ed).length; return acc; }, {});
+                const totalPosts = sent.length;
+                const interactions = sent.reduce((acc, c) => acc + (Number(c.reactions) || 0) + (Number(c.comments) || 0), 0);
+                const totalComments = sent.reduce((acc, c) => acc + (Number(c.comments) || 0), 0);
+                const avgScore = totalPosts > 0 ? (sent.reduce((acc, c) => acc + Number(calculateScore(c.reactions, c.comments, c.population)), 0) / totalPosts).toFixed(1) : "0.0";
+                const formatDist = FORMATOS.reduce((acc, f) => { acc[f] = sent.filter(c => c.formats?.includes(f)).length; return acc; }, {});
+                const editoriaDist = EDITORIAS.reduce((acc, ed) => { acc[ed] = sent.filter(c => c.editoria === ed).length; return acc; }, {});
                 const monthlyPosts = {}; const monthlyEngagement = {};
                 MESES_ABREV.forEach((mes, idx) => {
-                    const postsNoMes = sentComms.filter(c => new Date(c.date).getMonth() === idx);
-                    monthlyPosts[mes] = postsNoMes.length;
-                    if (postsNoMes.length > 0) {
-                        const sumScoreMes = postsNoMes.reduce((acc, c) => acc + Number(calculateScore(c.reactions, c.comments, c.population)), 0);
-                        monthlyEngagement[mes] = (sumScoreMes / postsNoMes.length).toFixed(1);
-                    } else { monthlyEngagement[mes] = 0; }
+                    const mPosts = sent.filter(c => new Date(c.date).getMonth() === idx);
+                    monthlyPosts[mes] = mPosts.length;
+                    if (mPosts.length > 0) monthlyEngagement[mes] = (mPosts.reduce((acc, c) => acc + Number(calculateScore(c.reactions, c.comments, c.population)), 0) / mPosts.length).toFixed(1);
+                    else monthlyEngagement[mes] = 0;
                 });
                 return { totalPosts, interactions, totalComments, avgScore, formatDist, editoriaDist, monthlyPosts, monthlyEngagement };
             }, [comms, filterYear, filterChannel]);
 
-            if (!user) return <div className="h-screen flex items-center justify-center font-black uppercase text-slate-300 animate-pulse italic text-2xl">U-VOICE HUB · SINCRONIZANDO COM A REDE...</div>;
-
             return (
                 <div className="min-h-screen pb-32">
-                    <nav className="bg-white border-b px-4 sm:px-10 py-5 flex flex-wrap justify-between items-center sticky top-0 z-50 shadow-sm gap-4 text-left">
-                        <div className="flex items-center gap-3"><UnicoLogo size={42} /><h1 className="text-xl sm:text-2xl font-black italic uppercase tracking-tighter leading-none">U-Voice</h1></div>
-                        <div className="flex bg-slate-100 p-1 rounded-full gap-1 overflow-x-auto max-w-full">
+                    {message && <div className="message-box" onClick={() => setMessage("")}>{message}</div>}
+                    <nav className="bg-white border-b px-4 sm:px-10 py-5 flex justify-between items-center sticky top-0 z-50 shadow-sm">
+                        <div className="flex items-center gap-3"><UnicoLogo size={42} /><h1 className="text-xl sm:text-2xl font-black italic uppercase tracking-tighter">U-Voice</h1></div>
+                        <div className="flex bg-slate-100 p-1 rounded-full gap-1">
                             {['comunicados', 'agenda', 'impacto'].map(tab => (
-                                <button key={tab} onClick={() => setActiveTab(tab)} className={`px-6 sm:px-10 py-2.5 rounded-full text-[9px] sm:text-[10px] font-black uppercase transition-all whitespace-nowrap ${activeTab === tab ? 'bg-black text-white shadow-lg' : 'text-slate-400 hover:text-slate-600'}`}>{tab}</button>
+                                <button key={tab} onClick={() => setActiveTab(tab)} className={`px-6 py-2.5 rounded-full text-[9px] sm:text-[10px] font-black uppercase transition-all whitespace-nowrap ${activeTab === tab ? 'bg-black text-white shadow-lg' : 'text-slate-400 hover:text-slate-600'}`}>{tab}</button>
                             ))}
                         </div>
                     </nav>
 
-                    <main className="max-w-7xl mx-auto px-6 sm:px-10 py-10 sm:py-16 text-left">
+                    <main className="max-w-7xl mx-auto px-6 sm:px-10 py-10 text-left">
                         <header className="mb-12">
-                            <h2 className="text-5xl sm:text-8xl font-black italic tracking-tighter leading-tight">
+                            <h2 className="text-5xl sm:text-8xl font-black italic tracking-tighter leading-tight text-slate-900">
                                 {activeTab === 'comunicados' ? 'flow.feed' : activeTab === 'agenda' ? 'next.steps' : 'impact.metrics'}
                             </h2>
-                            <p className="text-slate-400 font-black uppercase text-[10px] sm:text-xs tracking-[0.4em] mt-4 ml-1 italic leading-none">Gestão Estratégica Operacional</p>
+                            <p className="text-slate-400 font-black uppercase text-[10px] sm:text-xs tracking-[0.4em] mt-4 ml-1 italic leading-none">Gestão Estratégica Conectada</p>
                         </header>
 
                         {activeTab === 'comunicados' && (
                             <section className="animate-in fade-in duration-500">
                                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-10 gap-4">
                                     <h3 className="text-2xl font-black uppercase italic tracking-tighter">Fluxo de Posts</h3>
-                                    <button onClick={() => { setEditingComm(null); setSelectedFormats([]); setSelectedAnalysts([]); setIsModalCommOpen(true); }} className="w-full sm:w-auto bg-[#397394] text-white px-8 py-4 rounded-2xl text-[10px] font-black uppercase flex items-center justify-center gap-2 shadow-xl hover:bg-[#2d5c78] transition-all"><Icon name="plus" size={14} /> Novo Comunicado</button>
+                                    <button onClick={() => { setEditingComm(null); setSelectedAnalysts([]); setSelectedFormats([]); setIsModalCommOpen(true); }} className="w-full sm:w-auto bg-[#397394] text-white px-8 py-4 rounded-2xl text-[10px] font-black uppercase flex items-center justify-center gap-2 shadow-xl hover:bg-[#2d5c78] transition-all"><Icon name="plus" size={14} /> Novo Comunicado</button>
                                 </div>
                                 <div className="bg-white rounded-[3rem] border border-slate-100 overflow-hidden shadow-sm overflow-x-auto text-slate-700">
                                     <table className="w-full text-left min-w-[850px]">
@@ -362,24 +264,11 @@
                                             {comms.map(c => (
                                                 <tr key={c.id} className="hover:bg-slate-50/50 transition-colors group">
                                                     <td className="px-10 py-8 text-left">
-                                                        <div className="flex items-center gap-4">
-                                                            <div className="p-3 bg-slate-50 rounded-xl text-slate-300">{c.medium === 'Slack' ? <Icon name="slack" size={20} /> : <Icon name="mail" size={20} />}</div>
-                                                            <div><div className="font-black uppercase italic text-xl text-slate-800 leading-none">{c.title}</div><div className="text-[9px] font-black text-[#397394] mt-1 bg-blue-50 px-2 py-0.5 rounded uppercase italic w-fit">{c.editoria}</div></div>
-                                                        </div>
+                                                        <div className="flex items-center gap-4"><div className="p-3 bg-slate-50 rounded-xl text-slate-300">{c.medium === 'Slack' ? <Icon name="slack" size={20} /> : <Icon name="mail" size={20} />}</div><div><div className="font-black uppercase italic text-xl text-slate-800 leading-none">{c.title}</div><div className="text-[9px] font-black text-[#397394] mt-1 bg-blue-50 px-2 py-0.5 rounded uppercase italic w-fit">{c.editoria}</div></div></div>
                                                     </td>
-                                                    <td className="px-10 py-8 text-center">
-                                                        <div className="flex flex-col items-center gap-2 text-center">
-                                                            <div className="flex flex-wrap justify-center gap-1">{c.analysts?.map(a => <span key={a} className="text-[7px] font-black bg-slate-100 text-slate-500 px-2 py-0.5 rounded uppercase">{a.split(' ')[0]}</span>)}</div>
-                                                            <span className="text-[9px] font-black text-slate-400 italic tracking-tighter uppercase">{c.channelName}</span>
-                                                        </div>
-                                                    </td>
+                                                    <td className="px-10 py-8 text-center"><div className="flex flex-wrap justify-center gap-1">{c.analysts?.map(a => <span key={a} className="text-[7px] font-black bg-slate-100 text-slate-500 px-2 py-0.5 rounded uppercase">{a.split(' ')[0]}</span>)}</div><span className="text-[9px] font-black text-slate-400 italic tracking-tighter uppercase">{c.channelName}</span></td>
                                                     <td className="px-10 py-8 text-right font-black text-3xl tracking-tighter leading-none text-slate-900">{calculateScore(c.reactions, c.comments, c.population)}%</td>
-                                                    <td className="px-10 py-8 text-right">
-                                                        <div className="flex items-center justify-end gap-2">
-                                                            <button onClick={() => { setEditingComm(c); setSelectedFormats(c.formats || []); setSelectedAnalysts(c.analysts || []); setIsModalCommOpen(true); }} className="p-3 text-slate-700 hover:text-blue-600 hover:bg-white rounded-2xl shadow-sm transition-all"><Icon name="pencil" size={18} /></button>
-                                                            <button onClick={() => deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'comms', c.id))} className="p-3 hover:text-red-500 transition-all"><Icon name="trash-2" size={18} /></button>
-                                                        </div>
-                                                    </td>
+                                                    <td className="px-10 py-8 text-right text-slate-300"><div className="flex items-center justify-end gap-2 text-slate-700"><button onClick={() => { setEditingComm(c); setSelectedAnalysts(c.analysts || []); setSelectedFormats(c.formats || []); setIsModalCommOpen(true); }} className="p-3 hover:text-blue-600 hover:bg-white rounded-2xl shadow-sm transition-all text-slate-600"><Icon name="pencil" size={18} /></button><button onClick={() => deleteDoc(doc(db, 'artifacts', APP_ID_ROOT, 'public', 'data', 'comms', c.id))} className="p-3 hover:text-red-500 transition-all text-slate-700"><Icon name="trash-2" size={18} /></button></div></td>
                                                 </tr>
                                             ))}
                                         </tbody>
@@ -391,33 +280,23 @@
                         {activeTab === 'agenda' && (
                             <section className="animate-in fade-in duration-500">
                                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-10 gap-4 text-left">
-                                    <h3 className="text-2xl font-black uppercase italic tracking-tighter">Agenda Operacional</h3>
+                                    <h3 className="text-2xl font-black uppercase italic tracking-tighter">Agenda Estratégica</h3>
                                     <button onClick={() => openAgendaModal()} className="w-full sm:w-auto bg-[#397394] text-white px-8 py-4 rounded-2xl text-[10px] font-black uppercase flex items-center justify-center gap-2 shadow-xl hover:bg-[#2d5c78] transition-all"><Icon name="calendar" size={14} /> Novo Planeamento</button>
                                 </div>
                                 <div className="bg-white rounded-[3rem] border border-slate-100 overflow-hidden shadow-sm overflow-x-auto text-slate-700">
                                     <table className="w-full text-left min-w-[750px]">
                                         <thead className="bg-slate-50 border-b text-slate-400 text-[10px] font-black uppercase tracking-widest italic">
-                                            <tr><th className="px-10 py-6 text-left">Atividade / Sponsor</th><th className="px-10 py-6 text-center">Data</th><th className="px-10 py-6 text-center text-left">STATUS</th><th className="px-10 py-6 w-32 text-left"></th></tr>
+                                            <tr><th className="px-10 py-6">Atividade / Sponsor</th><th className="px-10 py-6 text-center">Data</th><th className="px-10 py-6 text-center">STATUS</th><th className="px-10 py-6 w-32"></th></tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-50">
                                             {agenda.map(ev => {
                                                 const isElected = ev.hasVendor && ev.selectedVendorIdx >= 0;
                                                 return (
                                                     <tr key={ev.id} className={`hover:bg-slate-50 transition-colors group ${isElected ? 'row-green-effect' : ''}`}>
-                                                        <td className="px-10 py-8 text-slate-800 text-left">
-                                                            <div className="flex items-center gap-4"><div className="font-black uppercase italic text-xl text-slate-800 leading-none">{ev.title}</div>{ev.hasCoffee && <span title="Coffee Break" className="text-xl">☕</span>}</div>
-                                                            <div className="text-[9px] font-bold text-slate-400 uppercase mt-2 tracking-widest italic text-left">
-                                                                {ev.sponsor} • {isElected ? <span className="text-[#BED993] font-black uppercase">ELEITO: {ev['vendor'+(ev.selectedVendorIdx+1)]}</span> : 'EQUIPA INTERNA'}
-                                                            </div>
-                                                        </td>
-                                                        <td className="px-10 py-8 text-center text-xs font-bold text-slate-500 text-left">{ev.date ? new Date(ev.date).toLocaleDateString('pt-BR') : '--'}</td>
-                                                        <td className="px-10 py-8 text-center text-slate-800 text-left"><span className="px-4 py-1.5 bg-blue-50 text-blue-700 text-[9px] font-black uppercase rounded-full">{ev.status}</span></td>
-                                                        <td className="px-10 py-8 text-right text-slate-300 text-left">
-                                                            <div className="flex items-center justify-end gap-2 text-slate-700 text-left">
-                                                                <button onClick={() => openAgendaModal(ev)} className="p-3 text-slate-700 hover:text-blue-600 hover:bg-white rounded-2xl shadow-sm transition-all"><Icon name="pencil" size={18} /></button>
-                                                                <button onClick={() => deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'agenda', ev.id))} className="p-3 hover:text-red-500 transition-all text-slate-700"><Icon name="trash-2" size={18} /></button>
-                                                            </div>
-                                                        </td>
+                                                        <td className="px-10 py-8 text-slate-800 text-left"><div className="flex items-center gap-4"><div className="font-black uppercase italic text-xl text-slate-800 leading-none">{ev.title}</div>{ev.hasCoffee && <span title="Coffee Break" className="text-xl">☕</span>}</div><div className="text-[9px] font-bold text-slate-400 uppercase mt-2 tracking-widest italic">{ev.sponsor} • {isElected ? <span className="text-[#BED993] font-black uppercase">ELEITO: {ev['vendor'+(ev.selectedVendorIdx+1)]}</span> : 'INTERNO'}</div></td>
+                                                        <td className="px-10 py-8 text-center text-xs font-bold text-slate-500">{ev.date ? new Date(ev.date).toLocaleDateString('pt-BR') : '--'}</td>
+                                                        <td className="px-10 py-8 text-center"><span className="px-4 py-1.5 bg-blue-50 text-blue-700 text-[9px] font-black uppercase rounded-full">{ev.status}</span></td>
+                                                        <td className="px-10 py-8 text-right text-slate-300"><div className="flex items-center justify-end gap-2 text-slate-700"><button onClick={() => openAgendaModal(ev)} className="p-3 hover:text-blue-600 hover:bg-white rounded-2xl shadow-sm transition-all text-slate-600"><Icon name="pencil" size={18} /></button><button onClick={() => deleteDoc(doc(db, 'artifacts', APP_ID_ROOT, 'public', 'data', 'agenda', ev.id))} className="p-3 hover:text-red-500 transition-all text-slate-700"><Icon name="trash-2" size={18} /></button></div></td>
                                                     </tr>
                                                 );
                                             })}
@@ -429,38 +308,19 @@
 
                         {activeTab === 'impacto' && (
                             <section className="animate-in fade-in duration-700 space-y-12">
-                                <div className="flex flex-wrap items-center gap-4 bg-white/80 backdrop-blur-md p-4 rounded-[1.5rem] border border-slate-100 shadow-sm w-fit sticky top-[85px] z-40 text-left">
-                                    <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 rounded-xl border border-slate-100 text-slate-400">
-                                        <Icon name="filter" size={14} /><span className="text-[10px] font-black uppercase tracking-widest italic text-slate-400">Ciclo</span>
-                                    </div>
-                                    <select value={filterYear} onChange={(e) => setFilterYear(e.target.value)} className="impact-filter"><option>2025</option><option>2026</option><option>2027</option></select>
+                                <div className="flex flex-wrap items-center gap-4 bg-white/80 backdrop-blur-md p-4 rounded-[1.5rem] border border-slate-100 shadow-sm w-fit sticky top-[85px] z-40">
+                                    <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 rounded-xl border border-slate-100 text-slate-400"><Icon name="filter" size={14} /><span className="text-[10px] font-black uppercase tracking-widest italic">Ciclo</span></div>
+                                    <select value={filterYear} onChange={(e) => setFilterYear(e.target.value)} className="impact-filter"><option>2025</option><option>2026</option></select>
                                     <select value={filterChannel} onChange={(e) => setFilterChannel(e.target.value)} className="impact-filter"><option>Todos Canais</option><option>Slack</option><option>E-mail</option></select>
                                 </div>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 text-left">
-                                    <div className="p-10 bg-white rounded-[3rem] border border-slate-100 shadow-sm group hover:scale-[1.02] transition-all text-left">
-                                        <div className="p-3 bg-slate-50 rounded-xl w-fit mb-6 text-slate-300 mx-auto sm:mx-0"><Icon name="file-text" size={26} /></div>
-                                        <div className="text-6xl font-black text-slate-900 tracking-tighter leading-none">{statsImpacto.totalPosts}</div>
-                                        <div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic">Total Posts</div>
-                                    </div>
-                                    <div className="p-10 bg-slate-900 rounded-[3rem] shadow-2xl relative overflow-hidden group hover:scale-[1.02] transition-all text-white text-left">
-                                        <div className="absolute top-8 right-8 bg-emerald-400 text-slate-950 text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter shadow-glow italic">Target</div>
-                                        <div className="p-3 bg-white/10 rounded-xl w-fit mb-6 text-white mx-auto sm:mx-0"><Icon name="trending-up" size={26} /></div>
-                                        <div className="text-6xl font-black tracking-tighter leading-none">{statsImpacto.interactions}</div>
-                                        <div className="text-[9px] font-black uppercase text-slate-500 tracking-widest mt-4 italic text-slate-400">Interações</div>
-                                    </div>
-                                    <div className="p-10 bg-white rounded-[3rem] border border-slate-100 shadow-sm hover:scale-[1.02] transition-all text-slate-900 text-left">
-                                        <div className="p-3 bg-red-50 rounded-xl w-fit mb-6 text-red-300 mx-auto sm:mx-0"><Icon name="message-circle" size={26} /></div>
-                                        <div className="text-6xl font-black text-slate-900 tracking-tighter leading-none">{statsImpacto.totalComments}</div>
-                                        <div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic text-slate-400">Comments</div>
-                                    </div>
-                                    <div className="p-10 bg-[#FBFAF3] rounded-[3rem] border border-[#F0EEE6] shadow-sm hover:scale-[1.02] transition-all text-slate-900 text-left">
-                                        <div className="p-3 bg-slate-900 text-white rounded-xl w-fit mb-6 mx-auto sm:mx-0"><Icon name="zap" size={26} /></div>
-                                        <div className="text-6xl font-black text-slate-900 tracking-tighter leading-none">{statsImpacto.avgScore}%</div>
-                                        <div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic text-slate-400">Score Engaja</div>
-                                    </div>
+                                    <div className="p-10 bg-white rounded-[3rem] border border-slate-100 shadow-sm group hover:scale-[1.02] transition-all text-left"><div className="p-3 bg-slate-50 rounded-xl w-fit mb-6 text-slate-300 mx-auto sm:mx-0"><Icon name="file-text" size={26} /></div><div className="text-6xl font-black text-slate-900 tracking-tighter leading-none">{statsImpacto.totalPosts}</div><div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic">Total Posts</div></div>
+                                    <div className="p-10 bg-slate-900 rounded-[3rem] shadow-2xl relative overflow-hidden group hover:scale-[1.02] transition-all text-white text-left"><div className="absolute top-8 right-8 bg-emerald-400 text-slate-950 text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter shadow-glow italic">Target</div><div className="p-3 bg-white/10 rounded-xl w-fit mb-6 text-white mx-auto sm:mx-0"><Icon name="trending-up" size={26} /></div><div className="text-6xl font-black tracking-tighter leading-none">{statsImpacto.interactions}</div><div className="text-[9px] font-black uppercase text-slate-500 tracking-widest mt-4 italic">Interações</div></div>
+                                    <div className="p-10 bg-white rounded-[3rem] border border-slate-100 shadow-sm hover:scale-[1.02] transition-all text-slate-900 text-left"><div className="p-3 bg-red-50 rounded-xl w-fit mb-6 text-red-300 mx-auto sm:mx-0"><Icon name="message-circle" size={26} /></div><div className="text-6xl font-black text-slate-900 tracking-tighter leading-none">{statsImpacto.totalComments}</div><div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic">Comments</div></div>
+                                    <div className="p-10 bg-[#FBFAF3] rounded-[3rem] border border-[#F0EEE6] shadow-sm hover:scale-[1.02] transition-all text-slate-900 text-left"><div className="p-3 bg-slate-900 text-white rounded-xl w-fit mb-6 mx-auto sm:mx-0"><Icon name="zap" size={26} /></div><div className="text-6xl font-black text-slate-900 tracking-tighter leading-none">{statsImpacto.avgScore}%</div><div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic">Score Engaja</div></div>
                                 </div>
                                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 text-left"><SimpleBarChart title="Distribuição por Formato" data={statsImpacto.formatDist} color="#397394" /><SimpleBarChart title="Distribuição por Editoria" data={statsImpacto.editoriaDist} color="#BED993" /></div>
-                                <div className="grid grid-cols-1 gap-8 text-left"><LineAreaChart title="Evolução de Comunicados (Volume Mensal)" data={statsImpacto.monthlyPosts} color="#397394" /><LineAreaChart title="Atingimento (%) - Percentual de Engajamento por Mês" data={statsImpacto.monthlyEngagement} color="#F77D8D" valueSuffix="%" /></div>
+                                <div className="grid grid-cols-1 gap-8 text-left"><LineAreaChart title="Evolução de Comunicados (Volume Mensal)" data={statsImpacto.monthlyPosts} color="#397394" /><LineAreaChart title="Engajamento Médio por Mês" data={statsImpacto.monthlyEngagement} color="#F77D8D" valueSuffix="%" /></div>
                             </section>
                         )}
                     </main>
@@ -470,23 +330,21 @@
                         <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[150] flex items-center justify-center p-2 sm:p-4 text-left text-slate-800">
                             <div className="bg-white w-full max-w-4xl rounded-[3rem] p-6 sm:p-12 shadow-2xl modal-animate relative max-h-[95vh] overflow-y-auto custom-scroll text-left">
                                 <button type="button" onClick={() => setIsModalCommOpen(false)} className="btn-close-modal"><Icon name="x" size={24} /></button>
-                                <div className="flex justify-between items-center mb-10 sticky top-0 bg-white z-10 py-2 border-b border-slate-50"><h3 className="text-xl sm:text-3xl font-black italic uppercase leading-none tracking-tighter text-slate-800">Registo de Comunicado</h3></div>
-                                <form onSubmit={handleSaveComm} className="grid grid-cols-1 md:grid-cols-2 gap-10 text-left">
+                                <h3 className="text-xl sm:text-3xl font-black italic uppercase leading-none tracking-tighter mb-10 text-slate-800">Registo de Comunicado</h3>
+                                <form onSubmit={handleSaveComm} className="grid grid-cols-1 md:grid-cols-2 gap-10 text-left text-slate-800">
                                     <div className="space-y-8 text-left">
                                         <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-widest italic uppercase font-bold text-slate-400">Título do Post</label><input name="title" defaultValue={editingComm?.title} required className="w-full bg-slate-50 border-none rounded-2xl p-5 font-bold text-lg text-slate-800 outline-none focus:ring-4 ring-blue-50 shadow-sm" /></div>
                                         <div><label className="text-[10px] font-black uppercase text-slate-400 mb-3 block tracking-widest italic font-bold uppercase text-slate-400">Analistas Responsáveis</label><div className="flex flex-wrap gap-2">{INITIAL_ANALYSTS.map(a => (<div key={a} onClick={() => toggleAnalyst(a)} className={`checkbox-flag ${selectedAnalysts.includes(a) ? 'active' : ''}`}><Icon name={selectedAnalysts.includes(a) ? "check-circle-2" : "circle"} size={14} />{a}</div>))}</div></div>
                                         <div className="grid grid-cols-2 gap-4 text-left"><div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-widest italic uppercase font-bold text-slate-400">Data Prevista</label><input name="date" type="date" defaultValue={editingComm?.date} required className="w-full bg-slate-50 border-none rounded-xl p-4 font-bold outline-none text-slate-500 shadow-sm" /></div><div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-widest italic uppercase font-bold text-slate-400">Hora</label><input name="postTime" type="time" defaultValue={editingComm?.postTime} className="w-full bg-slate-50 border-none rounded-xl p-4 font-bold outline-none text-slate-500 shadow-sm" /></div></div>
-                                        <div className="flex items-end gap-2 text-left"><div className="flex-1 text-left"><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-widest italic uppercase font-bold text-slate-400">Canal Slack</label><select name="channelName" defaultValue={editingComm?.channelName || channelsList[0]} className="w-full bg-slate-50 border-none rounded-xl p-5 font-black outline-none tracking-tighter appearance-none shadow-sm text-slate-800">{channelsList.map(ch => <option key={ch} value={ch}>{ch}</option>)}</select></div><button type="button" onClick={() => { const ch = prompt("Novo Canal:"); if(ch) setChannelsList([...channelsList, ch]) }} className="p-5 bg-slate-900 text-white rounded-xl shadow-lg active:scale-95"><Icon name="plus" size={18} /></button></div>
-                                        <div className="grid grid-cols-2 gap-4 text-left text-slate-800"><div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-widest italic uppercase font-bold text-slate-400 text-left">Meio</label><select name="medium" defaultValue={editingComm?.medium || 'Slack'} className="w-full bg-slate-50 border-none rounded-xl p-4 font-bold shadow-sm text-slate-700"><option>Slack</option><option>E-mail</option></select></div><div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-widest italic uppercase font-bold text-slate-400 text-left">STATUS</label><select name="status" defaultValue={editingComm?.status || 'Aguardando Envio'} className="w-full bg-slate-50 border-none rounded-xl p-4 font-bold shadow-sm text-slate-700"><option>Aguardando Envio</option><option>Enviado</option><option>Cancelado</option></select></div></div>
+                                        <div className="flex items-end gap-2 text-left"><div className="flex-1 text-left text-slate-800"><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-widest italic uppercase font-bold text-slate-400">Canal Slack</label><select name="channelName" defaultValue={editingComm?.channelName || channelsList[0]} className="w-full bg-slate-50 border-none rounded-xl p-5 font-black outline-none tracking-tighter appearance-none shadow-sm text-slate-800">{channelsList.map(ch => <option key={ch} value={ch}>{ch}</option>)}</select></div><button type="button" onClick={() => { const ch = prompt("Novo Canal:"); if(ch) setChannelsList([...channelsList, ch]) }} className="p-5 bg-slate-900 text-white rounded-xl shadow-lg active:scale-95"><Icon name="plus" size={18} /></button></div>
                                     </div>
                                     <div className="space-y-8 text-left text-slate-800">
                                         <div className="bg-[#FBFAF3] p-10 rounded-[3rem] border border-[#F0EEE6] space-y-8 shadow-inner text-center text-slate-800">
-                                            <div className="text-[10px] font-black uppercase text-[#397394] tracking-widest flex items-center justify-center gap-2 italic text-[#397394]"><Icon name="bar-chart-3" size={14} /> Consolidação de Impacto</div>
-                                            <div className="grid grid-cols-3 gap-4 text-left"><div className="space-y-2 text-center text-slate-800 text-left"><label className="text-[8px] uppercase text-[#8E97B0] block italic text-center">Reach</label><input name="views" type="number" defaultValue={editingComm?.views || 0} className="w-full bg-white border border-slate-100 rounded-xl p-4 font-black text-xl text-center outline-none shadow-sm text-slate-800" /></div><div className="space-y-2 text-center text-slate-800 text-left"><label className="text-[8px] uppercase text-[#8E97B0] block italic text-center text-slate-400">Reações</label><input name="reactions" type="number" defaultValue={editingComm?.reactions || 0} className="w-full bg-white border border-slate-100 rounded-xl p-4 font-black text-xl text-center outline-none shadow-sm text-slate-800" /></div><div className="space-y-2 text-center text-slate-800 text-left"><label className="text-[8px] uppercase text-[#8E97B0] block italic text-center text-slate-400">Coments</label><input name="comments" type="number" defaultValue={editingComm?.comments || 0} className="w-full bg-white border border-slate-100 rounded-xl p-4 font-black text-xl text-center outline-none shadow-sm text-slate-800" /></div></div>
-                                            <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-widest italic uppercase text-center text-slate-400 uppercase">População Base (126)</label><input name="population" type="number" defaultValue={editingComm?.population || 126} className="w-full bg-white border-none rounded-2xl p-4 font-black text-center outline-none shadow-sm text-slate-800" /></div>
+                                            <div className="text-[10px] font-black uppercase text-[#397394] tracking-widest flex items-center justify-center gap-2 italic text-[#397394]"><Icon name="bar-chart-3" size={14} /> Consolidação Impacto</div>
+                                            <div className="grid grid-cols-3 gap-4 text-left"><div className="space-y-2 text-center text-slate-800"><label className="text-[8px] uppercase text-[#8E97B0] block italic text-center">Reach</label><input name="views" type="number" defaultValue={editingComm?.views || 0} className="w-full bg-white border border-slate-100 rounded-xl p-4 font-black text-xl text-center outline-none shadow-sm text-slate-800" /></div><div className="space-y-2 text-center text-slate-800"><label className="text-[8px] uppercase text-[#8E97B0] block italic text-center">Reações</label><input name="reactions" type="number" defaultValue={editingComm?.reactions || 0} className="w-full bg-white border border-slate-100 rounded-xl p-4 font-black text-xl text-center outline-none shadow-sm text-slate-800" /></div><div className="space-y-2 text-center text-slate-800"><label className="text-[8px] uppercase text-[#8E97B0] block italic text-center">Coments</label><input name="comments" type="number" defaultValue={editingComm?.comments || 0} className="w-full bg-white border border-slate-100 rounded-xl p-4 font-black text-xl text-center outline-none shadow-sm text-slate-800" /></div></div>
                                         </div>
-                                        <div className="space-y-4 text-left"><label className="text-[10px] font-black uppercase text-slate-400 block tracking-widest italic font-bold uppercase text-slate-800">Formato (FLAGS)</label><div className="grid grid-cols-3 gap-3">{FORMATOS.map(f => (<div key={f} onClick={() => toggleFormat(f)} className={`p-4 rounded-xl border-2 text-center text-[10px] font-black uppercase cursor-pointer transition-all ${selectedFormats.includes(f) ? 'bg-[#397394] border-[#397394] text-white shadow-lg scale-105' : 'bg-white border-slate-50 text-slate-400 hover:border-slate-200 font-bold'}`}>{f}</div>))}</div></div>
-                                        <button type="submit" className="w-full py-6 bg-black text-white rounded-[2rem] font-black uppercase text-xs tracking-[0.3em] active:scale-[0.98] transition-all shadow-2xl shadow-black/20 italic">SALVAR REGISTO</button>
+                                        <div className="space-y-4 text-left text-slate-800"><label className="text-[10px] font-black uppercase text-slate-400 block tracking-widest italic font-bold uppercase text-slate-800 text-left">Formato (FLAGS)</label><div className="grid grid-cols-3 gap-3">{FORMATOS.map(f => (<div key={f} onClick={() => toggleFormat(f)} className={`p-4 rounded-xl border-2 text-center text-[10px] font-black uppercase cursor-pointer transition-all ${selectedFormats.includes(f) ? 'bg-[#397394] border-[#397394] text-white shadow-lg scale-105' : 'bg-white border-slate-50 text-slate-400 hover:border-slate-200 font-bold text-slate-800'}`}>{f}</div>))}</div></div>
+                                        <button type="submit" className="w-full py-6 bg-black text-white rounded-[2rem] font-black uppercase text-xs tracking-[0.3em] active:scale-[0.98] transition-all shadow-2xl shadow-black/20 italic">SALVAR E FECHAR</button>
                                     </div>
                                 </form>
                             </div>
@@ -499,25 +357,24 @@
                             <div className="bg-white w-full max-w-6xl rounded-[4rem] p-12 shadow-2xl modal-animate relative max-h-[95vh] overflow-y-auto custom-scroll text-left">
                                 <button type="button" onClick={() => setIsModalAgendaOpen(false)} className="btn-close-modal"><Icon name="x" size={28} /></button>
                                 <header className="mb-10 flex justify-between items-start sticky top-0 bg-white z-10 py-2 border-b border-slate-50 text-left">
-                                    <div className="pr-12 text-left"><h3 className="text-2xl sm:text-5xl font-black italic uppercase tracking-tighter leading-none text-slate-800">Ajustar Planeamento</h3><p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-2 ml-1 italic leading-loose text-slate-400">Mesa de Decisão Técnica e Governança Financeira</p></div>
+                                    <div className="pr-12 text-left"><h3 className="text-2xl sm:text-5xl font-black italic uppercase tracking-tighter leading-none text-slate-800">Novo Planeamento</h3><p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-2 ml-1 italic leading-loose text-slate-400">Mesa de Decisão Técnica e Governança Financeira</p></div>
                                 </header>
                                 <form onSubmit={handleSaveAgenda} className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start text-left text-slate-800">
-                                    <div className="lg:col-span-5 space-y-6 bg-slate-50 p-10 rounded-[3rem] border border-slate-100 shadow-inner text-left">
+                                    <div className="lg:col-span-5 space-y-6 bg-slate-50 p-10 rounded-[3rem] border border-slate-100 shadow-inner text-left text-slate-800">
                                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 items-end text-left">
-                                            <div className="sm:col-span-2 space-y-2 text-left"><label className="text-[10px] font-black uppercase text-slate-400 block tracking-widest italic font-bold">Atividade</label><input name="atividade" defaultValue={editingAgenda?.title} required className="w-full h-16 bg-white border-none rounded-xl px-6 font-bold text-slate-800 outline-none shadow-sm font-black italic uppercase text-lg" placeholder="Título" /></div>
+                                            <div className="sm:col-span-2 space-y-2 text-left"><label className="text-[10px] font-black uppercase text-slate-400 block tracking-widest italic font-bold text-slate-400">Atividade</label><input name="atividade" defaultValue={editingAgenda?.title} required className="w-full h-16 bg-white border-none rounded-xl px-6 font-bold text-slate-800 outline-none shadow-sm font-black italic uppercase text-lg text-slate-800" placeholder="Título" /></div>
                                             <div className="space-y-2 flex flex-col items-center"><div className="bg-white border border-slate-100 rounded-xl shadow-sm h-16 flex items-center justify-center w-full px-4 gap-3 group text-slate-800"><label className="text-[9px] font-black uppercase text-slate-400 tracking-widest italic cursor-pointer" htmlFor="coffee">Coffee?</label><input id="coffee" type="checkbox" checked={hasCoffee} onChange={(e) => setHasCoffee(e.target.checked)} className="w-5 h-5 rounded cursor-pointer accent-[#397394]" /></div></div>
                                         </div>
                                         <div className="grid grid-cols-2 gap-4 text-left">
-                                            <div className="space-y-2 text-left text-slate-800"><label className="text-[10px] font-black uppercase text-slate-400 block tracking-widest italic font-bold text-slate-400 uppercase">Data Prevista</label><input name="date" type="date" defaultValue={editingAgenda?.date} required className="w-full h-14 bg-white border-none rounded-xl px-4 font-bold outline-none text-slate-700 shadow-sm" /></div>
-                                            <div className="space-y-2 text-left text-slate-800 text-left"><label className="text-[10px] font-black uppercase text-slate-400 block tracking-widest font-bold text-slate-400 uppercase">STATUS</label><select name="status" defaultValue={editingAgenda?.status || 'Agendado'} className="w-full h-14 bg-white border-none rounded-xl px-4 font-bold outline-none shadow-sm text-slate-700"><option>Agendado</option><option>Realizado</option><option>Cancelado</option></select></div>
+                                            <div className="space-y-2 text-left"><label className="text-[10px] font-black uppercase text-slate-400 block tracking-widest italic font-bold text-slate-400">Data Prevista</label><input name="date" type="date" defaultValue={editingAgenda?.date} required className="w-full h-14 bg-white border-none rounded-xl px-4 font-bold outline-none text-slate-700 shadow-sm" /></div>
+                                            <div className="space-y-2 text-left"><label className="text-[10px] font-black uppercase text-slate-400 block tracking-widest font-bold text-slate-400">STATUS</label><select name="status" defaultValue={editingAgenda?.status || 'Agendado'} className="w-full h-14 bg-white border-none rounded-xl px-4 font-bold outline-none cursor-pointer shadow-sm text-slate-700"><option>Agendado</option><option>Realizado</option><option>Cancelado</option></select></div>
                                         </div>
                                         <div className="space-y-2 text-left uppercase text-slate-800 text-left"><label className="text-[10px] font-black uppercase text-slate-400 block tracking-widest font-bold uppercase text-slate-400">Sponsor Responsável</label><input name="sponsor" defaultValue={editingAgenda?.sponsor} required className="w-full h-14 bg-white border-none rounded-xl px-6 font-bold outline-none shadow-sm text-slate-800" /></div>
-                                        <div className="space-y-2 text-left bg-blue-50/50 p-4 rounded-2xl border border-blue-100 text-left"><label className="text-[10px] font-black uppercase text-[#397394] block tracking-widest italic font-bold">Budget Disponível (R$)</label><input type="number" step="0.01" value={localBudget} onChange={(e) => setLocalBudget(Number(e.target.value))} className="w-full h-14 bg-white border-none rounded-xl px-4 sm:px-6 font-black text-xl sm:text-2xl text-[#397394] outline-none shadow-sm" placeholder="0,00" /></div>
-                                        <div className="space-y-2 text-left text-slate-800 uppercase text-left"><label className="text-[10px] font-black uppercase text-slate-400 block tracking-widest font-bold uppercase text-slate-400">Pauta Técnica</label><textarea name="description" defaultValue={editingAgenda?.description} className="w-full h-40 bg-white border-none rounded-xl p-8 font-medium text-slate-600 outline-none resize-none leading-relaxed text-sm shadow-sm text-slate-600" placeholder="Detalhes estratégicos..."></textarea></div>
+                                        <div className="space-y-2 text-left bg-blue-50/50 p-4 rounded-2xl border border-blue-100 text-slate-800"><label className="text-[10px] font-black uppercase text-[#397394] block tracking-widest italic font-bold text-[#397394]">Budget Disponível (R$)</label><input type="number" step="0.01" value={localBudget} onChange={(e) => setLocalBudget(Number(e.target.value))} className="w-full h-14 bg-white border-none rounded-xl px-4 sm:px-6 font-black text-xl sm:text-2xl text-[#397394] outline-none shadow-sm text-left" placeholder="0,00" /></div>
                                     </div>
                                     <div className="lg:col-span-7 bg-slate-900 rounded-[4rem] p-12 shadow-2xl flex flex-col justify-between self-stretch min-h-[750px] text-white text-left">
                                         <div>
-                                            <div className="flex justify-between items-center mb-10 border-b border-white/5 pb-8 text-left"><div className="text-[10px] font-black uppercase text-white tracking-[0.3em] flex items-center gap-3 italic text-left text-white"><div className="w-2.5 h-2.5 rounded-full bg-amber-400 shadow-glow"></div> MESA DE DECISÃO</div><div className="flex items-center gap-4 bg-white/5 p-3 rounded-full border border-white/10 px-6 text-white text-left"><span className="text-[8px] font-black text-slate-500 uppercase tracking-tighter italic">Fornecedor?</span><button type="button" onClick={() => setVendorToggle(!vendorToggle)} className={`w-14 h-7 rounded-full relative transition-all duration-500 ${vendorToggle ? 'bg-[#BED993]' : 'bg-slate-700'}`}><div className={`absolute top-1 left-1 w-5 h-5 rounded-full bg-white shadow-lg transition-all duration-500 ${vendorToggle ? 'translate-x-7' : ''}`}></div></button></div></div>
+                                            <div className="flex justify-between items-center mb-10 border-b border-white/5 pb-8 text-left text-white"><div className="text-[10px] font-black uppercase text-white tracking-[0.3em] flex items-center gap-3 italic text-left text-white"><div className="w-2.5 h-2.5 rounded-full bg-amber-400 shadow-glow"></div> MESA DE DECISÃO</div><div className="flex items-center gap-4 bg-white/5 p-3 rounded-full border border-white/10 px-6 text-white text-left"><span className="text-[8px] font-black text-slate-500 uppercase tracking-tighter italic text-white text-left">Fornecedor?</span><button type="button" onClick={() => setVendorToggle(!vendorToggle)} className={`w-14 h-7 rounded-full relative transition-all duration-500 ${vendorToggle ? 'bg-[#BED993]' : 'bg-slate-700'}`}><div className={`absolute top-1 left-1 w-5 h-5 rounded-full bg-white shadow-lg transition-all duration-500 ${vendorToggle ? 'translate-x-7' : ''}`}></div></button></div></div>
                                             {vendorToggle ? (
                                                 <div className="space-y-6 animate-in fade-in zoom-in duration-500 text-white text-left">
                                                     {[0, 1, 2].map(i => {
@@ -525,7 +382,7 @@
                                                         return (
                                                             <div key={i} onClick={() => setSelectedVendorIdx(i)} className={`card-decision p-6 rounded-[2rem] bg-white/5 border-2 flex flex-col gap-4 ${selectedVendorIdx === i ? 'border-[#BED993] bg-white/10 shadow-glow-green scale-[1.02]' : 'border-white/5 hover:border-white/10'}`}>
                                                                 <div className="flex items-center gap-6 text-left"><div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black text-xs ${selectedVendorIdx === i ? 'bg-[#BED993] text-emerald-950' : 'bg-white/10 text-white/20'}`}>0{i+1}</div><input placeholder={`NOME DO FORNECEDOR ${i+1}`} value={localVendors[i].name} onChange={(e) => { const n = [...localVendors]; n[i].name = e.target.value; setLocalVendors(n); }} className="flex-1 bg-transparent border-none text-base font-extrabold outline-none text-white placeholder:text-white/10 uppercase shadow-none text-left" onClick={(e) => e.stopPropagation()} /><div className={`px-5 py-2.5 rounded-xl font-black uppercase text-[8px] transition-all tracking-widest ${selectedVendorIdx === i ? 'bg-[#BED993] text-emerald-950 shadow-lg font-black' : 'bg-white/10 text-slate-400'}`}>{selectedVendorIdx === i ? 'ELEITO' : 'ELEGER'}</div></div>
-                                                                <div className="flex items-center justify-between pl-18 text-left text-white text-left"><div className="flex items-center gap-3 text-left"><span className="text-[9px] font-black text-slate-500 uppercase tracking-widest italic">Custo: R$</span><input type="number" step="0.01" value={localVendors[i].value} onChange={(e) => { const n = [...localVendors]; n[i].value = Number(e.target.value); setLocalVendors(n); }} className="bg-transparent border-none text-xl font-black text-emerald-400 outline-none w-32 shadow-none text-white text-left" onClick={(e) => e.stopPropagation()} /></div><div className="text-right flex flex-col items-end text-white text-right text-white"><span className="text-[8px] font-black text-blue-400 uppercase block tracking-widest opacity-60 italic mb-0.5">Diferença / %</span><span className={`text-xs font-black px-3 py-1 rounded-lg ${isOver ? 'bg-red-500/10 text-red-400' : 'bg-blue-500/10 text-blue-400'}`}>{isOver ? '+' : ''}{diff.toLocaleString('pt-BR')} ({percent}%)</span></div></div>
+                                                                <div className="flex items-center justify-between pl-18 text-left text-white text-left"><div className="flex items-center gap-3 text-left text-white"><span className="text-[9px] font-black text-slate-500 uppercase tracking-widest italic text-slate-400">Custo: R$</span><input type="number" step="0.01" value={localVendors[i].value} onChange={(e) => { const n = [...localVendors]; n[i].value = Number(e.target.value); setLocalVendors(n); }} className="bg-transparent border-none text-xl font-black text-emerald-400 outline-none w-32 shadow-none text-white text-left" onClick={(e) => e.stopPropagation()} /></div><div className="text-right flex flex-col items-end text-white text-right"><span className="text-[8px] font-black text-blue-400 uppercase block tracking-widest opacity-60 italic mb-0.5 text-blue-400">Diferença / %</span><span className={`text-xs font-black px-3 py-1 rounded-lg ${isOver ? 'bg-red-500/10 text-red-400' : 'bg-blue-500/10 text-blue-400'}`}>{isOver ? '+' : ''}{diff.toLocaleString('pt-BR')} ({percent}%)</span></div></div>
                                                             </div>
                                                         );
                                                     })}
@@ -540,7 +397,7 @@
                     )}
 
                     <footer className="fixed bottom-0 w-full bg-white/95 backdrop-blur-md border-t border-slate-100 px-6 sm:px-10 py-5 flex flex-col sm:flex-row justify-between items-center text-[8px] sm:text-[9px] text-slate-300 font-black uppercase tracking-[0.4em] z-40 shadow-inner">
-                        <div className="flex items-center gap-3 text-slate-400"><div className={`w-2.5 h-2.5 rounded-full ${user ? 'bg-green-500 shadow-[0_0_12px_rgba(34,197,94,0.3)]' : 'bg-red-500 animate-pulse'}`}></div><span>© 2026 Unico Ops. Todos os direitos reservados.</span></div>
+                        <div className="flex items-center gap-3 text-slate-400"><div className={`w-2.5 h-2.5 rounded-full ${user ? 'bg-green-500 shadow-[0_0_12px_rgba(34,197,94,0.3)]' : 'bg-red-500 animate-pulse'}`}></div><span>© 2026 Unico Ops. Sincronização em Tempo Real Ativa.</span></div>
                     </footer>
                 </div>
             );
@@ -551,4 +408,3 @@
     </script>
 </body>
 </html>
-
