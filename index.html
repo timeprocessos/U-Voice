@@ -11,7 +11,7 @@
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
-        body { font-family: 'Inter', sans-serif; background-color: #FDFDFE; margin: 0; padding: 0; }
+        body { font-family: 'Inter', sans-serif; background-color: #F8FAFC; margin: 0; padding: 0; }
         
         .overdue-pulse { animation: pulse-red 2s infinite; }
         @keyframes pulse-red {
@@ -30,10 +30,9 @@
 
         .card-decision { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); border: 2px solid transparent; cursor: pointer; }
         .card-decision.selected { border-color: #BED993; background-color: #FBFAF3; transform: scale(1.01); }
-
+        
         .impact-filter { background: white; border: 1px solid #F1F5F9; border-radius: 12px; padding: 8px 16px; font-size: 10px; font-weight: 900; text-transform: uppercase; color: #1e293b; outline: none; }
         
-        /* Glow for target badge */
         .shadow-glow { box-shadow: 0 0 15px rgba(52, 211, 153, 0.4); }
     </style>
 </head>
@@ -57,11 +56,10 @@
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'u-voice-prod-v11';
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'u-voice-prod-v12';
 
         window.FirebaseInstance = { 
-            auth, db, appId, firebaseConfig,
-            collection, doc, onSnapshot, setDoc, deleteDoc, addDoc, updateDoc, query, signInAnonymously, signInWithCustomToken, onAuthStateChanged 
+            auth, db, appId, collection, doc, onSnapshot, setDoc, deleteDoc, addDoc, updateDoc, query, signInAnonymously, signInWithCustomToken, onAuthStateChanged 
         };
     </script>
 
@@ -146,7 +144,8 @@
                     } catch (e) { console.error(e); }
                 };
                 startAuth();
-                return onAuthStateChanged(auth, setUser);
+                const unsubscribe = onAuthStateChanged(auth, setUser);
+                return () => unsubscribe();
             }, [auth]);
 
             useEffect(() => {
@@ -160,9 +159,10 @@
                 return () => { unsubComms(); unsubAgenda(); };
             }, [user, db, appId]);
 
-            const calculateScore = (reactions = 0, comments = 0, population = 126) => {
+            const calculateScore = (reactions = 0, comments = 0, population = 126, posts = 1) => {
                 if (!population || population === 0) return 0;
-                return ((((Number(reactions) * 1) + (Number(comments) * 2)) / Number(population)) * 100).toFixed(1);
+                // Planilha: ((E6*B1)+(F6*B2))/(E1*D6)
+                return ((((Number(reactions) * 1) + (Number(comments) * 2)) / (Number(population) * Number(posts))) * 100).toFixed(1);
             };
 
             const toggleFormat = (f) => {
@@ -172,7 +172,8 @@
             const isOverdue = (date, status) => {
                 if (!date || status === 'Enviado' || status === 'Cancelado') return false;
                 const today = new Date().setHours(0,0,0,0);
-                return new Date(date) < today;
+                const scheduled = new Date(date).setHours(0,0,0,0);
+                return scheduled < today;
             };
 
             const handleSaveComm = async (e) => {
@@ -204,7 +205,7 @@
                     setIsModalCommOpen(false);
                     setEditingComm(null);
                     setSelectedFormats([]);
-                } catch (error) { console.error("Erro ao guardar comunicado:", error); }
+                } catch (error) { console.error("Erro ao salvar:", error); }
             };
 
             const handleSaveAgenda = async (e) => {
@@ -233,7 +234,7 @@
                     }
                     setIsModalAgendaOpen(false);
                     setEditingAgenda(null);
-                } catch (error) { console.error("Erro ao guardar agenda:", error); }
+                } catch (error) { console.error("Erro ao salvar agenda:", error); }
             };
 
             const statsImpacto = useMemo(() => {
@@ -257,17 +258,9 @@
                 return { totalPosts, interactions, totalComments, avgScore, formatDistribution, editoriaDistribution };
             }, [comms]);
 
-            const openEditComm = (c) => {
-                setEditingComm(c);
-                setSelectedFormats(c.formats || []);
-                setIsModalCommOpen(true);
-            };
-
-            if (!user) return <div className="h-screen flex items-center justify-center font-black uppercase text-slate-200 animate-pulse italic">A estabelecer ligação Cloud...</div>;
-
             return (
                 <div className="min-h-screen pb-24">
-                    <nav className="bg-white border-b px-8 py-5 flex justify-between items-center sticky top-0 z-50 shadow-sm">
+                    <nav className="bg-white border-b px-8 py-5 flex justify-between items-center sticky top-0 z-50">
                         <div className="flex items-center gap-10">
                             <div className="flex items-center gap-4">
                                 <UnicoLogo size={42} />
@@ -284,13 +277,13 @@
                     <main className="max-w-7xl mx-auto px-8 py-12">
                         <header className="mb-12">
                             <h2 className="text-8xl font-black italic tracking-tighter leading-none">by the numbers.</h2>
-                            <p className="text-slate-400 font-black uppercase text-xs tracking-[0.4em] mt-4 ml-2 italic">Dashboard de Insights e Operações</p>
+                            <p className="text-slate-400 font-black uppercase text-xs tracking-[0.4em] mt-4 ml-2 italic">Insights Estratégicos e Governança</p>
                         </header>
 
                         {activeTab === 'comunicados' && (
                             <section className="animate-in fade-in duration-500">
                                 <div className="flex justify-between items-center mb-8">
-                                    <h3 className="text-2xl font-black uppercase italic text-slate-800 tracking-tighter">Fluxo de Mensagens</h3>
+                                    <h3 className="text-2xl font-black uppercase italic text-slate-800 tracking-tighter">Fluxo de Comunicados</h3>
                                     <button onClick={() => { setEditingComm(null); setSelectedFormats([]); setIsModalCommOpen(true); }} className="bg-[#397394] text-white px-8 py-4 rounded-2xl text-[10px] font-black uppercase flex items-center gap-2 shadow-xl active:scale-95 transition-all"><Icon name="plus" size={14} /> Adicionar Comunicado</button>
                                 </div>
 
@@ -299,17 +292,15 @@
                                         <thead className="bg-slate-50/50 border-b border-slate-100">
                                             <tr className="text-[10px] font-black uppercase text-slate-400 tracking-widest">
                                                 <th className="px-10 py-6">Item / Editoria</th>
-                                                <th className="px-10 py-6 text-center">Informações / STATUS</th>
-                                                <th className="px-10 py-6 text-right">Métricas Lado a Lado</th>
+                                                <th className="px-10 py-6 text-center">Canal / STATUS</th>
+                                                <th className="px-10 py-6 text-right">Métricas Ponderadas</th>
                                                 <th className="px-10 py-6 w-44"></th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-50">
-                                            {comms.length === 0 ? (
-                                                <tr><td colSpan="4" className="p-32 text-center text-slate-200 font-black uppercase tracking-widest text-xs italic">Aguardando novos registos...</td></tr>
-                                            ) : comms.map(c => (
+                                            {comms.map(c => (
                                                 <tr key={c.id} className="hover:bg-slate-50/50 transition-colors group">
-                                                    <td className="px-10 py-8">
+                                                    <td className="px-10 py-8 text-left">
                                                         <div className="flex items-center gap-5">
                                                             <div className="p-3 bg-slate-50 rounded-xl text-slate-300">
                                                                 {c.medium === 'Slack' ? <Icon name="slack" size={20} /> : <Icon name="mail" size={20} />}
@@ -334,25 +325,19 @@
                                                     </td>
                                                     <td className="px-10 py-8 text-right">
                                                         <div className="font-black text-3xl text-slate-900 tracking-tighter leading-none">{calculateScore(c.reactions, c.comments, c.population)}%</div>
-                                                        <div className="flex justify-end items-center gap-4 mt-2.5 opacity-80 italic border-t border-slate-50 pt-2">
-                                                            <span className="flex items-center gap-1 text-[9px] font-black uppercase tracking-widest"><Icon name="eye" size={10}/> {c.views || 0}</span>
-                                                            <span className="flex items-center gap-1 text-[9px] font-black uppercase tracking-widest"><Icon name="thumbs-up" size={10}/> {c.reactions || 0}</span>
-                                                            <span className="flex items-center gap-1 text-[9px] font-black uppercase tracking-widest"><Icon name="message-square" size={10}/> {c.comments || 0}</span>
+                                                        <div className="flex justify-end items-center gap-4 mt-2 opacity-60 italic">
+                                                            <span title="Visitas" className="flex items-center gap-1 text-[9px] font-black uppercase tracking-widest"><Icon name="eye" size={10}/> {c.views || 0}</span>
+                                                            <span title="Reações" className="flex items-center gap-1 text-[9px] font-black uppercase tracking-widest"><Icon name="thumbs-up" size={10}/> {c.reactions || 0}</span>
+                                                            <span title="Comentários" className="flex items-center gap-1 text-[9px] font-black uppercase tracking-widest"><Icon name="message-square" size={10}/> {c.comments || 0}</span>
                                                         </div>
                                                     </td>
                                                     <td className="px-10 py-8 text-right">
                                                         <div className="flex items-center justify-end gap-2">
                                                             {c.link && (
-                                                                <a href={c.link} target="_blank" className="p-3 text-slate-300 hover:text-[#397394] hover:bg-blue-50 rounded-2xl transition-all shadow-sm">
-                                                                    <Icon name="link" size={18} />
-                                                                </a>
+                                                                <a href={c.link} target="_blank" className="p-3 text-slate-300 hover:text-[#397394] hover:bg-blue-50 rounded-2xl transition-all shadow-sm"><Icon name="link" size={18} /></a>
                                                             )}
-                                                            <button onClick={() => openEditComm(c)} className="p-3 text-slate-600 hover:text-blue-500 hover:bg-white rounded-2xl shadow-sm transition-all border border-transparent hover:border-slate-100">
-                                                                <Icon name="pencil" size={18} />
-                                                            </button>
-                                                            <button onClick={() => deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'comms', c.id))} className="p-3 text-slate-200 hover:text-red-500 hover:bg-red-50 rounded-2xl transition-all">
-                                                                <Icon name="trash-2" size={18} />
-                                                            </button>
+                                                            <button onClick={() => { setEditingComm(c); setSelectedFormats(c.formats || []); setIsModalCommOpen(true); }} className="p-3 text-slate-700 hover:text-blue-500 hover:bg-white rounded-2xl shadow-sm border border-transparent hover:border-slate-100"><Icon name="pencil" size={18} /></button>
+                                                            <button onClick={() => deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'comms', c.id))} className="p-3 text-slate-200 hover:text-red-500 hover:bg-red-50 rounded-2xl transition-all"><Icon name="trash-2" size={18} /></button>
                                                         </div>
                                                     </td>
                                                 </tr>
@@ -366,13 +351,13 @@
                         {activeTab === 'agenda' && (
                             <section className="animate-in fade-in duration-500">
                                 <div className="flex justify-between items-center mb-10">
-                                    <h3 className="text-2xl font-black uppercase italic text-slate-800 tracking-tighter">Eventos Corporativos</h3>
+                                    <h3 className="text-2xl font-black uppercase italic text-slate-800 tracking-tighter">Planeamento de Operações</h3>
                                     <button onClick={() => { setEditingAgenda(null); setVendorToggle(false); setSelectedVendorIdx(null); setIsModalAgendaOpen(true); }} className="bg-[#397394] text-white px-8 py-4 rounded-2xl text-[10px] font-black uppercase flex items-center gap-2 shadow-xl active:scale-95 transition-all"><Icon name="calendar" size={14} /> Novo Planeamento</button>
                                 </div>
-                                <div className="bg-white rounded-[3rem] border border-slate-100 overflow-hidden shadow-sm">
+                                <div className="bg-white rounded-[3rem] border border-slate-100 overflow-hidden shadow-sm text-left">
                                     <table className="w-full text-left">
                                         <thead className="bg-slate-50 border-b">
-                                            <tr className="text-[10px] font-black uppercase text-slate-400 tracking-widest"><th className="px-10 py-6">Atividade / Sponsor</th><th className="px-10 py-6 text-center">Data</th><th className="px-10 py-6 text-center">STATUS</th><th className="px-10 py-6 w-24"></th></tr>
+                                            <tr className="text-[10px] font-black uppercase text-slate-400 tracking-widest"><th className="px-10 py-6">Atividade / Sponsor</th><th className="px-10 py-6 text-center">Data</th><th className="px-10 py-6 text-center">STATUS</th><th className="px-10 py-6 w-32"></th></tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-50">
                                             {agenda.map(ev => (
@@ -385,7 +370,7 @@
                                                     <td className="px-10 py-8 text-center"><span className="px-4 py-1.5 bg-blue-50 text-blue-700 text-[9px] font-black uppercase rounded-full">{ev.status || 'STATUS'}</span></td>
                                                     <td className="px-10 py-8 text-right">
                                                         <div className="flex items-center justify-end gap-2">
-                                                            <button onClick={() => { setEditingAgenda(ev); setVendorToggle(ev.hasVendor); setSelectedVendorIdx(ev.selectedVendorIdx >= 0 ? ev.selectedVendorIdx : null); setIsModalAgendaOpen(true); }} className="p-3 text-slate-600 hover:text-blue-500 hover:bg-white rounded-2xl shadow-sm transition-all border border-transparent hover:border-slate-100"><Icon name="pencil" size={18} /></button>
+                                                            <button onClick={() => { setEditingAgenda(ev); setVendorToggle(ev.hasVendor); setSelectedVendorIdx(ev.selectedVendorIdx >= 0 ? ev.selectedVendorIdx : null); setIsModalAgendaOpen(true); }} className="p-3 text-slate-700 hover:text-blue-600 hover:bg-white rounded-2xl shadow-sm transition-all border border-transparent hover:border-slate-100"><Icon name="pencil" size={18} /></button>
                                                             <button onClick={() => deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'agenda', ev.id))} className="p-3 text-slate-200 hover:text-red-500 hover:bg-red-50 rounded-2xl transition-all"><Icon name="trash-2" size={18} /></button>
                                                         </div>
                                                     </td>
@@ -398,7 +383,7 @@
                         )}
 
                         {activeTab === 'impacto' && (
-                            <section className="animate-in fade-in duration-500 space-y-10">
+                            <section className="animate-in fade-in duration-500 space-y-10 text-left">
                                 <div className="flex items-center gap-4 bg-white p-3 rounded-[1.5rem] border border-slate-100 shadow-sm w-fit">
                                     <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 rounded-xl border border-slate-100">
                                         <Icon name="filter" size={12} className="text-slate-400" />
@@ -409,25 +394,22 @@
                                 </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                                    <div className="p-10 bg-white rounded-[3rem] border border-slate-100 shadow-sm relative group hover:scale-[1.02] transition-all">
+                                    <div className="p-10 bg-white rounded-[3rem] border border-slate-100 shadow-sm group hover:scale-[1.02] transition-all">
                                         <div className="p-3 bg-slate-50 rounded-xl w-fit mb-6 text-slate-300"><Icon name="file-text" size={24} /></div>
                                         <div className="text-6xl font-black text-slate-900 tracking-tighter">{statsImpacto.totalPosts}</div>
                                         <div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-2">Total Posts</div>
                                     </div>
-                                    
                                     <div className="p-10 bg-slate-900 rounded-[3rem] shadow-2xl relative overflow-hidden group hover:scale-[1.02] transition-all">
-                                        <div className="absolute top-8 right-8 bg-emerald-400 text-slate-950 text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter shadow-glow">Target</div>
+                                        <div className="absolute top-8 right-8 bg-emerald-400 text-slate-950 text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter shadow-glow italic">Target</div>
                                         <div className="p-3 bg-white/10 rounded-xl w-fit mb-6 text-white"><Icon name="trending-up" size={24} /></div>
                                         <div className="text-6xl font-black text-white tracking-tighter">{statsImpacto.interactions}</div>
                                         <div className="text-[9px] font-black uppercase text-slate-500 tracking-widest mt-2">Interações Totais</div>
                                     </div>
-
                                     <div className="p-10 bg-white rounded-[3rem] border border-slate-100 shadow-sm hover:scale-[1.02] transition-all">
                                         <div className="p-3 bg-red-50 rounded-xl w-fit mb-6 text-red-300"><Icon name="message-circle" size={24} /></div>
                                         <div className="text-6xl font-black text-slate-900 tracking-tighter">{statsImpacto.totalComments}</div>
                                         <div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-2">Comments Total</div>
                                     </div>
-
                                     <div className="p-10 bg-[#FBFAF3] rounded-[3rem] border border-[#F0EEE6] shadow-sm hover:scale-[1.02] transition-all">
                                         <div className="p-3 bg-slate-900 text-white rounded-xl w-fit mb-6"><Icon name="zap" size={24} /></div>
                                         <div className="text-6xl font-black text-slate-900 tracking-tighter">{statsImpacto.avgScore}%</div>
@@ -437,13 +419,13 @@
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                     <SimpleBarChart title="Distribuição por Formato" data={statsImpacto.formatDistribution} color="#397394" />
-                                    <SimpleBarChart title="Performance por Editoria" data={statsImpacto.editoriaDistribution} color="#BED993" />
+                                    <SimpleBarChart title="Distribuição por Editoria" data={statsImpacto.editoriaDistribution} color="#BED993" />
                                 </div>
                             </section>
                         )}
                     </main>
 
-                    {/* MODAL COMUNICADO (V11) */}
+                    {/* MODAL COMUNICADO */}
                     {isModalCommOpen && (
                         <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
                             <div className="bg-white w-full max-w-4xl rounded-[4rem] p-12 shadow-2xl modal-animate relative max-h-[92vh] overflow-y-auto custom-scroll text-left">
@@ -455,65 +437,64 @@
                                             <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-widest italic font-bold">Data Prevista</label><input name="date" type="date" defaultValue={editingComm?.date} required className="w-full bg-slate-50 border-none rounded-2xl p-5 font-bold outline-none" /></div>
                                             <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-widest italic font-bold">Horário</label><input name="postTime" type="time" defaultValue={editingComm?.postTime} className="w-full bg-slate-50 border-none rounded-2xl p-5 font-bold outline-none text-slate-500" /></div>
                                         </div>
-                                        <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-widest italic font-bold">Editoria</label><select name="editoria" defaultValue={editingComm?.editoria || EDITORIAS[0]} className="w-full bg-slate-50 border-none rounded-2xl p-5 font-bold outline-none cursor-pointer">{EDITORIAS.map(e => <option key={e}>{e}</option>)}</select></div>
+                                        <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-widest italic font-bold">Editoria Corporativa</label><select name="editoria" defaultValue={editingComm?.editoria || EDITORIAS[0]} className="w-full bg-slate-50 border-none rounded-2xl p-5 font-bold outline-none cursor-pointer tracking-tighter font-black">{EDITORIAS.map(e => <option key={e}>{e}</option>)}</select></div>
                                         <div className="grid grid-cols-2 gap-4">
-                                            <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-widest italic font-bold">Canal</label><input name="channelName" defaultValue={editingComm?.channelName} required className="w-full bg-slate-50 border-none rounded-2xl p-5 font-bold outline-none" placeholder="#geral" /></div>
+                                            <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-widest italic font-bold">Canal</label><input name="channelName" defaultValue={editingComm?.channelName} required className="w-full bg-slate-50 border-none rounded-2xl p-5 font-bold outline-none font-black tracking-tighter" placeholder="#ops-geral" /></div>
                                             <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-widest italic font-bold">Meio</label><select name="medium" defaultValue={editingComm?.medium || 'Slack'} className="w-full bg-slate-50 border-none rounded-2xl p-5 font-bold outline-none cursor-pointer"><option>Slack</option><option>E-mail</option></select></div>
                                         </div>
-                                        <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-widest italic font-bold">Hyperlink</label><input name="link" defaultValue={editingComm?.link} className="w-full bg-slate-50 border-none rounded-2xl p-5 font-bold outline-none text-xs text-blue-500" placeholder="https://..." /></div>
+                                        <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-widest italic font-bold">Link (Direto)</label><input name="link" defaultValue={editingComm?.link} className="w-full bg-slate-50 border-none rounded-2xl p-5 font-bold outline-none text-xs text-blue-500" placeholder="https://..." /></div>
                                         <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-widest italic font-bold">STATUS</label><select name="status" defaultValue={editingComm?.status || 'Aguardando Envio'} className="w-full bg-slate-50 border-none rounded-2xl p-5 font-bold outline-none"><option>Aguardando Envio</option><option>Enviado</option><option>Cancelado</option></select></div>
                                     </div>
-
                                     <div className="space-y-8">
                                         <div className="bg-[#FBFAF3] p-10 rounded-[3rem] border border-[#F0EEE6] space-y-8 shadow-inner text-center">
                                             <div className="text-[10px] font-black uppercase text-[#397394] tracking-widest flex items-center justify-center gap-2 italic"><Icon name="bar-chart-3" size={14} /> Consolidação de Impacto</div>
                                             <div className="grid grid-cols-3 gap-4">
-                                                <div className="space-y-2"><label className="text-[8px] font-black uppercase text-[#8E97B0] block italic tracking-widest text-center">Reach 👁️</label><input name="views" type="number" defaultValue={editingComm?.views || 0} className="w-full bg-white border border-slate-100 rounded-xl p-4 font-black text-xl text-center outline-none" /></div>
-                                                <div className="space-y-2"><label className="text-[8px] font-black uppercase text-[#8E97B0] block italic tracking-widest text-center">Reações 👍</label><input name="reactions" type="number" defaultValue={editingComm?.reactions || 0} className="w-full bg-white border border-slate-100 rounded-xl p-4 font-black text-xl text-center outline-none" /></div>
-                                                <div className="space-y-2"><label className="text-[8px] font-black uppercase text-[#8E97B0] block italic tracking-widest text-center">Coments 💬</label><input name="comments" type="number" defaultValue={editingComm?.comments || 0} className="w-full bg-white border border-slate-100 rounded-xl p-4 font-black text-xl text-center outline-none" /></div>
+                                                <div className="space-y-2"><label className="text-[8px] font-black uppercase text-[#8E97B0] block italic tracking-widest">Reach 👁️</label><input name="views" type="number" defaultValue={editingComm?.views || 0} className="w-full bg-white border border-slate-100 rounded-xl p-4 font-black text-xl text-center outline-none shadow-sm" /></div>
+                                                <div className="space-y-2"><label className="text-[8px] font-black uppercase text-[#8E97B0] block italic tracking-widest">Reações 👍</label><input name="reactions" type="number" defaultValue={editingComm?.reactions || 0} className="w-full bg-white border border-slate-100 rounded-xl p-4 font-black text-xl text-center outline-none shadow-sm" /></div>
+                                                <div className="space-y-2"><label className="text-[8px] font-black uppercase text-[#8E97B0] block italic tracking-widest">Coments 💬</label><input name="comments" type="number" defaultValue={editingComm?.comments || 0} className="w-full bg-white border border-slate-100 rounded-xl p-4 font-black text-xl text-center outline-none shadow-sm" /></div>
                                             </div>
-                                            <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-widest italic">População Base (Cálculo Score)</label><input name="population" type="number" defaultValue={editingComm?.population || 126} className="w-full bg-white border-none rounded-2xl p-4 font-black text-center outline-none" /></div>
+                                            <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-widest italic">População Total (Base: 126)</label><input name="population" type="number" defaultValue={editingComm?.population || 126} className="w-full bg-white border-none rounded-2xl p-4 font-black text-center outline-none" /></div>
                                         </div>
-
                                         <div className="space-y-4">
-                                            <label className="text-[10px] font-black uppercase text-slate-400 block tracking-widest italic font-bold">Formato (Seleção Múltipla)</label>
+                                            <label className="text-[10px] font-black uppercase text-slate-400 block tracking-widest italic font-bold">Formato do Conteúdo (FLAGS)</label>
                                             <div className="grid grid-cols-3 gap-3">
                                                 {FORMATOS.map(f => (
-                                                    <div key={f} onClick={() => toggleFormat(f)} className={`p-4 rounded-xl border-2 text-center text-[10px] font-black uppercase cursor-pointer transition-all ${selectedFormats.includes(f) ? 'bg-[#397394] border-[#397394] text-white shadow-lg' : 'bg-white border-slate-50 text-slate-400 hover:border-slate-200'}`}>{f}</div>
+                                                    <div key={f} onClick={() => toggleFormat(f)} className={`p-4 rounded-xl border-2 text-center text-[10px] font-black uppercase cursor-pointer transition-all ${selectedFormats.includes(f) ? 'bg-[#397394] border-[#397394] text-white shadow-lg scale-105' : 'bg-white border-slate-50 text-slate-400 hover:border-slate-200'}`}>{f}</div>
                                                 ))}
                                             </div>
                                         </div>
-
-                                        <button type="submit" className="w-full py-6 bg-black text-white rounded-[2rem] font-black uppercase text-xs tracking-[0.3em] active:scale-[0.98] transition-all shadow-2xl shadow-black/20">SALVAR E FECHAR</button>
+                                        <button type="submit" className="w-full py-6 bg-black text-white rounded-[2rem] font-black uppercase text-xs tracking-[0.3em] active:scale-[0.98] transition-all shadow-2xl shadow-black/20 italic">SALVAR E FECHAR TUDO</button>
                                     </div>
                                 </form>
                             </div>
                         </div>
                     )}
 
-                    {/* MODAL AGENDA */}
+                    {/* MODAL AGENDA (UX VERTICALIZADA) */}
                     {isModalAgendaOpen && (
                         <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
                             <div className="bg-white w-full max-w-6xl rounded-[4rem] p-12 shadow-2xl modal-animate relative max-h-[92vh] overflow-y-auto custom-scroll text-left">
                                 <header className="mb-10 flex justify-between items-start border-b border-slate-50 pb-8">
-                                    <div><h3 className="text-5xl font-black italic uppercase tracking-tighter leading-none">{editingAgenda ? 'Ajustar' : 'Novo'} Planeamento</h3><p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-2 ml-1 italic leading-loose">Mesa de Decisão Técnica e Operacional</p></div>
+                                    <div><h3 className="text-5xl font-black italic uppercase tracking-tighter leading-none">Novo Planeamento</h3><p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-2 ml-1 italic leading-loose">Mesa de Decisão Técnica e Governança Operacional</p></div>
                                     <button onClick={() => setIsModalAgendaOpen(false)} className="p-3 bg-slate-50 rounded-full hover:text-red-500 transition-all active:scale-90"><Icon name="x" size={28} /></button>
                                 </header>
 
                                 <form onSubmit={handleSaveAgenda} className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
+                                    {/* COLUNA ESQUERDA: INFORMAÇÕES VERTICAIS PARA EVITAR CORTE */}
                                     <div className="lg:col-span-5 space-y-6 bg-slate-50 p-10 rounded-[3rem] border border-slate-100 shadow-inner">
-                                        <div className="space-y-2"><label className="text-[10px] font-black uppercase text-slate-400 block tracking-widest italic font-bold">Atividade</label><input name="atividade" defaultValue={editingAgenda?.title} required className="w-full h-16 bg-white border-none rounded-xl px-6 font-bold text-slate-800 outline-none shadow-sm" /></div>
-                                        <div className="space-y-2"><label className="text-[10px] font-black uppercase text-slate-400 block tracking-widest italic font-bold">Data Prevista</label><input name="date" type="date" defaultValue={editingAgenda?.date} required className="w-full h-16 bg-white border-none rounded-xl px-6 font-bold outline-none text-slate-500" /></div>
+                                        <div className="space-y-2"><label className="text-[10px] font-black uppercase text-slate-400 block tracking-widest italic font-bold">Atividade</label><input name="atividade" defaultValue={editingAgenda?.title} required className="w-full h-16 bg-white border-none rounded-xl px-6 font-bold text-slate-800 outline-none shadow-sm font-black italic uppercase" placeholder="Título da Pauta" /></div>
+                                        <div className="space-y-2"><label className="text-[10px] font-black uppercase text-slate-400 block tracking-widest italic font-bold text-slate-400">Data Prevista</label><input name="date" type="date" defaultValue={editingAgenda?.date} required className="w-full h-16 bg-white border-none rounded-xl px-6 font-bold outline-none text-slate-500 shadow-sm" /></div>
                                         <div className="space-y-2"><label className="text-[10px] font-black uppercase text-slate-400 block tracking-widest italic font-bold">STATUS</label><select name="status" defaultValue={editingAgenda?.status || 'Agendado'} className="w-full h-16 bg-white border-none rounded-xl px-6 font-bold outline-none cursor-pointer shadow-sm"><option>Agendado</option><option>Realizado</option><option>Cancelado</option></select></div>
-                                        <div className="space-y-2"><label className="text-[10px] font-black uppercase text-slate-400 block tracking-widest italic font-bold">Sponsor</label><input name="sponsor" defaultValue={editingAgenda?.sponsor} required className="w-full h-16 bg-white border-none rounded-xl px-6 font-bold outline-none shadow-sm" /></div>
-                                        <div className="space-y-2"><label className="text-[10px] font-black uppercase text-slate-400 block tracking-widest italic font-bold">Link Invite</label><input name="inviteLink" defaultValue={editingAgenda?.inviteLink} className="w-full h-16 bg-white border-none rounded-xl px-6 font-bold outline-none text-xs italic text-blue-500" /></div>
-                                        <div className="space-y-2"><label className="text-[10px] font-black uppercase text-slate-400 block tracking-widest italic font-bold">Pauta Técnica</label><textarea name="description" defaultValue={editingAgenda?.description} className="w-full h-40 bg-white border-none rounded-xl p-6 font-medium text-slate-600 outline-none resize-none leading-relaxed text-sm shadow-sm"></textarea></div>
+                                        <div className="space-y-2"><label className="text-[10px] font-black uppercase text-slate-400 block tracking-widest italic font-bold">Sponsor (Responsável)</label><input name="sponsor" defaultValue={editingAgenda?.sponsor} required className="w-full h-16 bg-white border-none rounded-xl px-6 font-bold outline-none shadow-sm" placeholder="Nome do Responsável" /></div>
+                                        <div className="space-y-2"><label className="text-[10px] font-black uppercase text-slate-400 block tracking-widest italic font-bold text-blue-500">Link Invite / Reunião</label><input name="inviteLink" defaultValue={editingAgenda?.inviteLink} className="w-full h-16 bg-white border-none rounded-xl px-6 font-bold outline-none text-xs italic text-blue-500 shadow-sm" placeholder="https://..." /></div>
+                                        <div className="space-y-2"><label className="text-[10px] font-black uppercase text-slate-400 block tracking-widest italic font-bold">Pauta Técnica (Descrição)</label><textarea name="description" defaultValue={editingAgenda?.description} className="w-full h-40 bg-white border-none rounded-xl p-8 font-medium text-slate-600 outline-none resize-none leading-relaxed text-sm shadow-sm" placeholder="Escreva aqui os detalhes da pauta técnica..."></textarea></div>
                                     </div>
 
+                                    {/* COLUNA DIREITA: MESA DE DECISÃO INTEGRADA NO ESPAÇO AO LADO */}
                                     <div className="lg:col-span-7 bg-slate-900 rounded-[4rem] p-12 shadow-2xl flex flex-col justify-between self-stretch min-h-[700px]">
                                         <div>
                                             <div className="flex justify-between items-center mb-10 border-b border-white/5 pb-8">
-                                                <div className="text-[10px] font-black uppercase text-white tracking-[0.3em] flex items-center gap-3 italic"><div className="w-2.5 h-2.5 rounded-full bg-amber-400"></div> MESA DE DECISÃO</div>
+                                                <div className="text-[10px] font-black uppercase text-white tracking-[0.3em] flex items-center gap-3 italic"><div className="w-2.5 h-2.5 rounded-full bg-amber-400 shadow-glow"></div> MESA DE DECISÃO</div>
                                                 <div className="flex items-center gap-4 bg-white/5 p-3 rounded-full border border-white/10 px-6">
                                                     <span className="text-[9px] font-black text-slate-500 uppercase tracking-tighter italic">Com Fornecedor?</span>
                                                     <button type="button" onClick={() => setVendorToggle(!vendorToggle)} className={`w-14 h-7 rounded-full relative transition-all duration-500 ${vendorToggle ? 'bg-[#BED993]' : 'bg-slate-700'}`}><div className={`absolute top-1 left-1 w-5 h-5 rounded-full bg-white shadow-lg transition-all duration-500 ${vendorToggle ? 'translate-x-7' : ''}`}></div></button>
@@ -523,18 +504,19 @@
                                             {vendorToggle ? (
                                                 <div className="space-y-6 animate-in fade-in zoom-in duration-500">
                                                     {[0, 1, 2].map(i => (
-                                                        <div key={i} onClick={() => setSelectedVendorIdx(i)} className={`card-decision p-6 rounded-[2rem] bg-white/5 border-2 flex items-center gap-6 ${selectedVendorIdx === i ? 'border-[#BED993] bg-white/10' : 'border-white/5 hover:border-white/10'}`}>
+                                                        <div key={i} onClick={() => setSelectedVendorIdx(i)} className={`card-decision p-6 rounded-[2rem] bg-white/5 border-2 flex items-center gap-6 ${selectedVendorIdx === i ? 'border-[#BED993] bg-white/10 shadow-glow' : 'border-white/5 hover:border-white/10'}`}>
                                                             <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black text-xs ${selectedVendorIdx === i ? 'bg-[#BED993] text-emerald-950' : 'bg-white/10 text-white/20'}`}>0{i+1}</div>
                                                             <input name={`v${i+1}`} defaultValue={editingAgenda?.[`vendor${i+1}`]} placeholder={`Fornecedor Opção ${i+1}`} className="flex-1 bg-transparent border-none text-base font-extrabold outline-none text-white placeholder:text-white/10" onClick={(e) => e.stopPropagation()} />
                                                             <div className={`px-5 py-2.5 rounded-xl font-black uppercase text-[8px] transition-all tracking-widest ${selectedVendorIdx === i ? 'bg-[#BED993] text-emerald-950 shadow-lg' : 'bg-white/10 text-slate-400'}`}>{selectedVendorIdx === i ? 'ELEITO' : 'ELEGER'}</div>
                                                         </div>
                                                     ))}
+                                                    <p className="text-[8px] font-bold text-slate-500 uppercase text-center tracking-[0.3em] italic mt-8 leading-loose opacity-40">A eleição oficializa a pauta no ecossistema operativo global.</p>
                                                 </div>
                                             ) : (
-                                                <div className="h-[450px] flex flex-col items-center justify-center text-center opacity-20 border border-dashed border-white/20 rounded-[3rem]"><Icon name="users" size={64} className="mb-8 text-white" /><h4 className="font-black uppercase text-sm text-white tracking-[0.4em]">EQUIPA INTERNA</h4><p className="text-[9px] font-bold text-white uppercase mt-4 tracking-widest italic leading-loose text-center px-10">Execução exclusiva por recursos próprios.</p></div>
+                                                <div className="h-[450px] flex flex-col items-center justify-center text-center opacity-20 border border-dashed border-white/20 rounded-[3rem]"><Icon name="users" size={64} className="mb-8 text-white" /><h4 className="font-black uppercase text-sm text-white tracking-[0.4em]">USO INTERNO ATIVADO</h4><p className="text-[9px] font-bold text-white uppercase mt-4 tracking-widest italic leading-loose text-center px-10">Este evento será executado integralmente por recursos próprios alocados.</p></div>
                                             )}
                                         </div>
-                                        <div className="mt-12"><button type="submit" className="w-full h-24 bg-white text-black hover:bg-slate-100 rounded-[2.5rem] font-black uppercase text-xs tracking-[0.4em] shadow-2xl active:scale-[0.98] transition-all flex items-center justify-center gap-5 italic shadow-white/5">CONFIRMAR E SALVAR REGISTO</button></div>
+                                        <div className="mt-12"><button type="submit" className="w-full h-24 bg-white text-black hover:bg-slate-100 rounded-[2.5rem] font-black uppercase text-xs tracking-[0.4em] shadow-2xl active:scale-[0.98] transition-all flex items-center justify-center gap-5 italic shadow-white/5 font-black uppercase italic">CONFIRMAR E SALVAR REGISTO</button></div>
                                     </div>
                                 </form>
                             </div>
