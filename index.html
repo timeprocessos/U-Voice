@@ -10,101 +10,39 @@
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800;900&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #FDFDFE; margin: 0; padding: 0; overflow-x: hidden; }
         
-        :root {
-            --primary-blue: #397394;
-            --accent-green: #BED993;
-            --bg-main: #FDFDFE;
-        }
-
-        body { 
-            font-family: 'Inter', sans-serif; 
-            background-color: var(--bg-main); 
-            margin: 0; 
-            padding: 0; 
-            color: #1e293b;
-            -webkit-font-smoothing: antialiased;
-        }
-
-        /* Custom Scrollbar */
         .custom-scroll::-webkit-scrollbar { width: 4px; height: 4px; }
-        .custom-scroll::-webkit-scrollbar-track { background: transparent; }
         .custom-scroll::-webkit-scrollbar-thumb { background: #E2E8F0; border-radius: 10px; }
         
-        /* Animations */
-        .modal-animate { animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
-        @keyframes slideUp { from { transform: translateY(30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .modal-animate { animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 
-        .fade-in { animation: fadeIn 0.3s ease-out; }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-
-        /* Component Styles */
-        .impact-filter { 
-            background: white; 
-            border: 1px solid #F1F5F9; 
-            border-radius: 12px; 
-            padding: 8px 16px; 
-            font-size: 10px; 
-            font-weight: 800; 
-            text-transform: uppercase; 
-            color: #64748b; 
-            outline: none; 
-            transition: all 0.2s; 
-            cursor: pointer; 
-            appearance: none;
-        }
-        .impact-filter:hover { border-color: var(--primary-blue); color: var(--primary-blue); }
+        .impact-filter { background: white; border: 1px solid #F1F5F9; border-radius: 12px; padding: 8px 16px; font-size: 10px; font-weight: 900; text-transform: uppercase; color: #1e293b; outline: none; transition: all 0.2s; cursor: pointer; }
+        .impact-filter:hover { border-color: #CBD5E1; }
         
-        .row-green-effect { 
-            border-left: 5px solid var(--accent-green) !important; 
-            background: linear-gradient(90deg, rgba(190, 217, 147, 0.08) 0%, rgba(255, 255, 255, 0) 100%); 
-        }
-
+        .row-green-effect { border-left: 4px solid #BED993 !important; background: linear-gradient(90deg, rgba(190, 217, 147, 0.05) 0%, rgba(255, 255, 255, 0) 100%); }
+        input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+        
         .btn-close-modal { 
             position: absolute; top: 1.5rem; right: 1.5rem; background: #000; color: #fff; 
-            width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; 
-            justify-content: center; z-index: 170; transition: all 0.3s; 
-            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.15); border: 2px solid rgba(255,255,255,0.1); 
+            width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; 
+            justify-content: center; z-index: 170; transition: all 0.2s; 
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2); border: 2px solid rgba(255,255,255,0.1); cursor: pointer; 
         }
         .btn-close-modal:hover { transform: scale(1.1) rotate(90deg); background: #ef4444; }
 
-        .checkbox-flag { 
-            display: flex; align-items: center; gap: 8px; padding: 10px 16px; 
-            background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 14px; 
-            cursor: pointer; transition: all 0.2s; font-size: 10px; font-weight: 800; 
-            text-transform: uppercase; user-select: none;
-        }
-        .checkbox-flag.active { background: var(--primary-blue); color: white; border-color: var(--primary-blue); box-shadow: 0 4px 12px rgba(57, 115, 148, 0.2); }
+        .checkbox-flag { display: flex; align-items: center; gap: 8px; padding: 8px 16px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; cursor: pointer; transition: all 0.2s; font-size: 11px; font-weight: 700; text-transform: uppercase; }
+        .checkbox-flag.active { background: #397394; color: white; border-color: #397394; }
         
-        .status-pill { padding: 4px 14px; border-radius: 99px; font-size: 9px; font-weight: 900; text-transform: uppercase; display: inline-flex; align-items: center; gap: 4px; }
+        .status-pill { padding: 4px 12px; border-radius: 99px; font-size: 9px; font-weight: 900; text-transform: uppercase; display: inline-block; }
         .status-sent { background: #ecfdf5; color: #059669; }
-        .status-pending { background: #fffbeb; color: #d97706; }
+        .status-pending { background: #fef3c7; color: #d97706; }
         .status-canceled { background: #fef2f2; color: #dc2626; }
         
-        .card-decision { transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); border: 2.5px solid transparent; cursor: pointer; }
-        .shadow-glow-green { box-shadow: 0 0 25px rgba(190, 217, 147, 0.3); }
-
-        .message-box { 
-            position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%); 
-            background: #0f172a; color: white; padding: 14px 28px; border-radius: 16px; 
-            z-index: 1000; font-weight: 800; font-size: 10px; text-transform: uppercase; 
-            letter-spacing: 0.15em; box-shadow: 0 20px 40px rgba(0,0,0,0.4);
-            animation: slideUp 0.3s forwards;
-        }
-
-        /* Glassmorphism for inputs */
-        .glass-input {
-            background: rgba(248, 250, 252, 0.8);
-            backdrop-filter: blur(4px);
-            border: 1px solid #e2e8f0;
-            transition: all 0.2s;
-        }
-        .glass-input:focus {
-            background: #fff;
-            border-color: var(--primary-blue);
-            ring: 4px rgba(57, 115, 148, 0.1);
-        }
+        .card-decision { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); border: 2px solid transparent; cursor: pointer; }
+        .message-box { position: fixed; bottom: 85px; left: 50%; transform: translateX(-50%); background: #1e293b; color: white; padding: 12px 24px; border-radius: 12px; z-index: 200; font-weight: 900; font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; box-shadow: 0 20px 40px rgba(0,0,0,0.3); }
     </style>
 </head>
 <body>
@@ -112,21 +50,29 @@
 
     <script type="text/babel" data-type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, onAuthStateChanged, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, doc, onSnapshot, deleteDoc, addDoc, updateDoc, query, orderBy } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, doc, onSnapshot, deleteDoc, addDoc, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // Firebase Configuration from Environment
-        const firebaseConfig = JSON.parse(__firebase_config);
+        // Configuração do Firebase
+        const firebaseConfig = {
+            apiKey: "AIzaSyCRNpfVN3n_Ue9kocKSU7EGlp9ElBJWvRg",
+            authDomain: "u-voice-82837.firebaseapp.com",
+            projectId: "u-voice-82837",
+            storageBucket: "u-voice-82837.firebasestorage.app",
+            messagingSenderId: "363918476944",
+            appId: "1:363918476944:web:02fe7e523c4eed24abba15"
+        };
+
         const firebaseApp = initializeApp(firebaseConfig);
         const auth = getAuth(firebaseApp);
         const db = getFirestore(firebaseApp);
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'u-voice-v26-gold';
+        const APP_ID_ROOT = 'u-voice-v26-gold';
 
         const { useState, useEffect, useMemo, useRef } = React;
 
         // --- CONSTANTES ---
         const EDITORIAS_LIST = ["Originais Unico", "Career Ops", "The Ops Playbook", "The Ops Story"];
-        const FORMATOS_LIST = ["Vídeo", "Imagem", "GIF", "Texto", "Slide", "PDF", "Repost"];
+        const FORMATOS_LIST = ["Vídeo", "Imagem", "GIF", "Texto", "Slide", "PDF"];
         const STATUS_OPTIONS = ["Aguardando Envio", "Enviado", "Cancelado"];
         const MESES_MAP = [
             { label: "Janeiro", val: "0" }, { label: "Fevereiro", val: "1" }, { label: "Março", val: "2" },
@@ -138,7 +84,7 @@
         const ANALYSTS_LIST = ["Ariel Mori Dell Aringa", "Diego Francisco Rocha"];
         const CHANNELS_LIST = ["#news-ops-all-team", "#news-cx-team", "#news-analysis-team", "#news-onboarding-team", "#news-ops-leaders"];
 
-        // --- COMPONENTES ---
+        // --- COMPONENTES AUXILIARES ---
         const Icon = ({ name, size = 18, className = "" }) => {
             const iconRef = useRef(null);
             useEffect(() => {
@@ -150,29 +96,23 @@
         };
 
         const UnicoLogo = ({ size = 34 }) => (
-            <div className="bg-black rounded-xl flex items-center justify-center shadow-lg transform transition-transform hover:scale-105" style={{ width: size, height: size }}>
+            <div className="bg-black rounded-xl flex items-center justify-center shadow-lg" style={{ width: size, height: size }}>
                 <svg width={size * 0.6} height={size * 0.6} viewBox="0 0 100 100" fill="none">
                     <path d="M20 20V55C20 71.5685 33.4315 85 50 85C66.5685 85 80 71.5685 80 55V20H65V55C65 63.2843 58.2843 70 50 70C41.7157 70 35 63.2843 35 55V20H20Z" fill="white"/>
                 </svg>
             </div>
         );
 
-        const SimpleBarChart = ({ data, title, color = "#397394" }) => {
+        function SimpleBarChart({ data, title, color = "#397394" }) {
             const maxVal = Math.max(...Object.values(data), 1);
             return (
-                <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm w-full">
-                    <h4 className="text-[10px] font-black uppercase text-slate-400 mb-6 tracking-[0.2em] italic">{title}</h4>
-                    <div className="space-y-5">
+                <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm w-full text-left">
+                    <h4 className="text-[10px] font-black uppercase text-slate-400 mb-6 tracking-widest italic">{title}</h4>
+                    <div className="space-y-4">
                         {Object.entries(data).map(([key, val]) => (
-                            <div key={key} className="space-y-2">
-                                <div className="flex justify-between text-[9px] font-black uppercase text-slate-600">
-                                    <span>{key}</span>
-                                    <span className="text-slate-400">{val}</span>
-                                </div>
-                                <div className="h-2.5 bg-slate-50 rounded-full overflow-hidden">
-                                    <div className="h-full rounded-full transition-all duration-1000 ease-out" 
-                                         style={{ width: `${(val/maxVal)*100}%`, backgroundColor: color }}></div>
-                                </div>
+                            <div key={key} className="space-y-1">
+                                <div className="flex justify-between text-[8px] font-black uppercase text-slate-500"><span>{key}</span><span>{val}</span></div>
+                                <div className="h-2 bg-slate-50 rounded-full overflow-hidden"><div className="h-full rounded-full transition-all duration-1000" style={{ width: `${(val/maxVal)*100}%`, backgroundColor: color }}></div></div>
                             </div>
                         ))}
                     </div>
@@ -180,40 +120,30 @@
             );
         }
 
-        const LineAreaChart = ({ data, title, color = "#397394", valueSuffix = "" }) => {
-            const chartHeight = 240; 
-            const chartWidth = 800;
-            const paddingX = 40; 
-            const paddingY = 60;
+        function LineAreaChart({ data, title, color = "#397394", valueSuffix = "" }) {
+            const chartHeight = 220; const chartWidth = 800;
+            const paddingX = 40; const paddingY = 60;
             const values = Object.values(data);
-            const maxVal = Math.max(...values, 1) * 1.3;
+            const maxVal = Math.max(...values, 1) * 1.2;
             const keys = Object.keys(data);
-            
             const points = keys.map((key, i) => {
                 const x = (i * (chartWidth - paddingX * 2)) / (keys.length - 1) + paddingX;
                 const y = chartHeight - ((data[key] / maxVal) * (chartHeight - paddingY * 2)) - paddingY;
                 return { x, y, val: data[key], label: key };
             });
-
             const linePath = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
             const areaPath = `${linePath} L ${points[points.length-1].x} ${chartHeight - paddingY} L ${points[0].x} ${chartHeight - paddingY} Z`;
-
             return (
-                <div className="bg-white p-8 rounded-[3rem] border border-slate-100 shadow-sm w-full">
-                    <h4 className="text-[11px] font-black uppercase text-slate-400 mb-10 tracking-[0.2em] italic">{title}</h4>
-                    <div className="relative w-full overflow-x-auto custom-scroll pb-6">
-                        <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} className="w-full min-w-[700px] h-auto overflow-visible">
-                            {[0, 0.5, 1].map((p, i) => (
-                                <line key={i} x1={paddingX} y1={chartHeight - paddingY - p * (chartHeight - paddingY * 2)} 
-                                      x2={chartWidth - paddingX} y2={chartHeight - paddingY - p * (chartHeight - paddingY * 2)} 
-                                      stroke="#F1F5F9" strokeWidth="2" strokeDasharray="6 6" />
-                            ))}
-                            <path d={areaPath} fill={color} fillOpacity="0.08" />
-                            <path d={linePath} fill="none" stroke={color} strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" />
+                <div className="bg-white p-8 rounded-[3rem] border border-slate-100 shadow-sm w-full transition-all">
+                    <h4 className="text-[11px] font-black uppercase text-slate-400 mb-8 tracking-[0.2em] italic">{title}</h4>
+                    <div className="relative w-full overflow-x-auto custom-scroll pb-4">
+                        <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} className="w-full min-w-[600px] h-auto overflow-visible">
+                            {[0, 0.5, 1].map((p, i) => (<line key={i} x1={paddingX} y1={chartHeight - paddingY - p * (chartHeight - paddingY * 2)} x2={chartWidth - paddingX} y2={chartHeight - paddingY - p * (chartHeight - paddingY * 2)} stroke="#F1F5F9" strokeWidth="1.5" strokeDasharray="4 4" />))}
+                            <path d={areaPath} fill={color} fillOpacity="0.05" /><path d={linePath} fill="none" stroke={color} strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
                             {points.map((p, i) => (
                                 <g key={i}>
-                                    <circle cx={p.x} cy={p.y} r="7" fill="white" stroke={color} strokeWidth="4" className="filter drop-shadow-sm" />
-                                    <text x={p.x} y={p.y - 25} textAnchor="middle" className="font-black" style={{ fontSize: '13px', fill: '#0f172a' }}>{p.val}{valueSuffix}</text>
+                                    <circle cx={p.x} cy={p.y} r="6" fill="white" stroke={color} strokeWidth="4" />
+                                    <text x={p.x} y={p.y - 22} textAnchor="middle" className="font-black" style={{ fontSize: '14px', fill: '#1e293b' }}>{p.val}{valueSuffix}</text>
                                     <text x={p.x} y={chartHeight - 15} textAnchor="middle" className="font-bold text-slate-400 uppercase" style={{ fontSize: '9px' }}>{p.label}</text>
                                 </g>
                             ))}
@@ -225,14 +155,14 @@
 
         // --- APP PRINCIPAL ---
         function App() {
+            // Estados Fundamentais
             const [user, setUser] = useState(null);
             const [activeTab, setActiveTab] = useState('comunicados');
             const [comms, setComms] = useState([]);
             const [agenda, setAgenda] = useState([]);
             const [message, setMessage] = useState("");
-            const [isLoading, setIsLoading] = useState(true);
             
-            // Modais e Edição
+            // Estados de Interface e Modais
             const [isModalCommOpen, setIsModalCommOpen] = useState(false);
             const [isModalAgendaOpen, setIsModalAgendaOpen] = useState(false);
             const [editingComm, setEditingComm] = useState(null);
@@ -240,7 +170,6 @@
 
             // Estados de Formulário
             const [channelsList, setChannelsList] = useState(CHANNELS_LIST);
-            const [availableAnalysts, setAvailableAnalysts] = useState(ANALYSTS_LIST);
             const [selectedAnalysts, setSelectedAnalysts] = useState([]);
             const [selectedFormats, setSelectedFormats] = useState([]);
             const [localBudget, setLocalBudget] = useState(0);
@@ -249,22 +178,18 @@
             const [selectedVendorIdx, setSelectedVendorIdx] = useState(null);
             const [localVendors, setLocalVendors] = useState([{ name: '', value: 0 }, { name: '', value: 0 }, { name: '', value: 0 }]);
 
-            // Filtros
+            // Filtros Dinâmicos (Aba Comunicados)
             const [filterAnalyst, setFilterAnalyst] = useState("Todos");
             const [filterYear, setFilterYear] = useState("2026");
             const [filterMonth, setFilterMonth] = useState("Todos");
             const [filterChannel, setFilterChannel] = useState("Todos Canais");
             const [filterEditoria, setFilterEditoria] = useState("Todas");
 
-            // 1. Auth Init
+            // 1. Inicialização de Autenticação e Dados
             useEffect(() => {
                 const initAuth = async () => {
                     try {
-                        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                            await signInWithCustomToken(auth, __initial_auth_token);
-                        } else {
-                            await signInAnonymously(auth);
-                        }
+                        await signInAnonymously(auth);
                     } catch (e) {
                         console.error("Firebase auth error:", e);
                     }
@@ -272,55 +197,37 @@
                 initAuth();
                 const unsubscribeAuth = onAuthStateChanged(auth, (u) => {
                     setUser(u);
-                    if (u) {
-                        setMessage("Conexão Segura Ativa");
-                        setIsLoading(false);
-                    }
+                    if (u) setMessage("U-Voice Gold Conectado");
                 });
                 return () => unsubscribeAuth();
             }, []);
 
-            // 2. Data Sync
+            // 2. Sincronização em Tempo Real (Blindagem contra Permission Error)
             useEffect(() => {
                 if (!user) return;
                 
-                const commsRef = collection(db, 'artifacts', appId, 'public', 'data', 'comms');
-                const unsubC = onSnapshot(commsRef, (snap) => {
-                    setComms(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-                }, (err) => console.error("Sync Error Comms:", err));
+                const unsubC = onSnapshot(collection(db, 'artifacts', APP_ID_ROOT, 'public', 'data', 'comms'), 
+                    (snap) => setComms(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+                    (err) => console.error("Firestore Error Comms:", err)
+                );
                 
-                const agendaRef = collection(db, 'artifacts', appId, 'public', 'data', 'agenda');
-                const unsubA = onSnapshot(agendaRef, (snap) => {
-                    setAgenda(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-                }, (err) => console.error("Sync Error Agenda:", err));
+                const unsubA = onSnapshot(collection(db, 'artifacts', APP_ID_ROOT, 'public', 'data', 'agenda'), 
+                    (snap) => setAgenda(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+                    (err) => console.error("Firestore Error Agenda:", err)
+                );
                 
                 return () => { unsubC(); unsubA(); };
             }, [user]);
 
-            // Mensagem Temporária
-            useEffect(() => {
-                if (message) {
-                    const timer = setTimeout(() => setMessage(""), 3500);
-                    return () => clearTimeout(timer);
-                }
-            }, [message]);
-
-            // Lógica de Negócio
-            const calculateScore = (reactions = 0, comments = 0, population = 0) => {
-                if (!population || population <= 0) return 0;
+            // --- LÓGICA DE NEGÓCIO ---
+            const calculateScore = (reactions = 0, comments = 0, population = 126) => {
+                if (!population || population === 0) return 0;
                 return ((((Number(reactions) * 1) + (Number(comments) * 2)) / Number(population)) * 100).toFixed(1);
             };
 
             const toggleAnalyst = (name) => setSelectedAnalysts(prev => prev.includes(name) ? prev.filter(n => n !== name) : [...prev, name]);
-            const addNewAnalyst = () => {
-                const name = prompt("Nome do novo analista:");
-                if (name && !availableAnalysts.includes(name)) {
-                    setAvailableAnalysts([...availableAnalysts, name]);
-                }
-            };
             const toggleFormat = (f) => setSelectedFormats(prev => prev.includes(f) ? prev.filter(item => item !== f) : [...prev, f]);
 
-            // CRUD Handlers
             const handleSaveComm = async (e) => {
                 e.preventDefault();
                 if (!user) return;
@@ -335,7 +242,7 @@
                     formats: selectedFormats, 
                     medium: fd.get('medium') || 'Slack', 
                     status: fd.get('status'),
-                    population: fd.get('population') ? Number(fd.get('population')) : 0, 
+                    population: Number(fd.get('population') || 126), 
                     views: Number(fd.get('views') || 0),
                     reactions: Number(fd.get('reactions') || 0), 
                     comments: Number(fd.get('comments') || 0), 
@@ -344,30 +251,10 @@
 
                 setIsModalCommOpen(false);
                 try {
-                    if (editingComm) await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'comms', editingComm.id), data);
-                    else await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'comms'), data);
-                    setMessage("Comunicado registrado!");
-                } catch (err) { setMessage("Erro ao salvar."); }
-            };
-
-            const handleSaveAgenda = async (e) => {
-                e.preventDefault();
-                if (!user) return;
-                const fd = new FormData(e.target);
-                const data = {
-                    title: fd.get('atividade'), date: fd.get('date'), sponsor: fd.get('sponsor'), description: fd.get('description'),
-                    status: fd.get('status'), budget: localBudget, hasCoffee: hasCoffee, hasVendor: vendorToggle,
-                    selectedVendorIdx: selectedVendorIdx !== null ? selectedVendorIdx : -1,
-                    vendor1: localVendors[0].name, vendorValue1: localVendors[0].value,
-                    vendor2: localVendors[1].name, vendorValue2: localVendors[1].value,
-                    vendor3: localVendors[2].name, vendorValue3: localVendors[2].value, updatedAt: new Date().toISOString()
-                };
-                setIsModalAgendaOpen(false);
-                try {
-                    if (editingAgenda) await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'agenda', editingAgenda.id), data);
-                    else await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'agenda'), data);
-                    setMessage("Planeamento salvo!");
-                } catch (err) { setMessage("Erro ao processar."); }
+                    if (editingComm) await updateDoc(doc(db, 'artifacts', APP_ID_ROOT, 'public', 'data', 'comms', editingComm.id), data);
+                    else await addDoc(collection(db, 'artifacts', APP_ID_ROOT, 'public', 'data', 'comms'), data);
+                    setMessage("Sucesso! Comunicado salvo.");
+                } catch (err) { setMessage("Erro ao gravar dados."); }
             };
 
             const openCommModal = (c = null) => {
@@ -393,7 +280,27 @@
                 setIsModalAgendaOpen(true);
             };
 
-            // Filtragem e Stats
+            const handleSaveAgenda = async (e) => {
+                e.preventDefault();
+                if (!user) return;
+                const fd = new FormData(e.target);
+                const data = {
+                    title: fd.get('atividade'), date: fd.get('date'), sponsor: fd.get('sponsor'), description: fd.get('description'),
+                    status: fd.get('status'), budget: localBudget, hasCoffee: hasCoffee, hasVendor: vendorToggle,
+                    selectedVendorIdx: selectedVendorIdx !== null ? selectedVendorIdx : -1,
+                    vendor1: localVendors[0].name, vendorValue1: localVendors[0].value,
+                    vendor2: localVendors[1].name, vendorValue2: localVendors[1].value,
+                    vendor3: localVendors[2].name, vendorValue3: localVendors[2].value, updatedAt: new Date().toISOString()
+                };
+                setIsModalAgendaOpen(false);
+                try {
+                    if (editingAgenda) await updateDoc(doc(db, 'artifacts', APP_ID_ROOT, 'public', 'data', 'agenda', editingAgenda.id), data);
+                    else await addDoc(collection(db, 'artifacts', APP_ID_ROOT, 'public', 'data', 'agenda'), data);
+                    setMessage("Agenda atualizada!");
+                } catch (err) { setMessage("Erro ao salvar."); }
+            };
+
+            // Memos para Filtros e Impacto
             const filteredComms = useMemo(() => {
                 return comms.filter(c => {
                     const d = new Date(c.date);
@@ -403,14 +310,19 @@
                     const channelMatch = filterChannel === "Todos Canais" || c.channelName === filterChannel;
                     const editoriaMatch = filterEditoria === "Todas" || c.editoria === filterEditoria;
                     return analystMatch && yearMatch && monthMatch && channelMatch && editoriaMatch;
-                }).sort((a, b) => new Date(b.date) - new Date(a.date));
+                });
             }, [comms, filterAnalyst, filterYear, filterMonth, filterChannel, filterEditoria]);
 
             const statsImpacto = useMemo(() => {
-                const sent = comms.filter(c => c.status === 'Enviado' && new Date(c.date).getFullYear().toString() === filterYear);
+                // REGRA SÊNIOR: APENAS POSTS ENVIADOS CONTAM PARA O IMPACTO
+                const sent = comms.filter(c => {
+                    const d = new Date(c.date);
+                    return c.status === 'Enviado' && d.getFullYear().toString() === filterYear && (filterChannel === "Todos Canais" || c.medium === filterChannel);
+                });
+
                 const totalPosts = sent.length;
                 const interactions = sent.reduce((acc, c) => acc + (Number(c.reactions) || 0) + (Number(c.comments) || 0), 0);
-                const totalComments = sent.reduce((acc, c) => acc + (Number(comments) || 0), 0);
+                const totalComments = sent.reduce((acc, c) => acc + (Number(c.comments) || 0), 0);
                 const scoreSum = sent.reduce((acc, c) => acc + Number(calculateScore(c.reactions, c.comments, c.population)), 0);
                 const avgScore = totalPosts > 0 ? (scoreSum / totalPosts).toFixed(1) : "0.0";
                 
@@ -425,317 +337,147 @@
                     else monthlyEngagement[mes] = 0;
                 });
                 return { totalPosts, interactions, totalComments, avgScore, formatDist, editoriaDist, monthlyPosts, monthlyEngagement };
-            }, [comms, filterYear]);
-
-            if (isLoading) return <div className="h-screen flex items-center justify-center bg-slate-50"><div className="animate-spin text-slate-900"><Icon name="loader-2" size={40} /></div></div>;
+            }, [comms, filterYear, filterChannel]);
 
             return (
-                <div className="min-h-screen pb-40">
-                    {message && <div className="message-box">{message}</div>}
+                <div className="min-h-screen pb-32">
+                    {message && <div className="message-box" onClick={() => setMessage("")}>{message}</div>}
                     
-                    {/* NAVBAR */}
-                    <nav className="bg-white/80 backdrop-blur-xl border-b border-slate-100 px-6 sm:px-12 py-5 flex justify-between items-center sticky top-0 z-50">
-                        <div className="flex items-center gap-4">
-                            <UnicoLogo size={42} />
-                            <h1 className="text-2xl font-black italic uppercase tracking-tighter leading-none text-slate-900">U-Voice</h1>
-                        </div>
-                        <div className="flex bg-slate-100/80 p-1.5 rounded-full gap-1 shadow-inner">
+                    <nav className="bg-white border-b px-4 sm:px-10 py-5 flex justify-between items-center sticky top-0 z-50 shadow-sm">
+                        <div className="flex items-center gap-3"><UnicoLogo size={42} /><h1 className="text-xl sm:text-2xl font-black italic uppercase tracking-tighter leading-none">U-Voice</h1></div>
+                        <div className="flex bg-slate-100 p-1 rounded-full gap-1 overflow-x-auto max-w-full">
                             {['comunicados', 'agenda', 'impacto'].map(tab => (
-                                <button key={tab} onClick={() => setActiveTab(tab)} 
-                                        className={`px-8 py-2.5 rounded-full text-[10px] font-black uppercase transition-all whitespace-nowrap ${activeTab === tab ? 'bg-black text-white shadow-lg' : 'text-slate-400 hover:text-slate-600'}`}>
-                                    {tab}
-                                </button>
+                                <button key={tab} onClick={() => setActiveTab(tab)} className={`px-6 py-2.5 rounded-full text-[9px] sm:text-[10px] font-black uppercase transition-all whitespace-nowrap ${activeTab === tab ? 'bg-black text-white shadow-lg' : 'text-slate-400 hover:text-slate-600'}`}>{tab}</button>
                             ))}
                         </div>
                     </nav>
 
-                    <main className="max-w-7xl mx-auto px-6 sm:px-12 py-12">
-                        {/* HEADER DINÂMICO */}
-                        <header className="mb-16">
-                            <h2 className="text-6xl sm:text-9xl font-black italic tracking-tighter leading-none text-slate-900 uppercase">
+                    <main className="max-w-7xl mx-auto px-6 sm:px-10 py-10 text-left">
+                        <header className="mb-12">
+                            <h2 className="text-5xl sm:text-8xl font-black italic tracking-tighter leading-tight text-slate-900 uppercase">
                                 {activeTab === 'comunicados' ? 'flow.feed' : activeTab === 'agenda' ? 'next.steps' : 'impact.metrics'}
                             </h2>
-                            <p className="text-slate-400 font-black uppercase text-[11px] tracking-[0.5em] mt-6 ml-2 italic flex items-center gap-3">
-                                <span className="w-12 h-[2px] bg-slate-200"></span>
-                                Gestão Estratégica Operacional
-                            </p>
+                            <p className="text-slate-400 font-black uppercase text-[10px] sm:text-xs tracking-[0.4em] mt-4 ml-1 italic leading-none text-slate-400">Gestão Estratégica Operacional</p>
                         </header>
 
-                        {/* TABS CONTENT */}
+                        {/* ÁREA AMARELA: FILTROS DINÂMICOS */}
                         {activeTab === 'comunicados' && (
-                            <div className="space-y-10 fade-in">
-                                {/* FILTROS */}
-                                <div className="flex flex-wrap items-center gap-4 bg-white p-5 rounded-[2.5rem] border border-slate-100 shadow-sm">
-                                    <div className="flex items-center gap-2 px-5 py-2.5 bg-slate-50 rounded-2xl text-slate-400 border border-slate-100">
-                                        <Icon name="filter" size={14} /><span className="text-[10px] font-black uppercase">Filtros</span>
-                                    </div>
-                                    <select value={filterAnalyst} onChange={(e) => setFilterAnalyst(e.target.value)} className="impact-filter"><option>Todos</option>{availableAnalysts.map(a => <option key={a}>{a}</option>)}</select>
-                                    <select value={filterYear} onChange={(e) => setFilterYear(e.target.value)} className="impact-filter"><option>2025</option><option>2026</option></select>
-                                    <select value={filterMonth} onChange={(e) => setFilterMonth(e.target.value)} className="impact-filter"><option value="Todos">Todos Meses</option>{MESES_MAP.map(m => <option key={m.val} value={m.val}>{m.label}</option>)}</select>
-                                    <select value={filterChannel} onChange={(e) => setFilterChannel(e.target.value)} className="impact-filter"><option>Todos Canais</option>{channelsList.map(c => <option key={c}>{c}</option>)}</select>
-                                    <button onClick={() => {setFilterAnalyst("Todos"); setFilterYear("2026"); setFilterMonth("Todos"); setFilterChannel("Todos Canais");}} className="ml-auto text-[10px] font-black uppercase text-red-400 hover:text-red-500 transition-colors">Limpar Tudo</button>
+                            <div className="flex flex-wrap items-center gap-3 mb-10 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm sticky top-[85px] z-40">
+                                <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 rounded-xl text-slate-400 border border-slate-100">
+                                    <Icon name="filter" size={14} /><span className="text-[10px] font-black uppercase">Filtros</span>
                                 </div>
-
-                                <div className="flex justify-between items-center px-4">
-                                    <h3 className="text-3xl font-black uppercase italic tracking-tighter">Fluxo de Posts</h3>
-                                    <button onClick={() => openCommModal()} className="bg-[#397394] text-white px-10 py-5 rounded-[2rem] text-[10px] font-black uppercase flex items-center gap-3 shadow-xl hover:bg-[#2d5c78] hover:-translate-y-1 transition-all">
-                                        <Icon name="plus" size={16} /> Novo Comunicado
-                                    </button>
-                                </div>
-
-                                <div className="bg-white rounded-[3.5rem] border border-slate-100 overflow-hidden shadow-sm overflow-x-auto">
-                                    <table className="w-full text-left min-w-[1000px]">
-                                        <thead className="bg-slate-50/50 border-b text-slate-400 text-[10px] font-black uppercase tracking-widest italic">
-                                            <tr>
-                                                <th className="px-12 py-8">Item / Editoria</th>
-                                                <th className="px-12 py-8 text-center">Data / Status</th>
-                                                <th className="px-12 py-8 text-center">Analistas / Canal</th>
-                                                <th className="px-12 py-8 text-right">Impact Score</th>
-                                                <th className="px-12 py-8 w-40"></th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-slate-50">
-                                            {filteredComms.map(c => (
-                                                <tr key={c.id} className="hover:bg-slate-50/30 transition-colors group">
-                                                    <td className="px-12 py-10">
-                                                        <div className="font-black uppercase italic text-lg text-slate-900 leading-none mb-2">{c.title}</div>
-                                                        <div className="text-[9px] font-black text-[#397394] bg-blue-50 px-3 py-1 rounded-full uppercase italic w-fit">{c.editoria}</div>
-                                                    </td>
-                                                    <td className="px-12 py-10 text-center">
-                                                        <div className="font-bold text-xs text-slate-600 mb-2">{c.date ? new Date(c.date).toLocaleDateString('pt-BR') : '--'}</div>
-                                                        <span className={`status-pill ${c.status === 'Enviado' ? 'status-sent' : c.status === 'Cancelado' ? 'status-canceled' : 'status-pending'}`}>
-                                                            <div className={`w-1.5 h-1.5 rounded-full ${c.status === 'Enviado' ? 'bg-emerald-500' : c.status === 'Cancelado' ? 'bg-red-500' : 'bg-amber-500'}`}></div>
-                                                            {c.status}
-                                                        </span>
-                                                    </td>
-                                                    <td className="px-12 py-10 text-center">
-                                                        <div className="flex flex-wrap justify-center gap-1.5 mb-2">
-                                                            {c.analysts?.map(a => <span key={a} className="text-[8px] font-black bg-slate-100 px-2.5 py-1 rounded uppercase">{a.split(' ')[0]}</span>)}
-                                                        </div>
-                                                        <span className="text-slate-400 font-bold uppercase italic text-[10px] tracking-wider">{c.channelName}</span>
-                                                    </td>
-                                                    <td className="px-12 py-10 text-right font-black text-4xl tracking-tighter text-slate-900">
-                                                        {calculateScore(c.reactions, c.comments, c.population)}<span className="text-xl opacity-30">%</span>
-                                                    </td>
-                                                    <td className="px-12 py-10 text-right">
-                                                        <div className="flex items-center justify-end gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                            <button onClick={() => openCommModal(c)} className="p-3 bg-white border border-slate-100 rounded-xl hover:text-blue-600 hover:border-blue-100 transition-all shadow-sm"><Icon name="pencil" size={16} /></button>
-                                                            <button onClick={() => deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'comms', c.id))} className="p-3 bg-white border border-slate-100 rounded-xl hover:text-red-500 hover:border-red-100 transition-all shadow-sm"><Icon name="trash-2" size={16} /></button>
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                            {filteredComms.length === 0 && <tr><td colSpan="5" className="px-12 py-20 text-center text-slate-400 font-bold uppercase tracking-widest italic">Nenhum registro encontrado</td></tr>}
-                                        </tbody>
-                                    </table>
-                                </div>
+                                <select value={filterAnalyst} onChange={(e) => setFilterAnalyst(e.target.value)} className="impact-filter"><option>Todos</option>{ANALYSTS_LIST.map(a => <option key={a}>{a}</option>)}</select>
+                                <select value={filterYear} onChange={(e) => setFilterYear(e.target.value)} className="impact-filter"><option>2025</option><option>2026</option></select>
+                                <select value={filterMonth} onChange={(e) => setFilterMonth(e.target.value)} className="impact-filter"><option value="Todos">Todos Meses</option>{MESES_MAP.map(m => <option key={m.val} value={m.val}>{m.label}</option>)}</select>
+                                <select value={filterChannel} onChange={(e) => setFilterChannel(e.target.value)} className="impact-filter"><option>Todos Canais</option>{channelsList.map(c => <option key={c}>{c}</option>)}</select>
+                                <select value={filterEditoria} onChange={(e) => setFilterEditoria(e.target.value)} className="impact-filter"><option>Todas</option>{EDITORIAS_LIST.map(e => <option key={e}>{e}</option>)}</select>
+                                <button onClick={() => {setFilterAnalyst("Todos"); setFilterYear("2026"); setFilterMonth("Todos"); setFilterChannel("Todos Canais"); setFilterEditoria("Todas");}} className="ml-auto text-[10px] font-black uppercase text-red-400 hover:text-red-500">Limpar</button>
                             </div>
                         )}
 
-                        {activeTab === 'agenda' && (
-                            <div className="space-y-12 fade-in">
-                                <div className="flex justify-between items-center px-4">
-                                    <h3 className="text-3xl font-black uppercase italic tracking-tighter text-slate-800">Agenda Operacional</h3>
-                                    <button onClick={() => openAgendaModal()} className="bg-[#397394] text-white px-10 py-5 rounded-[2rem] text-[10px] font-black uppercase flex items-center justify-center gap-3 shadow-xl hover:bg-[#2d5c78] hover:-translate-y-1 transition-all">
-                                        <Icon name="calendar" size={16} /> Novo Planeamento
-                                    </button>
+                        {activeTab === 'comunicados' && (
+                            <section className="animate-in fade-in duration-500">
+                                <div className="flex justify-between items-center mb-10"><h3 className="text-2xl font-black uppercase italic tracking-tighter">Fluxo de Posts</h3><button onClick={() => openCommModal()} className="bg-[#397394] text-white px-8 py-4 rounded-2xl text-[10px] font-black uppercase flex items-center gap-2 shadow-xl hover:bg-[#2d5c78] transition-all"><Icon name="plus" size={14} /> Novo Comunicado</button></div>
+                                <div className="bg-white rounded-[3rem] border border-slate-100 overflow-hidden shadow-sm overflow-x-auto text-slate-700">
+                                    <table className="w-full text-left min-w-[900px]">
+                                        <thead className="bg-slate-50 border-b text-slate-400 text-[10px] font-black uppercase tracking-widest italic text-left">
+                                            <tr><th className="px-10 py-6">Item / Editoria</th><th className="px-10 py-6 text-center">Data / Status</th><th className="px-10 py-6 text-center">Analistas / Canal</th><th className="px-10 py-6 text-right">Score</th><th className="px-10 py-6 w-32"></th></tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-50 text-slate-800 text-left">
+                                            {filteredComms.map(c => (
+                                                <tr key={c.id} className="hover:bg-slate-50/50 transition-colors group">
+                                                    <td className="px-10 py-8 text-left">
+                                                        <div className="font-black uppercase italic text-xl text-slate-800 leading-none">{c.title}</div>
+                                                        <div className="text-[9px] font-black text-[#397394] mt-1 bg-blue-50 px-2 py-0.5 rounded uppercase italic w-fit">{c.editoria}</div>
+                                                    </td>
+                                                    <td className="px-10 py-8 text-center text-slate-700 font-bold text-[10px]">
+                                                        <div className="mb-1">{c.date ? new Date(c.date).toLocaleDateString('pt-BR') : '--'}</div>
+                                                        <span className={`status-pill ${c.status === 'Enviado' ? 'status-sent' : c.status === 'Cancelado' ? 'status-canceled' : 'status-pending'}`}>{c.status}</span>
+                                                    </td>
+                                                    <td className="px-10 py-8 text-center text-slate-700 font-bold text-[10px]">
+                                                        <div className="flex flex-wrap justify-center gap-1 mb-1">{c.analysts?.map(a => <span key={a} className="text-[7px] font-black bg-slate-100 px-2 py-0.5 rounded uppercase">{a.split(' ')[0]}</span>)}</div>
+                                                        <span className="text-slate-400 uppercase italic">{c.channelName}</span>
+                                                    </td>
+                                                    <td className="px-10 py-8 text-right font-black text-3xl tracking-tighter text-slate-900">{calculateScore(c.reactions, c.comments, c.population)}%</td>
+                                                    <td className="px-10 py-8 text-right text-slate-300"><div className="flex items-center justify-end gap-2 text-slate-700"><button onClick={() => openCommModal(c)} className="p-3 hover:text-blue-600 transition-all"><Icon name="pencil" size={18} /></button><button onClick={() => deleteDoc(doc(db, 'artifacts', APP_ID_ROOT, 'public', 'data', 'comms', c.id))} className="p-3 hover:text-red-500 transition-all text-slate-700"><Icon name="trash-2" size={18} /></button></div></td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
                                 </div>
+                            </section>
+                        )}
 
-                                <div className="bg-white rounded-[3.5rem] border border-slate-100 overflow-hidden shadow-sm overflow-x-auto">
-                                    <table className="w-full text-left min-w-[800px]">
-                                        <thead className="bg-slate-50/50 border-b text-slate-400 text-[10px] font-black uppercase tracking-widest italic">
-                                            <tr>
-                                                <th className="px-12 py-8">Atividade / Sponsor</th>
-                                                <th className="px-12 py-8 text-center">Data</th>
-                                                <th className="px-12 py-8 text-center">Status</th>
-                                                <th className="px-12 py-8 w-40"></th>
-                                            </tr>
+                        {activeTab === 'agenda' && (
+                            <section className="animate-in fade-in duration-500">
+                                <div className="flex justify-between items-center mb-10"><h3 className="text-2xl font-black uppercase italic tracking-tighter text-slate-800">Agenda Operacional</h3><button onClick={() => openAgendaModal()} className="bg-[#397394] text-white px-8 py-4 rounded-2xl text-[10px] font-black uppercase flex items-center justify-center gap-2 shadow-xl hover:bg-[#2d5c78] transition-all"><Icon name="calendar" size={14} /> Novo Planeamento</button></div>
+                                <div className="bg-white rounded-[3rem] border border-slate-100 overflow-hidden shadow-sm overflow-x-auto text-slate-700 text-left">
+                                    <table className="w-full text-left min-w-[750px]">
+                                        <thead className="bg-slate-50 border-b text-slate-400 text-[10px] font-black uppercase tracking-widest italic text-left">
+                                            <tr><th className="px-10 py-6 text-left">Atividade / Sponsor</th><th className="px-10 py-6 text-center text-left">Data</th><th className="px-10 py-6 text-center text-left">STATUS</th><th className="px-10 py-6 w-32"></th></tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-50">
                                             {agenda.map(ev => {
                                                 const isElected = ev.hasVendor && ev.selectedVendorIdx >= 0;
                                                 return (
-                                                    <tr key={ev.id} className={`hover:bg-slate-50/30 transition-colors group ${isElected ? 'row-green-effect' : ''}`}>
-                                                        <td className="px-12 py-10">
-                                                            <div className="flex items-center gap-3 mb-2">
-                                                                <div className="font-black uppercase italic text-2xl text-slate-900 leading-none">{ev.title}</div>
-                                                                {ev.hasCoffee && <span title="Coffee Break" className="text-xl">☕</span>}
-                                                            </div>
-                                                            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest italic flex items-center gap-2">
-                                                                {ev.sponsor} • {isElected ? <span className="text-[#96b467] font-black uppercase">Vendedor: {ev['vendor'+(ev.selectedVendorIdx+1)]}</span> : 'Operação Interna'}
-                                                            </div>
-                                                        </td>
-                                                        <td className="px-12 py-10 text-center font-bold text-slate-600">
-                                                            {ev.date ? new Date(ev.date).toLocaleDateString('pt-BR') : '--'}
-                                                        </td>
-                                                        <td className="px-12 py-10 text-center">
-                                                            <span className="px-5 py-1.5 bg-blue-50 text-blue-700 text-[9px] font-black uppercase rounded-full tracking-widest">{ev.status}</span>
-                                                        </td>
-                                                        <td className="px-12 py-10 text-right">
-                                                            <div className="flex items-center justify-end gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                                <button onClick={() => openAgendaModal(ev)} className="p-3 bg-white border border-slate-100 rounded-xl hover:text-blue-600 shadow-sm"><Icon name="pencil" size={16} /></button>
-                                                                <button onClick={() => deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'agenda', ev.id))} className="p-3 bg-white border border-slate-100 rounded-xl hover:text-red-500 shadow-sm"><Icon name="trash-2" size={16} /></button>
-                                                            </div>
-                                                        </td>
+                                                    <tr key={ev.id} className={`hover:bg-slate-50 transition-colors group ${isElected ? 'row-green-effect' : ''}`}>
+                                                        <td className="px-10 py-8 text-slate-800 text-left"><div className="flex items-center gap-2"><div className="font-black uppercase italic text-xl text-slate-800 leading-none">{ev.title}</div>{ev.hasCoffee && <span title="Coffee Break" className="text-xl">☕</span>}</div><div className="text-[9px] font-bold text-slate-400 uppercase mt-2 tracking-widest italic">{ev.sponsor} • {isElected ? <span className="text-[#BED993] font-black uppercase">ELEITO: {ev['vendor'+(ev.selectedVendorIdx+1)]}</span> : 'EQUIPA INTERNA'}</div></td>
+                                                        <td className="px-10 py-8 text-center text-xs font-bold text-slate-500 text-left">{ev.date ? new Date(ev.date).toLocaleDateString('pt-BR') : '--'}</td>
+                                                        <td className="px-10 py-8 text-center text-left text-slate-800"><span className="px-4 py-1.5 bg-blue-50 text-blue-700 text-[9px] font-black uppercase rounded-full">{ev.status}</span></td>
+                                                        <td className="px-10 py-8 text-right text-slate-300"><div className="flex items-center justify-end gap-2 text-slate-700"><button onClick={() => openAgendaModal(ev)} className="p-3 hover:text-blue-600 transition-all"><Icon name="pencil" size={18} /></button><button onClick={() => deleteDoc(doc(db, 'artifacts', APP_ID_ROOT, 'public', 'data', 'agenda', ev.id))} className="p-3 hover:text-red-500 transition-all text-slate-700"><Icon name="trash-2" size={18} /></button></div></td>
                                                     </tr>
                                                 );
                                             })}
                                         </tbody>
                                     </table>
                                 </div>
-                            </div>
+                            </section>
                         )}
 
                         {activeTab === 'impacto' && (
-                            <div className="space-y-16 fade-in">
-                                <div className="flex flex-wrap items-center gap-4 bg-white/80 backdrop-blur-md p-5 rounded-[2.5rem] border border-slate-100 shadow-sm w-fit sticky top-[100px] z-40">
-                                    <div className="flex items-center gap-2 px-5 py-2.5 bg-slate-50 rounded-2xl border border-slate-100 text-slate-400"><Icon name="filter" size={14} /><span className="text-[10px] font-black uppercase tracking-widest italic text-slate-400">Ciclo</span></div>
+                            <section className="animate-in fade-in duration-500 space-y-12">
+                                <div className="flex flex-wrap items-center gap-4 bg-white/80 backdrop-blur-md p-4 rounded-[1.5rem] border border-slate-100 shadow-sm w-fit sticky top-[85px] z-40">
+                                    <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 rounded-xl border border-slate-100 text-slate-400"><Icon name="filter" size={14} /><span className="text-[10px] font-black uppercase tracking-widest italic text-slate-400">Ciclo</span></div>
                                     <select value={filterYear} onChange={(e) => setFilterYear(e.target.value)} className="impact-filter"><option>2025</option><option>2026</option></select>
                                     <select value={filterChannel} onChange={(e) => setFilterChannel(e.target.value)} className="impact-filter"><option>Todos Canais</option><option>Slack</option><option>E-mail</option></select>
                                 </div>
-
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-                                    <div className="p-10 bg-white rounded-[3.5rem] border border-slate-100 shadow-sm relative group overflow-hidden">
-                                        <div className="absolute top-0 left-0 w-2 h-full bg-slate-200 group-hover:bg-blue-400 transition-colors"></div>
-                                        <div className="p-4 bg-slate-50 rounded-2xl w-fit mb-8 text-slate-300"><Icon name="file-text" size={28} /></div>
-                                        <div className="text-7xl font-black text-slate-900 tracking-tighter leading-none mb-4">{statsImpacto.totalPosts}</div>
-                                        <div className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] italic">Total de Entregas</div>
-                                    </div>
-
-                                    <div className="p-10 bg-slate-900 rounded-[3.5rem] shadow-2xl relative overflow-hidden transform hover:scale-[1.03] transition-all">
-                                        <div className="absolute top-8 right-8 bg-emerald-400 text-slate-950 text-[9px] font-black px-3 py-1 rounded-full uppercase italic shadow-glow-green">Target</div>
-                                        <div className="p-4 bg-white/10 rounded-2xl w-fit mb-8 text-white"><Icon name="trending-up" size={28} /></div>
-                                        <div className="text-7xl font-black text-white tracking-tighter leading-none mb-4">{statsImpacto.interactions}</div>
-                                        <div className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] italic">Interações Totais</div>
-                                    </div>
-
-                                    <div className="p-10 bg-white rounded-[3.5rem] border border-slate-100 shadow-sm relative group overflow-hidden">
-                                        <div className="absolute top-0 left-0 w-2 h-full bg-slate-200 group-hover:bg-red-400 transition-colors"></div>
-                                        <div className="p-4 bg-red-50 rounded-2xl w-fit mb-8 text-red-300"><Icon name="message-circle" size={28} /></div>
-                                        <div className="text-7xl font-black text-slate-900 tracking-tighter leading-none mb-4">{statsImpacto.totalComments}</div>
-                                        <div className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] italic">Comentários</div>
-                                    </div>
-
-                                    <div className="p-10 bg-[#FBFAF3] rounded-[3.5rem] border border-[#F0EEE6] shadow-sm relative group overflow-hidden">
-                                        <div className="p-4 bg-slate-900 text-white rounded-2xl w-fit mb-8"><Icon name="zap" size={28} /></div>
-                                        <div className="text-7xl font-black text-slate-900 tracking-tighter leading-none mb-4">{statsImpacto.avgScore}<span className="text-2xl opacity-30">%</span></div>
-                                        <div className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] italic">Score Engaja</div>
-                                    </div>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 text-left text-slate-800">
+                                    <div className="p-10 bg-white rounded-[3rem] border border-slate-100 shadow-sm text-left"><div className="p-3 bg-slate-50 rounded-xl w-fit mb-6 text-slate-300 mx-auto sm:mx-0"><Icon name="file-text" size={26} /></div><div className="text-6xl font-black text-slate-900 tracking-tighter leading-none">{statsImpacto.totalPosts}</div><div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic">Total Posts</div></div>
+                                    <div className="p-10 bg-slate-900 rounded-[3rem] shadow-2xl relative overflow-hidden group hover:scale-[1.02] transition-all text-white text-left"><div className="absolute top-8 right-8 bg-emerald-400 text-slate-950 text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter shadow-glow italic">Target</div><div className="p-3 bg-white/10 rounded-xl w-fit mb-6 text-white mx-auto sm:mx-0"><Icon name="trending-up" size={26} /></div><div className="text-6xl font-black tracking-tighter leading-none">{statsImpacto.interactions}</div><div className="text-[9px] font-black uppercase text-slate-500 tracking-widest mt-4 italic text-slate-400">Interações</div></div>
+                                    <div className="p-10 bg-white rounded-[3rem] border border-slate-100 shadow-sm text-slate-900 text-left"><div className="p-3 bg-red-50 rounded-xl w-fit mb-6 text-red-300 mx-auto sm:mx-0"><Icon name="message-circle" size={26} /></div><div className="text-6xl font-black text-slate-900 tracking-tighter leading-none">{statsImpacto.totalComments}</div><div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic text-slate-400">Comments</div></div>
+                                    <div className="p-10 bg-[#FBFAF3] rounded-[3rem] border border-[#F0EEE6] shadow-sm text-slate-900 text-left"><div className="p-3 bg-slate-900 text-white rounded-xl w-fit mb-6 mx-auto sm:mx-0"><Icon name="zap" size={26} /></div><div className="text-6xl font-black text-slate-900 tracking-tighter leading-none">{statsImpacto.avgScore}%</div><div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic text-slate-400">Score Engaja</div></div>
                                 </div>
-
-                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-                                    <SimpleBarChart title="Distribuição por Formato" data={statsImpacto.formatDist} color="#397394" />
-                                    <SimpleBarChart title="Distribuição por Editoria" data={statsImpacto.editoriaDist} color="#BED993" />
-                                </div>
-
-                                <div className="space-y-10">
-                                    <LineAreaChart title="Volume Mensal de Comunicados" data={statsImpacto.monthlyPosts} color="#397394" />
-                                    <LineAreaChart title="Evolução de Engajamento Médio (%)" data={statsImpacto.monthlyEngagement} color="#F77D8D" valueSuffix="%" />
-                                </div>
-                            </div>
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 text-left"><SimpleBarChart title="Distribuição por Formato" data={statsImpacto.formatDist} color="#397394" /><SimpleBarChart title="Distribuição por Editoria" data={statsImpacto.editoriaDist} color="#BED993" /></div>
+                                <div className="grid grid-cols-1 gap-8 text-left"><LineAreaChart title="Evolução de Comunicados (Volume Mensal)" data={statsImpacto.monthlyPosts} color="#397394" /><LineAreaChart title="Percentual de Engajamento por Mês" data={statsImpacto.monthlyEngagement} color="#F77D8D" valueSuffix="%" /></div>
+                            </section>
                         )}
                     </main>
 
                     {/* MODAL COMUNICADO */}
                     {isModalCommOpen && (
-                        <div className="fixed inset-0 bg-slate-900/90 backdrop-blur-md z-[150] flex items-center justify-center p-4">
-                            <div className="bg-white w-full max-w-4xl rounded-[3.5rem] p-12 shadow-2xl modal-animate relative max-h-[90vh] overflow-y-auto custom-scroll">
+                        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[150] flex items-center justify-center p-2 sm:p-4 text-left text-slate-800">
+                            <div className="bg-white w-full max-w-4xl rounded-[3rem] p-12 shadow-2xl modal-animate relative max-h-[95vh] overflow-y-auto custom-scroll text-left text-slate-800">
                                 <button type="button" onClick={() => setIsModalCommOpen(false)} className="btn-close-modal"><Icon name="x" size={24} /></button>
-                                <h3 className="text-4xl font-black italic uppercase tracking-tighter mb-12 text-slate-900">REGISTRO DE COMUNICAÇÃO</h3>
-                                
-                                <form onSubmit={handleSaveComm} className="grid grid-cols-1 md:grid-cols-2 gap-12">
-                                    <div className="space-y-8">
-                                        <div className="space-y-3">
-                                            <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest italic ml-1">Título do Post</label>
-                                            <input name="title" defaultValue={editingComm?.title} required className="w-full glass-input rounded-2xl p-6 font-bold text-xl text-slate-900 outline-none" placeholder="Ex: Update Mensal de Operações" />
-                                        </div>
-                                        
-                                        <div className="space-y-4">
-                                            <div className="flex justify-between items-center px-1">
-                                                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest italic">Analistas Responsáveis</label>
-                                                <button type="button" onClick={addNewAnalyst} className="text-slate-400 hover:text-slate-900 transition-colors"><Icon name="plus-circle" size={16} /></button>
-                                            </div>
-                                            <div className="flex flex-wrap gap-2.5">
-                                                {availableAnalysts.map(a => (
-                                                    <div key={a} onClick={() => toggleAnalyst(a)} className={`checkbox-flag ${selectedAnalysts.includes(a) ? 'active' : ''}`}>
-                                                        <Icon name={selectedAnalysts.includes(a) ? "check" : "user"} size={14} />{a}
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-
-                                        <div className="grid grid-cols-2 gap-6">
-                                            <div className="space-y-3">
-                                                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest italic ml-1">Data Prevista</label>
-                                                <input name="date" type="date" defaultValue={editingComm?.date} required className="w-full glass-input rounded-2xl p-5 font-bold outline-none text-slate-700" />
-                                            </div>
-                                            <div className="space-y-3">
-                                                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest italic ml-1">Horário</label>
-                                                <input name="postTime" type="time" defaultValue={editingComm?.postTime} className="w-full glass-input rounded-2xl p-5 font-bold outline-none text-slate-700" />
-                                            </div>
-                                        </div>
-
-                                        <div className="space-y-3">
-                                            <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest italic ml-1">Canal de Disseminação</label>
-                                            <div className="flex gap-3">
-                                                <select name="channelName" defaultValue={editingComm?.channelName || channelsList[0]} className="flex-1 glass-input rounded-2xl p-6 font-black outline-none text-slate-900 appearance-none">
-                                                    {channelsList.map(ch => <option key={ch} value={ch}>{ch}</option>)}
-                                                </select>
-                                                <button type="button" onClick={() => { const ch = prompt("Novo Canal:"); if(ch) setChannelsList([...channelsList, ch]) }} className="p-6 bg-slate-900 text-white rounded-2xl shadow-lg active:scale-95"><Icon name="plus" /></button>
-                                            </div>
-                                        </div>
+                                <h3 className="text-3xl font-black italic uppercase leading-none tracking-tighter mb-10 text-slate-800">Registo de Comunicado</h3>
+                                <form onSubmit={handleSaveComm} className="grid grid-cols-1 md:grid-cols-2 gap-10 text-left text-slate-800">
+                                    <div className="space-y-8 text-left text-slate-800">
+                                        <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold text-slate-400 uppercase">Título do Post</label><input name="title" defaultValue={editingComm?.title} required className="w-full bg-slate-50 border-none rounded-2xl p-5 font-bold text-lg text-slate-800 outline-none focus:ring-4 ring-blue-50 shadow-sm" /></div>
+                                        <div><label className="text-[10px] font-black uppercase text-slate-400 mb-3 block font-bold text-slate-400 uppercase">Analistas Responsáveis</label><div className="flex flex-wrap gap-2">{ANALYSTS_LIST.map(a => (<div key={a} onClick={() => toggleAnalyst(a)} className={`checkbox-flag ${selectedAnalysts.includes(a) ? 'active' : ''}`}><Icon name={selectedAnalysts.includes(a) ? "check-circle-2" : "circle"} size={14} />{a}</div>))}</div></div>
+                                        <div className="grid grid-cols-2 gap-4 text-left text-slate-800"><div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold text-slate-400 uppercase text-left text-slate-400">Data Prevista</label><input name="date" type="date" defaultValue={editingComm?.date} required className="w-full bg-slate-50 border-none rounded-xl p-4 font-bold outline-none text-slate-700 shadow-sm" /></div><div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold text-slate-400 uppercase text-left text-slate-400">Hora</label><input name="postTime" type="time" defaultValue={editingComm?.postTime} className="w-full bg-slate-50 border-none rounded-xl p-4 font-bold outline-none text-slate-700 shadow-sm" /></div></div>
+                                        <div className="flex items-end gap-2 text-left"><div className="flex-1 text-left text-slate-800"><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold text-slate-400 uppercase">Canal Slack</label><select name="channelName" defaultValue={editingComm?.channelName || channelsList[0]} className="w-full bg-slate-50 border-none rounded-xl p-5 font-black outline-none shadow-sm text-slate-800">{channelsList.map(ch => <option key={ch} value={ch}>{ch}</option>)}</select></div><button type="button" onClick={() => { const ch = prompt("Novo Canal:"); if(ch) setChannelsList([...channelsList, ch]) }} className="p-5 bg-slate-900 text-white rounded-xl shadow-lg active:scale-95"><Icon name="plus" /></button></div>
                                     </div>
-
-                                    <div className="space-y-10">
-                                        <div className="bg-[#FBFAF3] p-10 rounded-[3.5rem] border border-[#F0EEE6] space-y-8 shadow-inner">
-                                            <div className="text-[10px] font-black uppercase text-[#397394] tracking-widest flex items-center justify-center gap-3 italic">
-                                                <Icon name="bar-chart-3" size={16} /> Consolidação de Resultados
-                                            </div>
-                                            <div className="grid grid-cols-3 gap-5">
-                                                <div className="space-y-2">
-                                                    <label className="text-[8px] uppercase text-slate-400 block font-black text-center italic">Reach</label>
-                                                    <input name="views" type="number" defaultValue={editingComm?.views || 0} className="w-full bg-white border border-slate-100 rounded-xl p-4 font-black text-xl text-center outline-none text-slate-900" />
-                                                </div>
-                                                <div className="space-y-2">
-                                                    <label className="text-[8px] uppercase text-slate-400 block font-black text-center italic">Reações</label>
-                                                    <input name="reactions" type="number" defaultValue={editingComm?.reactions || 0} className="w-full bg-white border border-slate-100 rounded-xl p-4 font-black text-xl text-center outline-none text-slate-900" />
-                                                </div>
-                                                <div className="space-y-2">
-                                                    <label className="text-[8px] uppercase text-slate-400 block font-black text-center italic">Coments</label>
-                                                    <input name="comments" type="number" defaultValue={editingComm?.comments || 0} className="w-full bg-white border border-slate-100 rounded-xl p-4 font-black text-xl text-center outline-none text-slate-900" />
-                                                </div>
-                                            </div>
-                                            <div className="space-y-3 pt-4">
-                                                <label className="text-[9px] font-black uppercase text-slate-400 block text-center tracking-widest italic">Base de Seres no Canal</label>
-                                                <input name="population" type="number" defaultValue={editingComm?.population ?? ''} className="w-full bg-white/50 border-none rounded-2xl p-4 font-black text-center outline-none text-slate-900 text-xl" />
-                                            </div>
+                                    <div className="space-y-8 text-left text-slate-800">
+                                        <div className="bg-[#FBFAF3] p-10 rounded-[3rem] border border-[#F0EEE6] space-y-8 shadow-inner text-center text-slate-800">
+                                            <div className="text-[10px] font-black uppercase text-[#397394] tracking-widest flex items-center justify-center gap-2 italic text-[#397394]"><Icon name="bar-chart-3" size={14} /> Consolidação Impacto</div>
+                                            <div className="grid grid-cols-3 gap-4 text-left"><div className="space-y-2 text-center text-slate-800 text-left"><label className="text-[8px] uppercase text-[#8E97B0] block italic text-center text-slate-400 uppercase">Reach</label><input name="views" type="number" defaultValue={editingComm?.views || 0} className="w-full bg-white border border-slate-100 rounded-xl p-4 font-black text-xl text-center outline-none shadow-sm text-slate-800" /></div><div className="space-y-2 text-center text-slate-800 text-left"><label className="text-[8px] uppercase text-[#8E97B0] block italic text-center text-slate-400 uppercase">Reações</label><input name="reactions" type="number" defaultValue={editingComm?.reactions || 0} className="w-full bg-white border border-slate-100 rounded-xl p-4 font-black text-xl text-center outline-none shadow-sm text-slate-800" /></div><div className="space-y-2 text-center text-slate-800 text-left"><label className="text-[8px] uppercase text-[#8E97B0] block italic text-center text-slate-400 uppercase">Coments</label><input name="comments" type="number" defaultValue={editingComm?.comments || 0} className="w-full bg-white border border-slate-100 rounded-xl p-4 font-black text-xl text-center outline-none shadow-sm text-slate-800" /></div></div>
+                                            <div className="mt-6 text-slate-400 text-center"><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-widest italic uppercase text-slate-400">Quantidade de Seres no Canal</label><input name="population" type="number" defaultValue={editingComm?.population || 126} className="w-full bg-white border-none rounded-2xl p-4 font-black text-center outline-none shadow-sm text-slate-800" /></div>
                                         </div>
-
-                                        <div className="grid grid-cols-2 gap-6">
-                                            <div className="space-y-2">
-                                                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest italic ml-1">Editoria</label>
-                                                <select name="editoria" defaultValue={editingComm?.editoria || EDITORIAS_LIST[0]} className="w-full glass-input rounded-2xl p-5 font-black text-slate-700 outline-none">{EDITORIAS_LIST.map(e => <option key={e}>{e}</option>)}</select>
-                                            </div>
-                                            <div className="space-y-2">
-                                                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest italic ml-1">Status</label>
-                                                <select name="status" defaultValue={editingComm?.status || "Aguardando Envio"} className="w-full glass-input rounded-2xl p-5 font-bold text-slate-700 outline-none">{STATUS_OPTIONS.map(s => <option key={s}>{s}</option>)}</select>
-                                            </div>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold text-slate-400 uppercase text-left">Editoria</label><select name="editoria" defaultValue={editingComm?.editoria || EDITORIAS_LIST[0]} className="w-full bg-slate-50 border-none rounded-xl p-4 font-black shadow-sm text-slate-700">{EDITORIAS_LIST.map(e => <option key={e}>{e}</option>)}</select></div>
+                                            <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold text-slate-400 uppercase text-left">Status</label><select name="status" defaultValue={editingComm?.status || "Aguardando Envio"} className="w-full bg-slate-50 border-none rounded-xl p-4 font-bold shadow-sm text-slate-700">{STATUS_OPTIONS.map(s => <option key={s}>{s}</option>)}</select></div>
                                         </div>
-
-                                        <div className="space-y-4">
-                                            <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest italic ml-1">Formato (FLAGS)</label>
-                                            <div className="grid grid-cols-3 gap-3">
-                                                {FORMATOS_LIST.map(f => (
-                                                    <div key={f} onClick={() => toggleFormat(f)} className={`p-4 rounded-2xl border-2 text-center text-[10px] font-black cursor-pointer transition-all ${selectedFormats.includes(f) ? 'bg-[#397394] border-[#397394] text-white shadow-lg' : 'bg-white border-slate-100 text-slate-400 hover:border-slate-300'}`}>
-                                                        {f}
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-
-                                        <button type="submit" className="w-full py-8 bg-black text-white rounded-[2.5rem] font-black uppercase text-xs tracking-[0.4em] active:scale-[0.98] transition-all shadow-2xl italic hover:bg-slate-800">
-                                            SALVAR REGISTO
-                                        </button>
+                                        <div className="space-y-4 text-left text-slate-800 text-left"><label className="text-[10px] font-black uppercase text-slate-400 block tracking-widest italic font-bold uppercase text-slate-800 text-left">Formato (FLAGS)</label><div className="grid grid-cols-3 gap-3">{FORMATOS_LIST.map(f => (<div key={f} onClick={() => toggleFormat(f)} className={`p-4 rounded-xl border-2 text-center text-[10px] font-black cursor-pointer transition-all ${selectedFormats.includes(f) ? 'bg-[#397394] border-[#397394] text-white shadow-lg scale-105' : 'bg-white border-slate-50 text-slate-400 hover:border-slate-200 font-bold text-slate-800 text-left'}`}>{f}</div>))}</div></div>
+                                        <button type="submit" className="w-full py-6 bg-black text-white rounded-[2rem] font-black uppercase text-xs tracking-[0.3em] active:scale-[0.98] transition-all shadow-2xl shadow-black/20 italic">SALVAR REGISTO</button>
                                     </div>
                                 </form>
                             </div>
@@ -744,127 +486,52 @@
 
                     {/* MODAL AGENDA */}
                     {isModalAgendaOpen && (
-                        <div className="fixed inset-0 bg-slate-900/90 backdrop-blur-md z-[150] flex items-center justify-center p-4">
-                            <div className="bg-white w-full max-w-6xl rounded-[4rem] p-12 shadow-2xl modal-animate relative max-h-[95vh] overflow-y-auto custom-scroll">
+                        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[150] flex items-center justify-center p-2 sm:p-4 text-left text-slate-800">
+                            <div className="bg-white w-full max-w-6xl rounded-[4rem] p-12 shadow-2xl modal-animate relative max-h-[95vh] overflow-y-auto custom-scroll text-left text-slate-800">
                                 <button type="button" onClick={() => setIsModalAgendaOpen(false)} className="btn-close-modal"><Icon name="x" size={28} /></button>
-                                
-                                <header className="mb-12 border-b border-slate-50 pb-8">
-                                    <h3 className="text-5xl font-black italic uppercase tracking-tighter leading-none text-slate-900">Ajustar Planeamento</h3>
-                                    <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mt-4 ml-1 italic">Governança Financeira e Decisão Técnica</p>
+                                <header className="mb-10 flex justify-between items-start sticky top-0 bg-white z-10 py-2 border-b border-slate-50 text-left">
+                                    <div className="pr-12 text-left text-slate-800 text-left"><h3 className="text-2xl sm:text-5xl font-black italic uppercase tracking-tighter leading-none text-slate-800 text-left">Ajustar Planeamento</h3><p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-2 ml-1 italic leading-loose text-slate-400">Mesa de Decisão Técnica e Governança Financeira</p></div>
                                 </header>
-
-                                <form onSubmit={handleSaveAgenda} className="grid grid-cols-1 lg:grid-cols-12 gap-12">
-                                    <div className="lg:col-span-5 space-y-8 bg-slate-50 p-12 rounded-[3.5rem] border border-slate-100 shadow-inner">
-                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-                                            <div className="sm:col-span-2 space-y-2">
-                                                <label className="text-[10px] font-black uppercase text-slate-400 block tracking-widest italic ml-1">Título da Atividade</label>
-                                                <input name="atividade" defaultValue={editingAgenda?.title} required className="w-full h-16 bg-white border-none rounded-2xl px-6 font-black italic uppercase text-xl text-slate-900 outline-none shadow-sm" placeholder="Ex: Workshop Ops" />
-                                            </div>
-                                            <div className="space-y-2">
-                                                <label className="text-[10px] font-black uppercase text-slate-400 block tracking-widest italic text-center">Coffee?</label>
-                                                <div className="bg-white rounded-2xl h-16 flex items-center justify-center shadow-sm">
-                                                    <input type="checkbox" checked={hasCoffee} onChange={(e) => setHasCoffee(e.target.checked)} className="w-6 h-6 rounded cursor-pointer accent-[#397394]" />
-                                                </div>
-                                            </div>
+                                <form onSubmit={handleSaveAgenda} className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start text-left text-slate-800">
+                                    <div className="lg:col-span-5 space-y-6 bg-slate-50 p-10 rounded-[3rem] border border-slate-100 shadow-inner text-left text-slate-800 text-left">
+                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 items-end text-left text-slate-800">
+                                            <div className="sm:col-span-2 space-y-2 text-left text-slate-400 text-left"><label className="text-[10px] font-black uppercase text-slate-400 block font-bold text-slate-400 text-left">Atividade</label><input name="atividade" defaultValue={editingAgenda?.title} required className="w-full h-16 bg-white border-none rounded-xl px-6 font-bold text-slate-800 outline-none shadow-sm font-black italic uppercase text-lg text-slate-800 text-left" placeholder="Título" /></div>
+                                            <div className="space-y-2 flex flex-col items-center text-slate-800 text-left text-left"><div className="bg-white border border-slate-100 rounded-xl shadow-sm h-16 flex items-center justify-center w-full px-4 gap-3 group text-slate-800"><label className="text-[9px] font-black uppercase text-slate-400 tracking-widest italic cursor-pointer text-slate-400" htmlFor="coffee">Coffee?</label><input id="coffee" type="checkbox" checked={hasCoffee} onChange={(e) => setHasCoffee(e.target.checked)} className="w-5 h-5 rounded cursor-pointer accent-[#397394]" /></div></div>
                                         </div>
-
-                                        <div className="grid grid-cols-2 gap-6">
-                                            <div className="space-y-2">
-                                                <label className="text-[10px] font-black uppercase text-slate-400 block tracking-widest italic ml-1">Data</label>
-                                                <input name="date" type="date" defaultValue={editingAgenda?.date} required className="w-full h-16 bg-white border-none rounded-2xl px-6 font-bold outline-none text-slate-700 shadow-sm" />
-                                            </div>
-                                            <div className="space-y-2">
-                                                <label className="text-[10px] font-black uppercase text-slate-400 block tracking-widest italic ml-1">Status</label>
-                                                <select name="status" defaultValue={editingAgenda?.status || 'Agendado'} className="w-full h-16 bg-white border-none rounded-2xl px-6 font-bold outline-none text-slate-700 shadow-sm appearance-none">
-                                                    <option>Agendado</option><option>Realizado</option><option>Cancelado</option>
-                                                </select>
-                                            </div>
+                                        <div className="grid grid-cols-2 gap-4 text-left text-slate-800 text-left text-left">
+                                            <div className="space-y-2 text-left text-slate-800 text-left text-left text-left"><label className="text-[10px] font-black uppercase text-slate-400 block font-bold text-slate-400 uppercase text-left">Data Prevista</label><input name="date" type="date" defaultValue={editingAgenda?.date} required className="w-full h-14 bg-white border-none rounded-xl px-4 font-bold outline-none text-slate-700 shadow-sm text-left" /></div>
+                                            <div className="space-y-2 text-left text-slate-800 text-left text-left text-left"><label className="text-[10px] font-black uppercase text-slate-400 block font-bold text-slate-400 uppercase text-left text-left text-left">STATUS</label><select name="status" defaultValue={editingAgenda?.status || 'Agendado'} className="w-full h-14 bg-white border-none rounded-xl px-4 font-bold outline-none cursor-pointer shadow-sm text-slate-700 text-left"><option>Agendado</option><option>Realizado</option><option>Cancelado</option></select></div>
                                         </div>
-
-                                        <div className="space-y-2">
-                                            <label className="text-[10px] font-black uppercase text-slate-400 block tracking-widest italic ml-1">Sponsor Principal</label>
-                                            <input name="sponsor" defaultValue={editingAgenda?.sponsor} required className="w-full h-16 bg-white border-none rounded-2xl px-6 font-bold outline-none text-slate-900 shadow-sm" />
-                                        </div>
-
-                                        <div className="bg-[#397394]/5 p-6 rounded-[2.5rem] border border-[#397394]/10">
-                                            <label className="text-[11px] font-black uppercase text-[#397394] block tracking-widest italic mb-3 ml-2">Budget Disponível (R$)</label>
-                                            <input type="number" step="0.01" value={localBudget} onChange={(e) => setLocalBudget(Number(e.target.value))} className="w-full bg-white border-none rounded-2xl px-8 py-6 font-black text-4xl text-[#397394] outline-none shadow-sm" placeholder="0,00" />
-                                        </div>
-
-                                        <div className="space-y-2">
-                                            <label className="text-[10px] font-black uppercase text-slate-400 block tracking-widest italic ml-1">Pauta e Detalhes</label>
-                                            <textarea name="description" defaultValue={editingAgenda?.description} className="w-full h-48 bg-white border-none rounded-3xl p-8 font-medium text-slate-600 outline-none resize-none leading-relaxed shadow-sm" placeholder="Documente aqui a proposta estratégica..."></textarea>
-                                        </div>
+                                        <div className="space-y-2 text-left uppercase text-slate-800 text-left text-left text-left text-left text-left"><label className="text-[10px] font-black uppercase text-slate-400 block font-bold uppercase text-slate-400 text-left">Sponsor Responsável</label><input name="sponsor" defaultValue={editingAgenda?.sponsor} required className="w-full h-14 bg-white border-none rounded-xl px-6 font-bold outline-none shadow-sm text-slate-800 text-left" /></div>
+                                        <div className="space-y-2 text-left bg-blue-50/50 p-4 rounded-2xl border border-blue-100 text-slate-800 text-left text-left text-left text-left text-left text-left"><label className="text-[10px] font-black uppercase text-[#397394] block font-bold text-[#397394] text-left text-left">Budget Disponível (R$)</label><input type="number" step="0.01" value={localBudget} onChange={(e) => setLocalBudget(Number(e.target.value))} className="w-full h-14 bg-white border-none rounded-xl px-4 sm:px-6 font-black text-xl sm:text-2xl text-[#397394] outline-none shadow-sm text-left text-left text-left" placeholder="0,00" /></div>
+                                        <div className="space-y-2 text-left text-slate-800 uppercase text-slate-800 text-left text-left text-left text-left text-left"><label className="text-[10px] font-black uppercase text-slate-400 block font-bold uppercase text-slate-400 text-left">Pauta Técnica</label><textarea name="description" defaultValue={editingAgenda?.description} className="w-full h-40 bg-white border-none rounded-xl p-8 font-medium text-slate-600 outline-none resize-none leading-relaxed text-sm shadow-sm text-slate-600 text-left" placeholder="Detalhes estratégicos..."></textarea></div>
                                     </div>
-
-                                    <div className="lg:col-span-7 bg-slate-900 rounded-[4.5rem] p-16 shadow-2xl flex flex-col justify-between self-stretch">
-                                        <div className="space-y-12">
-                                            <div className="flex justify-between items-center border-b border-white/10 pb-10">
-                                                <div className="text-[11px] font-black uppercase text-white tracking-[0.4em] flex items-center gap-4 italic">
-                                                    <div className="w-3 h-3 rounded-full bg-amber-400 shadow-[0_0_15px_rgba(251,191,36,0.5)]"></div> Mesa de Cotação
-                                                </div>
-                                                <div className="flex items-center gap-5 bg-white/5 p-4 rounded-full border border-white/10 px-8">
-                                                    <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest italic">Terceirizado?</span>
-                                                    <button type="button" onClick={() => setVendorToggle(!vendorToggle)} className={`w-16 h-8 rounded-full relative transition-all duration-500 ${vendorToggle ? 'bg-[#BED993]' : 'bg-slate-700'}`}>
-                                                        <div className={`absolute top-1 left-1 w-6 h-6 rounded-full bg-white shadow-xl transition-all duration-500 ${vendorToggle ? 'translate-x-8' : ''}`}></div>
-                                                    </button>
-                                                </div>
-                                            </div>
-
+                                    <div className="lg:col-span-7 bg-slate-900 rounded-[4rem] p-12 shadow-2xl flex flex-col justify-between self-stretch min-h-[750px] text-white text-left text-left text-left text-left text-left text-left">
+                                        <div>
+                                            <div className="flex justify-between items-center mb-10 border-b border-white/5 pb-8 text-left text-white text-left text-left text-left text-left text-left text-left text-left"><div className="text-[10px] font-black uppercase text-white tracking-[0.3em] flex items-center gap-3 italic text-left text-white text-left text-left text-left text-left text-left text-left text-left text-left text-left"><div className="w-2.5 h-2.5 rounded-full bg-amber-400 shadow-glow"></div> MESA DE DECISÃO</div><div className="flex items-center gap-4 bg-white/5 p-3 rounded-full border border-white/10 px-6 text-white text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left"><span className="text-[8px] font-black text-slate-500 uppercase tracking-tighter italic text-white text-left text-left text-left">Fornecedor?</span><button type="button" onClick={() => setVendorToggle(!vendorToggle)} className={`w-14 h-7 rounded-full relative transition-all duration-500 ${vendorToggle ? 'bg-[#BED993]' : 'bg-slate-700'}`}><div className={`absolute top-1 left-1 w-5 h-5 rounded-full bg-white shadow-lg transition-all duration-500 ${vendorToggle ? 'translate-x-7' : ''}`}></div></button></div></div>
                                             {vendorToggle ? (
-                                                <div className="space-y-8 fade-in">
+                                                <div className="space-y-6 animate-in fade-in zoom-in duration-500 text-white text-left text-left text-left text-left text-left text-left text-left text-left">
                                                     {[0, 1, 2].map(i => {
-                                                        const diff = localBudget - localVendors[i].value;
-                                                        const percent = localBudget > 0 ? (localVendors[i].value / localBudget * 100).toFixed(1) : 0;
-                                                        const isOver = diff < 0;
+                                                        const diff = localBudget - localVendors[i].value; const percent = localBudget > 0 ? (localVendors[i].value / localBudget * 100).toFixed(1) : 0; const isOver = diff < 0;
                                                         return (
-                                                            <div key={i} onClick={() => setSelectedVendorIdx(i)} className={`card-decision p-8 rounded-[2.5rem] bg-white/5 flex flex-col gap-6 ${selectedVendorIdx === i ? 'border-[#BED993] bg-white/10 shadow-glow-green' : 'border-white/5 hover:border-white/10'}`}>
-                                                                <div className="flex items-center gap-8">
-                                                                    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center font-black text-sm ${selectedVendorIdx === i ? 'bg-[#BED993] text-emerald-950' : 'bg-white/10 text-white/20'}`}>0{i+1}</div>
-                                                                    <input placeholder={`NOME DO FORNECEDOR ${i+1}`} value={localVendors[i].name} onChange={(e) => { const n = [...localVendors]; n[i].name = e.target.value; setLocalVendors(n); }} className="flex-1 bg-transparent border-none text-xl font-black outline-none text-white placeholder:text-white/10 uppercase" onClick={(e) => e.stopPropagation()} />
-                                                                    <div className={`px-6 py-3 rounded-2xl font-black uppercase text-[9px] transition-all tracking-widest ${selectedVendorIdx === i ? 'bg-[#BED993] text-emerald-950 shadow-lg' : 'bg-white/10 text-slate-500'}`}>{selectedVendorIdx === i ? 'ELEITO' : 'SELECIONAR'}</div>
-                                                                </div>
-                                                                <div className="flex items-center justify-between pl-20">
-                                                                    <div className="flex items-center gap-4">
-                                                                        <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest italic">INVESTIMENTO: R$</span>
-                                                                        <input type="number" step="0.01" value={localVendors[i].value} onChange={(e) => { const n = [...localVendors]; n[i].value = Number(e.target.value); setLocalVendors(n); }} className="bg-transparent border-none text-2xl font-black text-emerald-400 outline-none w-40" onClick={(e) => e.stopPropagation()} />
-                                                                    </div>
-                                                                    <div className="flex flex-col items-end">
-                                                                        <span className={`text-[10px] font-black px-4 py-2 rounded-xl ${isOver ? 'bg-red-500/20 text-red-400' : 'bg-blue-500/20 text-blue-400'}`}>
-                                                                            {isOver ? 'EXTRA: ' : 'SALDO: '} R$ {Math.abs(diff).toLocaleString('pt-BR')} ({percent}%)
-                                                                        </span>
-                                                                    </div>
-                                                                </div>
+                                                            <div key={i} onClick={() => setSelectedVendorIdx(i)} className={`card-decision p-6 rounded-[2rem] bg-white/5 border-2 flex flex-col gap-4 ${selectedVendorIdx === i ? 'border-[#BED993] bg-white/10 shadow-glow-green scale-[1.02]' : 'border-white/5 hover:border-white/10'}`}>
+                                                                <div className="flex items-center gap-6 text-left text-left text-left text-left text-left text-left text-left text-left"><div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black text-xs ${selectedVendorIdx === i ? 'bg-[#BED993] text-emerald-950' : 'bg-white/10 text-white/20'}`}>0{i+1}</div><input placeholder={`NOME DO FORNECEDOR ${i+1}`} value={localVendors[i].name} onChange={(e) => { const n = [...localVendors]; n[i].name = e.target.value; setLocalVendors(n); }} className="flex-1 bg-transparent border-none text-base font-extrabold outline-none text-white placeholder:text-white/10 uppercase shadow-none text-left text-left text-left text-left text-left text-left text-left text-left" onClick={(e) => e.stopPropagation()} /><div className={`px-5 py-2.5 rounded-xl font-black uppercase text-[8px] transition-all tracking-widest ${selectedVendorIdx === i ? 'bg-[#BED993] text-emerald-950 shadow-lg font-black' : 'bg-white/10 text-slate-400'}`}>{selectedVendorIdx === i ? 'ELEITO' : 'ELEGER'}</div></div>
+                                                                <div className="flex items-center justify-between pl-18 text-left text-white text-left text-left text-left text-left text-left text-left text-left text-left text-left"><div className="flex items-center gap-3 text-left text-white text-left text-left text-left text-left text-left text-left text-left text-left text-left"><span className="text-[9px] font-black text-slate-500 uppercase tracking-widest italic text-slate-400 text-left text-white text-left text-left">Custo: R$</span><input type="number" step="0.01" value={localVendors[i].value} onChange={(e) => { const n = [...localVendors]; n[i].value = Number(e.target.value); setLocalVendors(n); }} className="bg-transparent border-none text-xl font-black text-emerald-400 outline-none w-32 shadow-none text-white text-left text-left text-left text-left text-left text-left text-left text-left text-left" onClick={(e) => e.stopPropagation()} /></div><div className="text-right flex flex-col items-end text-white text-right text-white text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left"><span className="text-[8px] font-black text-blue-400 uppercase block tracking-widest opacity-60 italic mb-0.5 text-blue-300 text-left text-left text-left text-left text-left text-left">Diferença / %</span><span className={`text-xs font-black px-3 py-1 rounded-lg ${isOver ? 'bg-red-500/10 text-red-400' : 'bg-blue-500/10 text-blue-400'}`}>{isOver ? '+' : ''}{diff.toLocaleString('pt-BR')} ({percent}%)</span></div></div>
                                                             </div>
                                                         );
                                                     })}
                                                 </div>
-                                            ) : (
-                                                <div className="h-[450px] flex flex-col items-center justify-center text-center opacity-30 border-2 border-dashed border-white/20 rounded-[3.5rem] p-10">
-                                                    <Icon name="users" size={60} className="mb-8 text-white" />
-                                                    <h4 className="font-black uppercase text-lg text-white tracking-[0.6em]">OPERAÇÃO INTERNA</h4>
-                                                    <p className="text-[10px] font-bold text-slate-400 uppercase mt-6 tracking-widest italic leading-loose max-w-sm">Os recursos e talentos internos da Unico Ops serão alocados para esta atividade.</p>
-                                                </div>
-                                            )}
+                                            ) : (<div className="h-[450px] flex flex-col items-center justify-center text-center opacity-20 border border-dashed border-white/20 rounded-[3rem] p-6 text-white text-center text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left"><Icon name="users" size={48} className="mb-8 text-white" /><h4 className="font-black uppercase text-sm text-white tracking-[0.4em] text-white text-left">USO INTERNO ATIVADO</h4><p className="text-[9px] font-bold text-white uppercase mt-4 tracking-widest italic leading-loose text-center px-10 text-white italic text-left text-left text-left text-left text-left text-left text-left text-left text-left">Recursos operacionais próprios alocados.</p></div>)}
                                         </div>
-                                        <button type="submit" className="w-full h-28 bg-white text-slate-900 hover:bg-slate-50 rounded-[3rem] font-black uppercase text-[13px] tracking-[0.5em] shadow-2xl active:scale-[0.98] transition-all flex items-center justify-center gap-6 italic mt-12">
-                                            <Icon name="check-circle-2" size={24} /> FINALIZAR PLANEAMENTO
-                                        </button>
+                                        <div className="mt-12 text-slate-900 text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left"><button type="submit" className="w-full h-24 bg-white text-black hover:bg-slate-100 rounded-[2.5rem] font-black uppercase text-xs tracking-[0.3em] shadow-2xl active:scale-[0.98] transition-all flex items-center justify-center gap-5 italic shadow-white/5 font-black uppercase italic text-slate-900 text-center"><Icon name="check-circle-2" size={22} /> CONFIRMAR E SALVAR TUDO</button></div>
                                     </div>
                                 </form>
                             </div>
                         </div>
                     )}
 
-                    {/* FOOTER */}
-                    <footer className="fixed bottom-0 w-full bg-white/95 backdrop-blur-md border-t border-slate-100 px-12 py-6 flex flex-col sm:flex-row justify-between items-center text-[10px] text-slate-300 font-black uppercase tracking-[0.5em] z-40">
-                        <div className="flex items-center gap-4">
-                            <div className={`w-3 h-3 rounded-full ${user ? 'bg-green-500 shadow-[0_0_15px_rgba(34,197,94,0.4)]' : 'bg-red-500 animate-pulse'}`}></div>
-                            <span>© 2026 UNICO OPS HUB • AMBIENTE GOLD</span>
-                        </div>
-                        <div className="flex gap-8 text-slate-200">
-                            <span>SISTEMA DE GESTÃO DE VOZ</span>
-                        </div>
+                    <footer className="fixed bottom-0 w-full bg-white/95 backdrop-blur-md border-t border-slate-100 px-6 sm:px-10 py-5 flex flex-col sm:flex-row justify-between items-center text-[8px] sm:text-[9px] text-slate-300 font-black uppercase tracking-[0.4em] z-40 shadow-inner gap-2">
+                        <div className="flex items-center gap-3 text-slate-400 text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left"><div className={`w-2.5 h-2.5 rounded-full ${user ? 'bg-green-500 shadow-[0_0_12px_rgba(34,197,94,0.3)]' : 'bg-red-500 animate-pulse'}`}></div><span>© 2026 Unico Ops. Todos os direitos reservados.</span></div>
                     </footer>
                 </div>
             );
