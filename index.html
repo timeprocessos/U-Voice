@@ -41,37 +41,32 @@
         .status-pending { background: #f1f5f9; color: #64748b; }
         .status-error { background: #fef2f2; color: #dc2626; }
         
+        .status-delayed { 
+            background: #ef4444; color: #ffffff; 
+            animation: blinker 1s cubic-bezier(.5, 0, 1, 1) infinite alternate;
+        }
+        @keyframes blinker { from { opacity: 1; } to { opacity: 0.5; } }
+
         .message-box { position: fixed; bottom: 85px; left: 50%; transform: translateX(-50%); background: #1e293b; color: white; padding: 12px 24px; border-radius: 12px; z-index: 200; font-weight: 900; font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; box-shadow: 0 20px 40px rgba(0,0,0,0.3); }
 
         .round-flag-container {
-            width: 22px;
-            height: 22px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 50%;
-            background: #fff;
-            border: 1px solid #e2e8f0;
-            font-size: 14px;
-            line-height: 1;
-            overflow: hidden;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center;
+            border-radius: 50%; background: #fff; border: 1px solid #e2e8f0; font-size: 14px;
+            line-height: 1; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.05);
         }
 
+        .channel-indicator {
+            width: 42px; height: 42px; min-width: 42px; min-height: 42px; 
+            border-radius: 50%; display: flex; align-items: center;
+            justify-content: center; color: white; border: 2px solid white; 
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08); flex-shrink: 0;
+            overflow: hidden; aspect-ratio: 1/1;
+        }
+        
         .analyst-avatar {
-            width: 32px;
-            height: 32px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 900;
-            font-size: 10px;
-            color: white;
-            flex-shrink: 0;
-            border: 2px solid white;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-            text-shadow: 0 1px 2px rgba(0,0,0,0.2);
+            width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center;
+            justify-content: center; font-weight: 900; font-size: 10px; color: white;
+            flex-shrink: 0; border: 2px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         }
     </style>
 </head>
@@ -115,8 +110,8 @@
         const ANALYSTS_LIST = ["Ariel Mori Dell Aringa", "Diego Francisco Rocha"];
         const CHANNELS_LIST = ["#news-ops-all-team", "#news-cx-team", "#news-analysis-team", "#news-onboarding-team", "#news-ops-leaders"];
 
-        // --- COMPONENTES AUXILIARES ---
-        const Icon = ({ name, size = 18, className = "" }) => {
+        // --- COMPONENTES AUXILIARES (Padronizados como Function para Hoisting) ---
+        function Icon({ name, size = 18, className = "" }) {
             const iconRef = useRef(null);
             useEffect(() => {
                 if (window.lucide && iconRef.current) {
@@ -124,23 +119,16 @@
                 }
             }, [name, size, className]);
             return <span ref={iconRef} className="inline-flex items-center justify-center"><i data-lucide={name}></i></span>;
-        };
+        }
 
-        const formatLocalDate = (dateStr) => {
+        function formatLocalDate(dateStr) {
             if(!dateStr) return '--';
             const parts = dateStr.split('-');
             if(parts.length !== 3) return dateStr;
             return `${parts[2]}/${parts[1]}/${parts[0]}`;
-        };
+        }
 
-        const AnalystAvatar = ({ name }) => {
-            if (!name) return <div className="analyst-avatar bg-slate-300">?</div>;
-            const initials = name.includes("Ariel") ? "AM" : name.includes("Diego") ? "DR" : "??";
-            const color = initials === "AM" ? "#BED993" : initials === "DR" ? "#397394" : "#94a3b8";
-            return <div className="analyst-avatar" style={{ backgroundColor: color }}>{initials}</div>;
-        };
-
-        const RoundFlag = ({ country }) => {
+        function RoundFlag({ country }) {
             const emoji = COUNTRIES_MAP[country] || "🌐";
             return (
                 <span className="inline-flex items-center gap-2 bg-slate-50 px-2 py-1 rounded-full border border-slate-100">
@@ -148,15 +136,40 @@
                     <span className="text-[9px] font-bold uppercase text-slate-600">{country}</span>
                 </span>
             );
-        };
+        }
 
-        const UnicoLogo = ({ size = 34 }) => (
-            <div className="bg-black rounded-xl flex items-center justify-center shadow-lg" style={{ width: size, height: size }}>
-                <svg width={size * 0.6} height={size * 0.6} viewBox="0 0 100 100" fill="none">
-                    <path d="M20 20V55C20 71.5685 33.4315 85 50 85C66.5685 85 80 71.5685 80 55V20H65V55C65 63.2843 58.2843 70 50 70C41.7157 70 35 63.2843 35 55V20H20Z" fill="white"/>
-                </svg>
-            </div>
-        );
+        function ChannelIndicator({ type }) {
+            const isSlack = type === 'slack';
+            return (
+                <div className={`channel-indicator ${isSlack ? 'bg-[#4A154B]' : 'bg-[#397394]'}`}>
+                    <Icon name={isSlack ? "slack" : "mail"} size={22} />
+                </div>
+            );
+        }
+
+        function checkIsDelayed(date, time, status) {
+            if (status === 'Enviado' || status === 'Cancelado' || !date) return false;
+            const scheduledTime = time || "00:00";
+            const scheduledDate = new Date(`${date}T${scheduledTime}`);
+            return scheduledDate < new Date();
+        }
+
+        function AnalystAvatar({ name }) {
+            if (!name) return <div className="analyst-avatar bg-slate-300">?</div>;
+            const initials = name.includes("Ariel") ? "AM" : name.includes("Diego") ? "DR" : "??";
+            const color = initials === "AM" ? "#BED993" : initials === "DR" ? "#397394" : "#94a3b8";
+            return <div className="analyst-avatar" style={{ backgroundColor: color }}>{initials}</div>;
+        }
+
+        function UnicoLogo({ size = 34 }) {
+            return (
+                <div className="bg-black rounded-xl flex items-center justify-center shadow-lg" style={{ width: size, height: size }}>
+                    <svg width={size * 0.6} height={size * 0.6} viewBox="0 0 100 100" fill="none">
+                        <path d="M20 20V55C20 71.5685 33.4315 85 50 85C66.5685 85 80 71.5685 80 55V20H65V55C65 63.2843 58.2843 70 50 70C41.7157 70 35 63.2843 35 55V20H20Z" fill="white"/>
+                    </svg>
+                </div>
+            );
+        }
 
         function LineAreaChart({ data, title, color = "#397394", valueSuffix = "" }) {
             const chartHeight = 220; const chartWidth = 800;
@@ -207,7 +220,6 @@
             const [externalComms, setExternalComms] = useState([]);
             const [message, setMessage] = useState("");
             
-            // Estados de Modais
             const [isModalCommOpen, setIsModalCommOpen] = useState(false);
             const [isModalExternalOpen, setIsModalExternalOpen] = useState(false);
             const [isModalAgendaOpen, setIsModalAgendaOpen] = useState(false);
@@ -218,15 +230,14 @@
             const [editingAgenda, setEditingAgenda] = useState(null);
             const [targetDelete, setTargetDelete] = useState(null);
 
-            // Estados de Formulário
             const [allAnalysts, setAllAnalysts] = useState(ANALYSTS_LIST);
             const [allExtAnalysts, setAllExtAnalysts] = useState(ANALYSTS_LIST);
             const [channelsList, setChannelsList] = useState(CHANNELS_LIST);
             const [selectedAnalysts, setSelectedAnalysts] = useState([]);
             const [selectedFormats, setSelectedFormats] = useState([]);
             const [selectedCountries, setSelectedCountries] = useState([]);
+            const [selectedDeliveryChannel, setSelectedDeliveryChannel] = useState('slack');
 
-            // Filtros
             const [sortOrder, setSortOrder] = useState('desc');
             const [filterYear, setFilterYear] = useState("2026");
             const [filterMonth, setFilterMonth] = useState("Todos");
@@ -235,7 +246,6 @@
             const [extFilterMonth, setExtFilterMonth] = useState("Todos");
             const [extFilterCountry, setExtFilterCountry] = useState("Todos");
 
-            // Budget / Agenda
             const [localBudget, setLocalBudget] = useState(0);
             const [hasCoffee, setHasCoffee] = useState(false);
             const [vendorToggle, setVendorToggle] = useState(false);
@@ -254,19 +264,28 @@
 
             useEffect(() => {
                 if (!user) return;
-                const unsubC = onSnapshot(collection(db, 'artifacts', APP_ID_ROOT, 'public', 'data', 'comms'), (snap) => setComms(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
-                const unsubA = onSnapshot(collection(db, 'artifacts', APP_ID_ROOT, 'public', 'data', 'agenda'), (snap) => setAgenda(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
-                const unsubE = onSnapshot(collection(db, 'artifacts', APP_ID_ROOT, 'public', 'data', 'external'), (snap) => setExternalComms(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+                const unsubC = onSnapshot(collection(db, 'artifacts', APP_ID_ROOT, 'public', 'data', 'comms'), (snap) => setComms(snap.docs.map(d => ({ id: d.id, ...d.data() }))), (err) => console.error(err));
+                const unsubA = onSnapshot(collection(db, 'artifacts', APP_ID_ROOT, 'public', 'data', 'agenda'), (snap) => setAgenda(snap.docs.map(d => ({ id: d.id, ...d.data() }))), (err) => console.error(err));
+                const unsubE = onSnapshot(collection(db, 'artifacts', APP_ID_ROOT, 'public', 'data', 'external'), (snap) => setExternalComms(snap.docs.map(d => ({ id: d.id, ...d.data() }))), (err) => console.error(err));
                 return () => { unsubC(); unsubA(); unsubE(); };
             }, [user]);
 
-            // Handlers
-            const openCommModal = (c = null) => { setEditingComm(c); setSelectedAnalysts(c?.analysts || []); setSelectedFormats(c?.formats || []); setIsModalCommOpen(true); };
+            const openCommModal = (c = null) => { 
+                setEditingComm(c); 
+                setSelectedAnalysts(c?.analysts || []); 
+                setSelectedFormats(c?.formats || []); 
+                setSelectedDeliveryChannel(c?.deliveryChannel || 'slack');
+                setIsModalCommOpen(true); 
+            };
+
             const openExternalModal = (e = null) => { 
-                setEditingExternal(e); setSelectedCountries(e?.countries || []); 
-                setSentCount(e?.sentCount || 0); setOpenedCount(e?.openedCount || 0); 
+                setEditingExternal(e); 
+                setSelectedCountries(e?.countries || []); 
+                setSentCount(e?.sentCount || 0); 
+                setOpenedCount(e?.openedCount || 0); 
                 setIsModalExternalOpen(true); 
             };
+
             const openAgendaModal = (ev = null) => {
                 if (ev) {
                     setEditingAgenda(ev); setLocalBudget(Number(ev.budget || 0)); setHasCoffee(ev.hasCoffee || false);
@@ -279,7 +298,6 @@
                 setIsModalAgendaOpen(true);
             };
 
-            const promptDelete = (id, collection) => { setTargetDelete({ id, collection }); setIsDeleteModalOpen(true); };
             const executeDelete = async () => {
                 if (!targetDelete) return;
                 try { await deleteDoc(doc(db, 'artifacts', APP_ID_ROOT, 'public', 'data', targetDelete.collection, targetDelete.id)); setMessage("Excluído!"); } catch (e) { setMessage("Erro!"); }
@@ -292,7 +310,7 @@
             const handleSaveComm = async (e) => {
                 e.preventDefault();
                 const fd = new FormData(e.target);
-                const data = { title: fd.get('title'), channelName: fd.get('channelName'), date: fd.get('date'), postTime: fd.get('postTime'), editoria: fd.get('editoria'), analysts: selectedAnalysts, formats: selectedFormats, status: fd.get('status'), population: Number(fd.get('population')) || 0, views: Number(fd.get('views') || 0), reactions: Number(fd.get('reactions') || 0), comments: Number(fd.get('comments') || 0), updatedAt: new Date().toISOString() };
+                const data = { title: fd.get('title'), channelName: fd.get('channelName'), date: fd.get('date'), postTime: fd.get('postTime'), editoria: fd.get('editoria'), analysts: selectedAnalysts, formats: selectedFormats, deliveryChannel: selectedDeliveryChannel, status: fd.get('status'), population: Number(fd.get('population')) || 0, views: Number(fd.get('views') || 0), reactions: Number(fd.get('reactions') || 0), comments: Number(fd.get('comments') || 0), updatedAt: new Date().toISOString() };
                 setIsModalCommOpen(false);
                 if (editingComm) await updateDoc(doc(db, 'artifacts', APP_ID_ROOT, 'public', 'data', 'comms', editingComm.id), data);
                 else await addDoc(collection(db, 'artifacts', APP_ID_ROOT, 'public', 'data', 'comms'), data);
@@ -314,6 +332,15 @@
                 setIsModalAgendaOpen(false);
                 if (editingAgenda) await updateDoc(doc(db, 'artifacts', APP_ID_ROOT, 'public', 'data', 'agenda', editingAgenda.id), data);
                 else await addDoc(collection(db, 'artifacts', APP_ID_ROOT, 'public', 'data', 'agenda'), data);
+            };
+
+            const renderBudgetLogic = (vendorValue) => {
+                if (!localBudget || !vendorValue || localBudget <= 0) return null;
+                const pct = (vendorValue / localBudget) * 100;
+                const diff = pct - 100;
+                if (pct < 100) return <span className="text-[11px] font-black text-emerald-500 uppercase tracking-tighter">({(100 - pct).toFixed(1)}% de economia)</span>;
+                if (pct === 100) return <span className="text-[11px] font-black text-blue-500 uppercase tracking-tighter">(100% do recurso)</span>;
+                return <span className="text-[11px] font-black text-red-500 uppercase tracking-tighter">({diff.toFixed(1)}% acima do orçado)</span>;
             };
 
             const filteredInternalComms = useMemo(() => {
@@ -367,8 +394,10 @@
                     </nav>
 
                     <main className="max-w-7xl mx-auto px-6 sm:px-10 py-10">
-                        <header className="mb-12">
-                            <h2 className="text-5xl sm:text-8xl font-black italic tracking-tighter leading-tight text-slate-900 uppercase">{activeTab === 'comunicados' ? 'flow.feed' : activeTab === 'external' ? 'Comm.Externo' : activeTab === 'agenda' ? 'next.steps' : 'impact.metrics'}</h2>
+                        <header className="mb-12 text-left">
+                            <h2 className="text-5xl sm:text-8xl font-black italic tracking-tighter leading-tight text-slate-900 uppercase">
+                                {activeTab === 'comunicados' ? 'flow.feed' : activeTab === 'external' ? 'Comm.Externo' : activeTab === 'agenda' ? 'next.steps' : 'impact.metrics'}
+                            </h2>
                             <p className="text-slate-400 font-black uppercase text-xs tracking-[0.4em] mt-4 ml-1 italic leading-none">Gestão Estratégica Operacional</p>
                         </header>
 
@@ -381,23 +410,43 @@
                                     <select value={filterMonth} onChange={(e) => setFilterMonth(e.target.value)} className="impact-filter"><option value="Todos">Mês: Todos</option>{MESES_MAP.map(m => <option key={m.val} value={m.val}>{m.label}</option>)}</select>
                                     <button onClick={() => openCommModal()} className="ml-auto bg-[#397394] text-white px-8 py-4 rounded-2xl text-[10px] font-black uppercase flex items-center gap-2 shadow-xl hover:bg-[#2d5c78] transition-all"><Icon name="plus" size={14} /> Novo Comunicado</button>
                                 </div>
-                                <div className="bg-white rounded-[3rem] border border-slate-100 overflow-hidden shadow-sm overflow-x-auto">
+                                <div className="bg-white rounded-[3rem] border border-slate-100 overflow-hidden shadow-sm overflow-x-auto text-left">
                                     <table className="w-full text-left min-w-[900px]">
                                         <thead className="bg-slate-50 border-b text-slate-400 text-[10px] font-black uppercase tracking-widest italic">
                                             <tr><th className="px-10 py-6 text-left">Item / Editoria</th><th className="px-10 py-6 text-center">Data / Status</th><th className="px-10 py-6 text-center">Analistas / Canal</th><th className="px-10 py-6 text-right">Impact Score</th><th className="px-10 py-6 w-32"></th></tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-50 text-slate-800">
-                                            {filteredInternalComms.map(c => (
-                                                <tr key={c.id} className="hover:bg-slate-50/50 transition-colors group">
-                                                    <td className="px-10 py-8"><div className="flex items-center gap-4"><AnalystAvatar name={c.analysts?.[0]} /><div><div className="font-black uppercase italic text-lg text-slate-900 leading-none">{c.title}</div><div className="text-[9px] font-black text-[#397394] mt-1 bg-blue-50 px-2 py-0.5 rounded uppercase italic w-fit">{c.editoria}</div></div></div></td>
-                                                    <td className="px-10 py-8 text-center text-[10px] font-bold"><div>{formatLocalDate(c.date)}</div><span className={`status-pill ${c.status === 'Enviado' ? 'status-sent' : 'status-pending'}`}>{c.status}</span></td>
-                                                    <td className="px-10 py-8 text-center text-[10px] font-bold"><div>{c.analysts?.join(', ')}</div><span className="text-slate-400 italic">{c.channelName}</span></td>
-                                                    <td className="px-10 py-8 text-right font-black text-2xl tracking-tighter text-slate-900">
-                                                        {(() => { const pop = Number(c.population) || 0; if (pop === 0) return "0.0"; return ((((Number(c.reactions || 0) * 1) + (Number(c.comments || 0) * 2)) / pop) * 100).toFixed(1); })()}%
-                                                    </td>
-                                                    <td className="px-10 py-8 text-right flex items-center justify-end gap-1"><button onClick={() => openCommModal(c)} className="p-3 text-slate-400 hover:text-blue-600 transition-colors"><Icon name="pencil" size={18} /></button><button onClick={() => promptDelete(c.id, 'comms')} className="p-3 text-slate-400 hover:text-red-500 transition-colors"><Icon name="trash-2" size={18} /></button></td>
-                                                </tr>
-                                            ))}
+                                            {filteredInternalComms.map(c => {
+                                                const isDelayed = checkIsDelayed(c.date, c.postTime, c.status);
+                                                return (
+                                                    <tr key={c.id} className="hover:bg-slate-50/50 transition-colors group">
+                                                        <td className="px-10 py-8 text-left">
+                                                            <div className="flex items-center gap-4">
+                                                                <ChannelIndicator type={c.deliveryChannel} />
+                                                                <div>
+                                                                    <div className="font-black uppercase italic text-lg text-slate-900 leading-none">{c.title}</div>
+                                                                    <div className="text-[9px] font-black text-[#397394] mt-1 bg-blue-50 px-2 py-0.5 rounded uppercase italic w-fit">{c.editoria}</div>
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-10 py-8 text-center text-[10px] font-bold">
+                                                            <div>{formatLocalDate(c.date)} {c.postTime || ''}</div>
+                                                            <div className="flex flex-col gap-1 items-center mt-1">
+                                                                <span className={`status-pill ${c.status === 'Enviado' ? 'status-sent' : 'status-pending'}`}>{c.status}</span>
+                                                                {isDelayed && <span className="status-pill status-delayed">ATRASADO</span>}
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-10 py-8 text-center text-[10px] font-bold"><div>{c.analysts?.join(', ')}</div><span className="text-slate-400 italic">{c.channelName}</span></td>
+                                                        <td className="px-10 py-8 text-right font-black text-2xl tracking-tighter text-slate-900">
+                                                            {(() => { const pop = Number(c.population) || 0; if (pop === 0) return "0.0"; return ((((Number(c.reactions || 0) * 1) + (Number(c.comments || 0) * 2)) / pop) * 100).toFixed(1); })()}%
+                                                        </td>
+                                                        <td className="px-10 py-8 text-right flex items-center justify-end gap-1">
+                                                            <button onClick={() => openCommModal(c)} className="p-3 text-slate-400 hover:text-blue-600 transition-colors"><Icon name="pencil" size={18} /></button>
+                                                            <button onClick={() => promptDelete(c.id, 'comms')} className="p-3 text-slate-400 hover:text-red-500 transition-colors"><Icon name="trash-2" size={18} /></button>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
                                         </tbody>
                                     </table>
                                 </div>
@@ -406,7 +455,7 @@
 
                         {activeTab === 'external' && (
                             <section className="animate-in fade-in duration-500">
-                                <div className="flex flex-wrap items-center gap-3 mb-10 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm sticky top-[85px] z-40">
+                                <div className="flex flex-wrap items-center gap-3 mb-10 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm sticky top-[85px] z-40 text-left">
                                     <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 rounded-xl text-slate-400 border border-slate-100"><Icon name="filter" size={14} /><span className="text-[10px] font-black uppercase">Filtros</span></div>
                                     <button onClick={() => setExtSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')} className="impact-filter"><Icon name={extSortOrder === 'desc' ? "sort-desc" : "sort-asc"} size={14} /><span>{extSortOrder === 'desc' ? 'Recentes' : 'Antigos'}</span></button>
                                     <select value={extFilterYear} onChange={(e) => setExtFilterYear(e.target.value)} className="impact-filter"><option>2025</option><option>2026</option></select>
@@ -421,12 +470,15 @@
                                         </thead>
                                         <tbody className="divide-y divide-slate-50 text-slate-800">
                                             {filteredExternalComms.map(e => (
-                                                <tr key={e.id} className="hover:bg-slate-50/50 transition-colors group">
+                                                <tr key={e.id} className="hover:bg-slate-50/50 transition-colors group text-left">
                                                     <td className="px-10 py-8"><div className="flex items-center gap-4"><AnalystAvatar name={e.analyst} /><div><div className="flex items-center gap-2 font-black uppercase italic text-lg text-slate-900 leading-none">{e.title}{e.commLink && <a href={e.commLink} target="_blank" className="text-slate-300 hover:text-blue-500"><Icon name="link" size={14} /></a>}</div><div className="text-[9px] font-bold text-slate-400 mt-1 uppercase tracking-wider">{e.objective || 'Sem objetivo'}</div><div className="text-[8px] font-black text-[#397394] mt-2 uppercase tracking-tighter">Analista: {e.analyst || '--'}</div></div></div></td>
-                                                    <td className="px-10 py-8 text-center"><div className="flex flex-wrap justify-center gap-2">{e.countries?.map(c => <RoundFlag key={c} country={c} />)}</div></td>
+                                                    <td className="px-10 py-8 text-center text-left"><div className="flex flex-wrap justify-center gap-2">{e.countries?.map(c => <RoundFlag key={c} country={c} />)}</div></td>
                                                     <td className="px-10 py-8 text-center text-[10px] font-bold"><div>{formatLocalDate(e.date)} {e.postTime || ''}</div><span className={`status-pill ${e.status === 'Enviado' ? 'status-sent' : e.status === 'Erro' ? 'status-error' : 'status-pending'}`}>{e.status}</span></td>
                                                     <td className="px-10 py-8 text-right font-black text-2xl tracking-tighter text-slate-900">{e.openRate}% <div className="text-[8px] text-slate-300 font-bold uppercase tracking-widest mt-1">Base: {e.sentCount}</div></td>
-                                                    <td className="px-10 py-8 text-right flex items-center justify-end gap-1"><button onClick={() => openExternalModal(e)} className="p-3 text-slate-400 hover:text-blue-600 transition-colors"><Icon name="pencil" size={18} /></button><button onClick={() => promptDelete(e.id, 'external')} className="p-3 text-slate-400 hover:text-red-500 transition-colors"><Icon name="trash-2" size={18} /></button></td>
+                                                    <td className="px-10 py-8 text-right flex items-center justify-end gap-1">
+                                                        <button onClick={() => openExternalModal(e)} className="p-3 text-slate-400 hover:text-blue-600 transition-colors"><Icon name="pencil" size={18} /></button>
+                                                        <button onClick={() => promptDelete(e.id, 'external')} className="p-3 text-slate-400 hover:text-red-500 transition-colors"><Icon name="trash-2" size={18} /></button>
+                                                    </td>
                                                 </tr>
                                             ))}
                                         </tbody>
@@ -437,15 +489,11 @@
 
                         {activeTab === 'impacto' && (
                             <section className="animate-in fade-in duration-500 space-y-12">
-                                <div className="flex flex-wrap items-center gap-4 bg-white/80 backdrop-blur-md p-4 rounded-[1.5rem] border border-slate-100 shadow-sm w-fit sticky top-[85px] z-40">
-                                    <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 rounded-xl border border-slate-100 text-slate-400"><Icon name="filter" size={14} /><span className="text-[10px] font-black uppercase tracking-widest italic text-slate-400">Ciclo</span></div>
-                                    <select value={filterYear} onChange={(e) => setFilterYear(e.target.value)} className="impact-filter"><option>2025</option><option>2026</option></select>
-                                </div>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 text-left text-slate-800 text-left">
-                                    <div className="p-10 bg-white rounded-[3rem] border border-slate-100 shadow-sm"><div className="p-3 bg-slate-50 rounded-xl w-fit mb-6 text-slate-300 mx-auto sm:mx-0"><Icon name="file-text" size={26} /></div><div className="text-6xl font-black text-slate-900 tracking-tighter leading-none">{statsImpacto.totalPosts}</div><div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic">Total Posts</div></div>
-                                    <div className="p-10 bg-slate-900 rounded-[3rem] shadow-2xl relative overflow-hidden group hover:scale-[1.02] transition-all text-white"><div className="absolute top-8 right-8 bg-emerald-400 text-slate-950 text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter shadow-glow italic text-left text-left">Target</div><div className="p-3 bg-white/10 rounded-xl w-fit mb-6 text-white mx-auto sm:mx-0"><Icon name="trending-up" size={26} /></div><div className="text-6xl font-black tracking-tighter leading-none text-left">{statsImpacto.interactions}</div><div className="text-[9px] font-black uppercase text-slate-500 tracking-widest mt-4 italic text-slate-400 text-left">Interações</div></div>
-                                    <div className="p-10 bg-white rounded-[3rem] border border-slate-100 shadow-sm text-slate-900"><div className="p-3 bg-red-50 rounded-xl w-fit mb-6 text-red-300 mx-auto sm:mx-0"><Icon name="message-circle" size={26} /></div><div className="text-6xl font-black text-slate-900 tracking-tighter leading-none">{statsImpacto.totalComments}</div><div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic text-slate-400 text-left">Comments</div></div>
-                                    <div className="p-10 bg-[#f8fafc] rounded-[3rem] border border-slate-100 shadow-sm text-slate-900"><div className="p-3 bg-slate-900 text-white rounded-xl w-fit mb-6 mx-auto sm:mx-0"><Icon name="zap" size={26} /></div><div className="text-6xl font-black text-slate-900 tracking-tighter leading-none">{statsImpacto.avgScore}%</div><div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic text-slate-400 text-left">Score Engaja</div></div>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 text-left">
+                                    <div className="p-10 bg-white rounded-[3rem] border border-slate-100 shadow-sm"><div className="text-6xl font-black text-slate-900 tracking-tighter leading-none">{statsImpacto.totalPosts}</div><div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic">Total Posts</div></div>
+                                    <div className="p-10 bg-slate-900 rounded-[3rem] shadow-2xl relative overflow-hidden group hover:scale-[1.02] transition-all text-white"><div className="p-3 bg-white/10 rounded-xl w-fit mb-6 text-white mx-auto sm:mx-0"><Icon name="trending-up" size={26} /></div><div className="text-6xl font-black tracking-tighter leading-none">{statsImpacto.interactions}</div><div className="text-[9px] font-black uppercase text-slate-500 tracking-widest mt-4 italic">Interações</div></div>
+                                    <div className="p-10 bg-white rounded-[3rem] border border-slate-100 shadow-sm text-slate-900"><div className="text-6xl font-black text-slate-900 tracking-tighter leading-none">{statsImpacto.totalComments}</div><div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic">Comments</div></div>
+                                    <div className="p-10 bg-[#f8fafc] rounded-[3rem] border border-slate-100 shadow-sm text-slate-900"><div className="text-6xl font-black text-slate-900 tracking-tighter leading-none">{statsImpacto.avgScore}%</div><div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic">Score Engaja</div></div>
                                 </div>
                                 <div className="grid grid-cols-1 gap-8 text-left"><LineAreaChart title="Evolução de Comunicados (Volume Mensal)" data={statsImpacto.monthlyPosts} color="#397394" /><LineAreaChart title="Taxa de Engajamento Mensal (Curva Orgânica)" data={statsImpacto.monthlyEngagement} color="#F77D8D" valueSuffix="%" /></div>
                             </section>
@@ -453,19 +501,22 @@
 
                         {activeTab === 'agenda' && (
                             <section className="animate-in fade-in duration-500">
-                                <div className="flex justify-between items-center mb-10"><h3 className="text-2xl font-black uppercase italic tracking-tighter text-slate-800">Agenda Operacional</h3><button onClick={() => openAgendaModal()} className="bg-[#397394] text-white px-8 py-4 rounded-2xl text-[10px] font-black uppercase flex items-center justify-center gap-2 shadow-xl hover:bg-[#2d5c78] transition-all"><Icon name="calendar" size={14} /> Novo Planeamento</button></div>
+                                <div className="flex justify-between items-center mb-10 text-left"><h3 className="text-2xl font-black uppercase italic tracking-tighter text-slate-800">Agenda Operacional</h3><button onClick={() => openAgendaModal()} className="bg-[#397394] text-white px-8 py-4 rounded-2xl text-[10px] font-black uppercase flex items-center justify-center gap-2 shadow-xl hover:bg-[#2d5c78] transition-all"><Icon name="calendar" size={14} /> Novo Planejamento</button></div>
                                 <div className="bg-white rounded-[3rem] border border-slate-100 overflow-hidden shadow-sm overflow-x-auto text-slate-700 text-left">
                                     <table className="w-full text-left min-w-[750px]">
-                                        <thead className="bg-slate-50 border-b text-slate-400 text-[10px] font-black uppercase tracking-widest italic text-left text-left">
-                                            <tr><th className="px-10 py-6 text-left text-left">Atividade / Sponsor</th><th className="px-10 py-6 text-center text-left text-left">Data</th><th className="px-10 py-6 text-center text-left text-left">STATUS</th><th className="px-10 py-6 w-32"></th></tr>
+                                        <thead className="bg-slate-50 border-b text-slate-400 text-[10px] font-black uppercase tracking-widest italic text-left">
+                                            <tr><th className="px-10 py-6 text-left">Atividade / Sponsor</th><th className="px-10 py-6 text-center">Data</th><th className="px-10 py-6 text-center">STATUS</th><th className="px-10 py-6 w-32"></th></tr>
                                         </thead>
-                                        <tbody className="divide-y divide-slate-50">
+                                        <tbody className="divide-y divide-slate-50 text-left">
                                             {agenda.map(ev => (
                                                 <tr key={ev.id} className={`hover:bg-slate-50 transition-colors group ${ev.hasVendor && ev.selectedVendorIdx >= 0 ? 'row-green-effect' : ''}`}>
-                                                    <td className="px-10 py-8 text-slate-800 text-left text-left"><div className="flex items-center gap-2 text-left"><div className="font-black uppercase italic text-xl text-slate-800 leading-none text-left">{ev.title}</div>{ev.hasCoffee && <span title="Coffee Break" className="text-xl">☕</span>}</div><div className="text-[9px] font-bold text-slate-400 uppercase mt-2 tracking-widest italic text-left">{ev.sponsor} • {ev.hasVendor && ev.selectedVendorIdx >= 0 ? <span className="text-[#BED993] font-black uppercase">ELEITO: {ev['vendor'+(ev.selectedVendorIdx+1)]}</span> : 'EQUIPA INTERNA'}</div></td>
-                                                    <td className="px-10 py-8 text-center text-xs font-bold text-slate-500 text-left text-left">{ev.date ? formatLocalDate(ev.date) : '--'}</td>
-                                                    <td className="px-10 py-8 text-center text-left text-slate-800 text-left text-left"><span className="px-4 py-1.5 bg-blue-50 text-blue-700 text-[9px] font-black uppercase rounded-full">{ev.status}</span></td>
-                                                    <td className="px-10 py-8 text-right text-slate-300 text-left text-left text-left text-left"><button onClick={() => openAgendaModal(ev)} className="p-3 hover:text-blue-600 transition-all text-left"><Icon name="pencil" size={18} /></button><button onClick={() => promptDelete(ev.id, 'agenda')} className="p-3 hover:text-red-500 transition-all text-slate-700 text-left"><Icon name="trash-2" size={18} /></button></td>
+                                                    <td className="px-10 py-8 text-slate-800 text-left"><div className="font-black uppercase italic text-xl text-slate-800 leading-none">{ev.title}</div><div className="text-[9px] font-bold text-slate-400 uppercase mt-2 tracking-widest italic">{ev.sponsor} {ev.hasVendor && ev.selectedVendorIdx >= 0 && <span className="text-[#BED993] font-black uppercase ml-2">• Vendor Atribuído</span>}</div></td>
+                                                    <td className="px-10 py-8 text-center text-xs font-bold text-slate-500">{ev.date ? formatLocalDate(ev.date) : '--'}</td>
+                                                    <td className="px-10 py-8 text-center"><span className="px-4 py-1.5 bg-blue-50 text-blue-700 text-[9px] font-black uppercase rounded-full">{ev.status}</span></td>
+                                                    <td className="px-10 py-8 text-right flex items-center justify-end gap-1">
+                                                        <button onClick={() => openAgendaModal(ev)} className="p-3 hover:text-blue-600 transition-all"><Icon name="pencil" size={18} /></button>
+                                                        <button onClick={() => promptDelete(ev.id, 'agenda')} className="p-3 hover:text-red-500 transition-all text-slate-700"><Icon name="trash-2" size={18} /></button>
+                                                    </td>
                                                 </tr>
                                             ))}
                                         </tbody>
@@ -475,95 +526,159 @@
                         )}
                     </main>
 
-                    {/* MODAIS (MANTIDOS E CORRIGIDOS) */}
+                    {/* MODAL COMUNICADOS INTERNOS */}
+                    {isModalCommOpen && (
+                        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[150] flex items-center justify-center p-2 sm:p-4 text-left">
+                            <div className="bg-white w-full max-w-4xl rounded-[3rem] p-12 shadow-2xl modal-animate relative max-h-[95vh] overflow-y-auto custom-scroll text-left">
+                                <button type="button" onClick={() => setIsModalCommOpen(false)} className="btn-close-modal"><Icon name="x" size={24} /></button>
+                                <h3 className="text-3xl font-black italic uppercase leading-none tracking-tighter mb-10 text-slate-800 uppercase">registro de comunicação</h3>
+                                <form onSubmit={handleSaveComm} className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                                    <div className="space-y-8 text-left">
+                                        <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold">Título Post</label><input name="title" defaultValue={editingComm?.title} required className="w-full bg-slate-50 border-none rounded-2xl p-5 font-bold text-lg outline-none shadow-sm" /></div>
+                                        <div>
+                                            <div className="flex items-center justify-between gap-3 mb-3 text-left">
+                                                <label className="text-[10px] font-black uppercase text-slate-400 block font-bold">Analistas</label>
+                                                <button type="button" onClick={() => {const a = prompt("Nome do Novo Analista:"); if(a) setAllAnalysts(prev => [...prev, a])}} className="bg-yellow-400 p-2 rounded-lg text-black hover:scale-110 transition-transform shadow-lg flex items-center justify-center text-left">
+                                                    <Icon name="plus" size={14} className="font-bold" />
+                                                </button>
+                                            </div>
+                                            <div className="flex flex-wrap gap-2 text-left">{allAnalysts.map(a => (<div key={a} onClick={() => toggleAnalyst(a)} className={`checkbox-flag ${selectedAnalysts.includes(a) ? 'active' : ''} text-left`}><Icon name={selectedAnalysts.includes(a) ? "check-circle-2" : "circle"} size={14} />{a}</div>))}</div>
+                                        </div>
+
+                                        {/* Ajuste Fino: Seletor de Canal com Transparência e Chave Dinâmica para Ícone */}
+                                        <div className="space-y-4">
+                                            <label className="text-[10px] font-black uppercase text-slate-400 block font-bold">Canal de Disparo</label>
+                                            <div className="flex gap-4">
+                                                <div onClick={() => setSelectedDeliveryChannel('slack')} className={`flex-1 p-4 rounded-xl border-2 cursor-pointer transition-all flex items-center justify-center gap-3 ${selectedDeliveryChannel === 'slack' ? 'bg-[#4A154B] border-[#4A154B] text-white shadow-lg scale-[1.02]' : 'bg-[#4A154B]/10 border-transparent text-[#4A154B]'}`}>
+                                                    <Icon name="slack" size={18} key={`mod-slack-${selectedDeliveryChannel === 'slack'}`} />
+                                                    <span className="text-[10px] font-black uppercase">Slack</span>
+                                                </div>
+                                                <div onClick={() => setSelectedDeliveryChannel('email')} className={`flex-1 p-4 rounded-xl border-2 cursor-pointer transition-all flex items-center justify-center gap-3 ${selectedDeliveryChannel === 'email' ? 'bg-[#397394] border-[#397394] text-white shadow-lg scale-[1.02]' : 'bg-[#397394]/10 border-transparent text-[#397394]'}`}>
+                                                    <Icon name="mail" size={18} key={`mod-email-${selectedDeliveryChannel === 'email'}`} />
+                                                    <span className="text-[10px] font-black uppercase">E-mail</span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold">Data</label><input name="date" type="date" defaultValue={editingComm?.date} required className="w-full bg-slate-50 border-none rounded-xl p-4 font-bold outline-none shadow-sm" /></div>
+                                            <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold">Hora</label><input name="postTime" type="time" defaultValue={editingComm?.postTime} required className="w-full bg-slate-50 border-none rounded-xl p-4 font-bold outline-none shadow-sm" /></div>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-8 text-left text-left text-left">
+                                        <div className="bg-[#f8fafc] p-10 rounded-[3rem] border border-slate-100 space-y-8 shadow-inner text-center">
+                                            <div className="text-[10px] font-black uppercase text-[#397394] tracking-widest italic flex items-center justify-center gap-2 text-center text-left">Impacto Interno</div>
+                                            <div className="grid grid-cols-3 gap-4 text-left">
+                                                <div><label className="text-[8px] uppercase text-slate-400 block italic text-center">Reach</label><input name="views" type="number" defaultValue={editingComm?.views || 0} className="w-full bg-white border border-slate-100 rounded-xl p-4 font-black text-center outline-none shadow-sm text-center text-left" /></div>
+                                                <div><label className="text-[8px] uppercase text-slate-400 block italic text-center">Reações</label><input name="reactions" type="number" defaultValue={editingComm?.reactions || 0} className="w-full bg-white border border-slate-100 rounded-xl p-4 font-black text-center outline-none shadow-sm text-center text-left" /></div>
+                                                <div><label className="text-[8px] uppercase text-slate-400 block italic text-center">Comments</label><input name="comments" type="number" defaultValue={editingComm?.comments || 0} className="w-full bg-white border border-slate-100 rounded-xl p-4 font-black text-center outline-none shadow-sm text-center text-left" /></div>
+                                            </div>
+                                            <div className="mt-6 text-left text-left text-left text-left text-left"><label className="text-[10px] font-black uppercase text-slate-400 block mb-2 italic text-left">Base Canal</label><input name="population" type="number" defaultValue={editingComm?.population} placeholder="Preencher" className="w-full bg-white border-none rounded-2xl p-4 font-black text-center outline-none shadow-sm text-left" /></div>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold">Editoria</label><select name="editoria" defaultValue={editingComm?.editoria || EDITORIAS_LIST[0]} className="w-full bg-slate-50 border-none rounded-xl p-4 font-black shadow-sm">{EDITORIAS_LIST.map(e => <option key={e}>{e}</option>)}</select></div>
+                                            <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold">Status</label><select name="status" defaultValue={editingComm?.status || "Aguardando Envio"} className="w-full bg-slate-50 border-none rounded-xl p-4 font-bold shadow-sm">{STATUS_OPTIONS.map(s => <option key={s}>{s}</option>)}</select></div>
+                                        </div>
+                                        <div className="space-y-4 text-left text-left text-left text-left text-left"><label className="text-[10px] font-black uppercase text-slate-400 block italic font-bold text-left">Flags</label><div className="grid grid-cols-3 gap-3 text-left text-left text-left">{FORMATOS_LIST.map(f => (<div key={f} onClick={() => toggleFormat(f)} className={`p-4 rounded-xl border-2 text-center text-[10px] font-black cursor-pointer transition-all ${selectedFormats.includes(f) ? 'bg-[#397394] border-[#397394] text-white shadow-lg scale-105' : 'bg-white border-slate-50 text-slate-400'} text-left`}>{f}</div>))}</div></div>
+                                        <button type="submit" className="w-full py-6 bg-black text-white rounded-[2rem] font-black uppercase text-xs tracking-[0.4em] active:scale-[0.98] shadow-2xl italic text-center text-left text-left text-left text-left">SALVAR REGISTRO</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* MODAL EXTERNOS (RESTAURADO COMPLETO) */}
                     {isModalExternalOpen && (
                         <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[150] flex items-center justify-center p-4">
                             <div className="bg-white w-full max-w-4xl rounded-[3rem] p-12 shadow-2xl modal-animate relative max-h-[90vh] overflow-y-auto custom-scroll text-left">
                                 <button type="button" onClick={() => setIsModalExternalOpen(false)} className="btn-close-modal"><Icon name="x" size={24} /></button>
                                 <h3 className="text-3xl font-black italic uppercase tracking-tighter mb-4 text-slate-800">REGISTRO DE COMUNICAÇÃO EXTERNA</h3>
-                                <p className="text-[10px] font-black uppercase text-[#397394] mb-10 tracking-[0.2em]">Product: IDCloud Outbound Flow</p>
-                                <form onSubmit={handleSaveExternal} className="grid grid-cols-1 md:grid-cols-2 gap-12 text-left text-left">
-                                    <div className="space-y-8 text-left text-left">
+                                <p className="text-[10px] font-black uppercase text-[#397394] mb-10 tracking-[0.2em] italic text-left">Product: IDCloud Outbound Flow</p>
+                                <form onSubmit={handleSaveExternal} className="grid grid-cols-1 md:grid-cols-2 gap-12 text-left">
+                                    <div className="space-y-8 text-left">
                                         <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold">Campanha (IDCloud)</label><input name="title" defaultValue={editingExternal?.title} required className="w-full bg-slate-50 border-none rounded-xl p-5 font-bold outline-none shadow-sm" placeholder="Nome da comunicação" /></div>
                                         <div>
-                                            <div className="flex items-center justify-between gap-3 mb-3 text-left"><label className="text-[10px] font-black uppercase text-slate-400 block font-bold">Analista Responsável</label><button type="button" onClick={() => {const a = prompt("Nome do Novo Analista:"); if(a) setAllExtAnalysts([...allExtAnalysts, a])}} className="text-[#397394] hover:scale-110 transition-transform"><Icon name="plus-circle" size={18}/></button></div>
+                                            <div className="flex items-center justify-between gap-3 mb-3 text-left"><label className="text-[10px] font-black uppercase text-slate-400 block font-bold text-left">Analista Responsável</label><button type="button" onClick={() => {const a = prompt("Nome do Novo Analista:"); if(a) setAllExtAnalysts([...allExtAnalysts, a])}} className="text-[#397394] hover:scale-110 transition-transform"><Icon name="plus-circle" size={18}/></button></div>
                                             <select name="analyst" defaultValue={editingExternal?.analyst || allExtAnalysts[0]} className="w-full bg-slate-50 border-none rounded-xl p-5 font-black outline-none shadow-sm">{allExtAnalysts.map(a => <option key={a} value={a}>{a}</option>)}</select>
                                         </div>
-                                        <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block italic font-bold">Objetivo (Camada PMM)</label><input name="objective" defaultValue={editingExternal?.objective} required className="w-full bg-slate-50 border-none rounded-xl p-5 font-bold outline-none shadow-sm" placeholder="Propósito da mensagem" /></div>
-                                        <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold">Link da Comunicação</label><div className="relative"><input name="commLink" defaultValue={editingExternal?.commLink} className="w-full bg-slate-50 border-none rounded-xl p-5 pl-12 font-bold outline-none shadow-sm" placeholder="URL do conteúdo" /><Icon name="link" size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 text-left" /></div></div>
-                                        <div><div className="flex items-center gap-2 mb-3 text-left"><label className="text-[10px] font-black uppercase text-slate-400 block font-bold">Público (Países)</label></div><div className="flex flex-wrap gap-2">{Object.keys(COUNTRIES_MAP).map(c => (<div key={c} onClick={() => setSelectedCountries(prev => prev.includes(c) ? prev.filter(x => x !== c) : [...prev, c])} className={`checkbox-flag ${selectedCountries.includes(c) ? 'active' : ''}`}><RoundFlag country={c} /></div>))}</div></div>
+                                        <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block italic font-bold text-left">Objetivo (Camada PMM)</label><input name="objective" defaultValue={editingExternal?.objective} required className="w-full bg-slate-50 border-none rounded-xl p-5 font-bold outline-none shadow-sm" placeholder="Propósito da mensagem" /></div>
+                                        <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold text-left">Link da Comunicação</label><div className="relative text-left"><input name="commLink" defaultValue={editingExternal?.commLink} className="w-full bg-slate-50 border-none rounded-xl p-5 pl-12 font-bold outline-none shadow-sm" placeholder="URL do conteúdo" /><Icon name="link" size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" /></div></div>
+                                        <div><div className="flex items-center gap-2 mb-3 text-left"><label className="text-[10px] font-black uppercase text-slate-400 block font-bold text-left">Público (Países)</label></div><div className="flex flex-wrap gap-2">{Object.keys(COUNTRIES_MAP).map(c => (<div key={c} onClick={() => setSelectedCountries(prev => prev.includes(c) ? prev.filter(x => x !== c) : [...prev, c])} className={`checkbox-flag ${selectedCountries.includes(c) ? 'active' : ''}`}><span className="round-flag-container">{COUNTRIES_MAP[c]}</span><span>{c}</span></div>))}</div></div>
                                     </div>
-                                    <div className="space-y-8 text-left text-left">
-                                        <div className="grid grid-cols-2 gap-4 text-left text-left">
-                                            <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold">Data Envio</label><input name="date" type="date" defaultValue={editingExternal?.date} required className="w-full bg-slate-50 border-none rounded-xl p-4 font-bold outline-none shadow-sm" /></div>
-                                            <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold">Hora Envio</label><input name="postTime" type="time" defaultValue={editingExternal?.postTime} required className="w-full bg-slate-50 border-none rounded-xl p-4 font-bold outline-none shadow-sm" /></div>
+                                    <div className="space-y-8 text-left text-left text-left">
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold text-left">Data Envio</label><input name="date" type="date" defaultValue={editingExternal?.date} required className="w-full bg-slate-50 border-none rounded-xl p-4 font-bold outline-none shadow-sm" /></div>
+                                            <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold text-left">Hora Envio</label><input name="postTime" type="time" defaultValue={editingExternal?.postTime} required className="w-full bg-slate-50 border-none rounded-xl p-4 font-bold outline-none shadow-sm" /></div>
                                         </div>
-                                        <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold">Status</label><select name="status" defaultValue={editingExternal?.status || 'Aguardando Envio'} className="w-full bg-slate-50 border-none rounded-xl p-4 font-black outline-none shadow-sm">{EXTERNAL_STATUS_OPTIONS.map(s => <option key={s}>{s}</option>)}</select></div>
+                                        <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold text-left">Status</label><select name="status" defaultValue={editingExternal?.status || 'Aguardando Envio'} className="w-full bg-slate-50 border-none rounded-xl p-4 font-black outline-none shadow-sm">{EXTERNAL_STATUS_OPTIONS.map(s => <option key={s}>{s}</option>)}</select></div>
                                         <div className="bg-[#f8fafc] p-10 rounded-[3rem] border border-slate-100 space-y-6 shadow-inner text-center">
-                                            <div className="text-[10px] font-black uppercase text-slate-400 tracking-widest italic flex items-center justify-center gap-2">Performance Outbound</div>
-                                            <div className="grid grid-cols-2 gap-6 text-left">
-                                                <div><label className="text-[8px] font-black uppercase text-slate-400 mb-2 block text-center text-left text-center text-center">Total Enviados</label><input name="sentCount" type="number" value={sentCount} onChange={(e) => setSentCount(Number(e.target.value))} className="w-full bg-white border-none rounded-xl p-4 font-black text-center text-xl outline-none shadow-sm text-center" /></div>
-                                                <div><label className="text-[8px] font-black uppercase text-slate-400 mb-2 block text-center text-left text-center text-center">Total Aberturas</label><input name="openedCount" type="number" value={openedCount} onChange={(e) => setOpenedCount(Number(e.target.value))} className="w-full bg-white border-none rounded-xl p-4 font-black text-center text-xl outline-none shadow-sm text-center" /></div>
+                                            <div className="text-[10px] font-black uppercase text-slate-400 tracking-widest italic flex items-center justify-center gap-2 text-left">Performance Outbound</div>
+                                            <div className="grid grid-cols-2 gap-6 text-left text-left text-left">
+                                                <div><label className="text-[8px] font-black uppercase text-slate-400 mb-2 block text-center">Total Enviados</label><input name="sentCount" type="number" value={sentCount} onChange={(e) => setSentCount(Number(e.target.value))} className="w-full bg-white border-none rounded-xl p-4 font-black text-center text-xl outline-none shadow-sm text-center text-left" /></div>
+                                                <div><label className="text-[8px] font-black uppercase text-slate-400 mb-2 block text-center">Total Aberturas</label><input name="openedCount" type="number" value={openedCount} onChange={(e) => setOpenedCount(Number(e.target.value))} className="w-full bg-white border-none rounded-xl p-4 font-black text-center text-xl outline-none shadow-sm text-center text-left" /></div>
                                             </div>
-                                            <div className="pt-4 border-t border-slate-200"><div className="text-[8px] font-black uppercase text-slate-400 mb-2 block">Open Rate Calculado</div><div className="text-4xl font-black text-slate-900">{autoOpenRate}%</div></div>
+                                            <div className="pt-4 border-t border-slate-200 text-center"><div className="text-[8px] font-black uppercase text-slate-400 mb-2 block text-left">Open Rate Calculado</div><div className="text-4xl font-black text-slate-900 text-left">{autoOpenRate}%</div></div>
                                         </div>
-                                        <button type="submit" className="w-full py-8 bg-black text-white rounded-[2.5rem] font-black uppercase text-xs tracking-[0.4em] active:scale-[0.98] shadow-2xl italic">REGISTRAR OUTBOUND</button>
+                                        <button type="submit" className="w-full py-8 bg-black text-white rounded-[2.5rem] font-black uppercase text-xs tracking-[0.4em] active:scale-[0.98] shadow-2xl italic text-center text-left">REGISTRAR OUTBOUND</button>
                                     </div>
                                 </form>
                             </div>
                         </div>
                     )}
 
-                    {isModalCommOpen && (
-                        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[150] flex items-center justify-center p-2 sm:p-4 text-left text-slate-800">
-                            <div className="bg-white w-full max-w-4xl rounded-[3rem] p-12 shadow-2xl modal-animate relative max-h-[95vh] overflow-y-auto custom-scroll text-left text-slate-800">
-                                <button type="button" onClick={() => setIsModalCommOpen(false)} className="btn-close-modal"><Icon name="x" size={24} /></button>
-                                <h3 className="text-3xl font-black italic uppercase leading-none tracking-tighter mb-10 text-slate-800 uppercase">registro de comunicação</h3>
-                                <form onSubmit={handleSaveComm} className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                    {/* MODAL PLANEJAMENTO */}
+                    {isModalAgendaOpen && (
+                        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[150] flex items-center justify-center p-4">
+                            <div className="bg-white w-full max-w-4xl rounded-[3rem] p-12 shadow-2xl modal-animate relative max-h-[90vh] overflow-y-auto custom-scroll text-left">
+                                <button type="button" onClick={() => setIsModalAgendaOpen(false)} className="btn-close-modal"><Icon name="x" size={24} /></button>
+                                <h3 className="text-3xl font-black italic uppercase leading-none tracking-tighter mb-10 text-slate-800 text-left">PLANEJAMENTO DE ATIVIDADE</h3>
+                                <form onSubmit={handleSaveAgenda} className="grid grid-cols-1 md:grid-cols-2 gap-10">
                                     <div className="space-y-8 text-left">
-                                        <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold text-left">Título Post</label><input name="title" defaultValue={editingComm?.title} required className="w-full bg-slate-50 border-none rounded-2xl p-5 font-bold text-lg outline-none shadow-sm" /></div>
-                                        <div>
-                                            <div className="flex items-center justify-between gap-3 mb-3 text-left"><label className="text-[10px] font-black uppercase text-slate-400 block font-bold">Analistas</label><button type="button" onClick={() => {const a = prompt("Nome Analista:"); if(a) setAllAnalysts([...allAnalysts, a])}} className="text-[#397394] hover:scale-110 transition-transform"><Icon name="plus-circle" size={18} /></button></div>
-                                            <div className="flex flex-wrap gap-2">{allAnalysts.map(a => (<div key={a} onClick={() => toggleAnalyst(a)} className={`checkbox-flag ${selectedAnalysts.includes(a) ? 'active' : ''}`}><Icon name={selectedAnalysts.includes(a) ? "check-circle-2" : "circle"} size={14} />{a}</div>))}</div>
+                                        <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold text-left">Atividade</label><input name="atividade" defaultValue={editingAgenda?.title} required className="w-full bg-slate-50 border-none rounded-2xl p-5 font-bold outline-none shadow-sm" /></div>
+                                        <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold text-left">Sponsor Responsável</label><input name="sponsor" defaultValue={editingAgenda?.sponsor} required className="w-full bg-slate-50 border-none rounded-2xl p-5 font-bold outline-none shadow-sm" /></div>
+                                        <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold text-left text-left">Descrição / Briefing</label><textarea name="description" defaultValue={editingAgenda?.description} rows="4" className="w-full bg-slate-50 border-none rounded-2xl p-5 font-bold outline-none shadow-sm resize-none text-left"></textarea></div>
+                                        <div className="grid grid-cols-2 gap-4 text-left text-left">
+                                            <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold text-left text-left text-left text-left">Data Prevista</label><input name="date" type="date" defaultValue={editingAgenda?.date} required className="w-full bg-slate-50 border-none rounded-xl p-4 font-bold outline-none shadow-sm text-left text-left text-left text-left" /></div>
+                                            <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold text-left text-left text-left text-left">Status</label><select name="status" defaultValue={editingAgenda?.status || 'Planejado'} className="w-full bg-slate-50 border-none rounded-xl p-4 font-black outline-none shadow-sm text-left text-left text-left text-left"><option>Planejado</option><option>Em Progresso</option><option>Concluído</option><option>Cancelado</option></select></div>
                                         </div>
-                                        <div className="grid grid-cols-2 gap-4 text-left"><div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold text-left">Data</label><input name="date" type="date" defaultValue={editingComm?.date} required className="w-full bg-slate-50 border-none rounded-xl p-4 font-bold outline-none shadow-sm" /></div><div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold text-left">Hora</label><input name="postTime" type="time" defaultValue={editingComm?.postTime} className="w-full bg-slate-50 border-none rounded-xl p-4 font-bold outline-none shadow-sm" /></div></div>
-                                        <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold text-left">Canal</label><select name="channelName" defaultValue={editingComm?.channelName || channelsList[0]} className="w-full bg-slate-50 border-none rounded-xl p-5 font-black outline-none shadow-sm">{channelsList.map(ch => <option key={ch} value={ch}>{ch}</option>)}</select></div>
                                     </div>
-                                    <div className="space-y-8">
-                                        <div className="bg-[#f8fafc] p-10 rounded-[3rem] border border-slate-100 space-y-8 shadow-inner text-center">
-                                            <div className="text-[10px] font-black uppercase text-[#397394] tracking-widest italic flex items-center justify-center gap-2 text-center text-center">Impacto Interno</div>
-                                            <div className="grid grid-cols-3 gap-4 text-left">
-                                                <div><label className="text-[8px] uppercase text-slate-400 block italic text-center">Reach</label><input name="views" type="number" defaultValue={editingComm?.views || 0} className="w-full bg-white border border-slate-100 rounded-xl p-4 font-black text-center outline-none shadow-sm" /></div>
-                                                <div><label className="text-[8px] uppercase text-slate-400 block italic text-center">Reações</label><input name="reactions" type="number" defaultValue={editingComm?.reactions || 0} className="w-full bg-white border border-slate-100 rounded-xl p-4 font-black text-center outline-none shadow-sm" /></div>
-                                                <div><label className="text-[8px] uppercase text-slate-400 block italic text-center">Comments</label><input name="comments" type="number" defaultValue={editingComm?.comments || 0} className="w-full bg-white border border-slate-100 rounded-xl p-4 font-black text-center outline-none shadow-sm" /></div>
+                                    <div className="space-y-8 text-left text-left text-left">
+                                        <div className="bg-[#f8fafc] p-8 rounded-[3rem] border border-slate-100 shadow-inner text-left">
+                                            <div className="mb-6 text-left"><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block text-left">Budget Alocado (R$)</label><input type="number" value={localBudget} onChange={(e) => setLocalBudget(Number(e.target.value))} className="w-full bg-white border-none rounded-xl p-4 font-black text-xl outline-none shadow-sm text-left" /></div>
+                                            <div className="space-y-4 text-left">
+                                                <div className="flex items-center justify-between"><label className="text-[10px] font-black uppercase text-slate-400">Fornecedores</label><button type="button" onClick={() => setVendorToggle(!vendorToggle)} className={`w-12 h-6 rounded-full transition-all relative ${vendorToggle ? 'bg-green-500' : 'bg-slate-300'}`}><div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${vendorToggle ? 'right-1' : 'left-1'}`}></div></button></div>
+                                                {vendorToggle && localVendors.map((v, i) => (
+                                                    <div key={i} className={`flex flex-col gap-1 mb-4 text-left p-4 rounded-2xl transition-all border ${selectedVendorIdx === i ? 'bg-[#BED993]/20 border-[#BED993] shadow-sm' : 'border-transparent'} text-left`}>
+                                                        <div className="flex gap-2 items-center text-left text-left">
+                                                            <input value={v.name} onChange={(e) => {const n=[...localVendors]; n[i].name=e.target.value; setLocalVendors(n)}} placeholder={`Fornecedor ${i+1}`} className="flex-1 bg-white p-3 rounded-lg text-[10px] font-bold outline-none border border-slate-100 text-left" />
+                                                            <input type="number" value={v.value} onChange={(e) => {const n=[...localVendors]; n[i].value=Number(e.target.value); setLocalVendors(n)}} className="w-24 bg-white p-3 rounded-lg text-[10px] font-bold outline-none border border-slate-100 text-left" />
+                                                            <button type="button" onClick={() => setSelectedVendorIdx(i)} className={`p-2 rounded-lg transition-all ${selectedVendorIdx === i ? 'bg-[#BED993] text-black shadow-inner' : 'bg-slate-200 text-slate-400 hover:bg-slate-300'} text-left text-left`}><Icon name="check" size={14}/></button>
+                                                        </div>
+                                                        <div className="pl-1 text-left text-left text-left">{renderBudgetLogic(v.value)}</div>
+                                                    </div>
+                                                ))}
                                             </div>
-                                            <div className="mt-6 text-left"><label className="text-[10px] font-black uppercase text-slate-400 block mb-2 italic text-center text-left">Base Canal</label><input name="population" type="number" defaultValue={editingComm?.population} placeholder="Preencher" className="w-full bg-white border-none rounded-2xl p-4 font-black text-center outline-none shadow-sm" /></div>
                                         </div>
-                                        <div className="grid grid-cols-2 gap-4 text-left">
-                                            <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold text-left">Editoria</label><select name="editoria" defaultValue={editingComm?.editoria || EDITORIAS_LIST[0]} className="w-full bg-slate-50 border-none rounded-xl p-4 font-black shadow-sm">{EDITORIAS_LIST.map(e => <option key={e}>{e}</option>)}</select></div>
-                                            <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold text-left">Status</label><select name="status" defaultValue={editingComm?.status || "Aguardando Envio"} className="w-full bg-slate-50 border-none rounded-xl p-4 font-bold shadow-sm">{STATUS_OPTIONS.map(s => <option key={s}>{s}</option>)}</select></div>
-                                        </div>
-                                        <div className="space-y-4 text-left"><label className="text-[10px] font-black uppercase text-slate-400 block italic font-bold text-left">Flags</label><div className="grid grid-cols-3 gap-3">{FORMATOS_LIST.map(f => (<div key={f} onClick={() => toggleFormat(f)} className={`p-4 rounded-xl border-2 text-center text-[10px] font-black cursor-pointer transition-all ${selectedFormats.includes(f) ? 'bg-[#397394] border-[#397394] text-white shadow-lg scale-105' : 'bg-white border-slate-50 text-slate-400'}`}>{f}</div>))}</div></div>
-                                        <button type="submit" className="w-full py-6 bg-black text-white rounded-[2rem] font-black uppercase text-xs tracking-[0.4em] active:scale-[0.98] shadow-2xl italic text-center text-left">SALVAR REGISTRO</button>
+                                        <button type="submit" className="w-full py-6 bg-black text-white rounded-[2rem] font-black uppercase text-xs tracking-[0.4em] active:scale-[0.98] shadow-2xl italic text-center text-left">SALVAR PLANEJAMENTO</button>
                                     </div>
                                 </form>
                             </div>
                         </div>
                     )}
 
+                    {/* MODAL EXCLUSÃO */}
                     {isDeleteModalOpen && (
-                        <div className="fixed inset-0 bg-slate-900/90 backdrop-blur-md z-[200] flex items-center justify-center p-4">
-                            <div className="bg-white w-full max-w-md rounded-[2.5rem] p-10 shadow-2xl modal-animate text-center text-center">
-                                <div className="w-20 h-20 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-6"><Icon name="trash-2" size={40} /></div>
+                        <div className="fixed inset-0 bg-slate-900/90 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
+                            <div className="bg-white w-full max-w-md rounded-[2.5rem] p-10 shadow-2xl modal-animate text-center">
+                                <div className="w-20 h-20 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-6 text-center text-left"><Icon name="trash-2" size={40} /></div>
                                 <h3 className="text-2xl font-black uppercase italic tracking-tighter text-slate-900 mb-2 leading-none text-center">Tem certeza?</h3>
-                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-10 italic text-center">Esta ação é irreversível.</p>
-                                <div className="grid grid-cols-2 gap-4"><button onClick={() => setIsDeleteModalOpen(false)} className="py-4 bg-slate-100 text-slate-400 rounded-2xl font-black uppercase text-[10px] tracking-widest italic text-center">Cancelar</button><button onClick={executeDelete} className="py-4 bg-red-500 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-red-600 shadow-lg shadow-red-500/20 italic text-center">Excluir</button></div>
+                                <div className="grid grid-cols-2 gap-4 mt-10"><button onClick={() => setIsDeleteModalOpen(false)} className="py-4 bg-slate-100 text-slate-400 rounded-2xl font-black uppercase text-[10px] tracking-widest italic text-center text-left">Cancelar</button><button onClick={executeDelete} className="py-4 bg-red-500 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-red-600 shadow-lg shadow-red-500/20 italic text-center text-left">Excluir</button></div>
                             </div>
                         </div>
                     )}
 
                     <footer className="fixed bottom-0 w-full bg-white/95 backdrop-blur-md border-t border-slate-100 px-6 sm:px-10 py-5 flex flex-col sm:flex-row justify-between items-center text-[8px] sm:text-[9px] text-slate-300 font-black uppercase tracking-[0.4em] z-40 shadow-inner gap-2 text-left">
-                        <div className="flex items-center gap-3 text-slate-400 text-left text-left text-left"><div className={`w-2.5 h-2.5 rounded-full ${user ? 'bg-green-500 shadow-[0_0_12px_rgba(34,197,94,0.3)]' : 'bg-slate-300 animate-pulse'}`}></div><span>© 2026 Unico Ops Hub. Ambiente Gold Ativo.</span></div>
+                        <div className="flex items-center gap-3 text-slate-400 text-left"><div className={`w-2.5 h-2.5 rounded-full ${user ? 'bg-green-500 shadow-[0_0_12px_rgba(34,197,94,0.3)]' : 'bg-slate-300 animate-pulse'} text-left text-left text-left text-left text-left`}></div><span>© 2026 Unico Ops Hub. Ambiente Gold Ativo.</span></div>
                     </footer>
                 </div>
             );
