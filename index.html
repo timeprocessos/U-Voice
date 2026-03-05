@@ -200,6 +200,7 @@
             const [editingAgenda, setEditingAgenda] = useState(null);
 
             const [allAnalysts, setAllAnalysts] = useState(ANALYSTS_LIST);
+            const [allExtAnalysts, setAllExtAnalysts] = useState(ANALYSTS_LIST);
             const [selectedAnalysts, setSelectedAnalysts] = useState([]);
             const [selectedFormats, setSelectedFormats] = useState([]);
             const [availableCountries, setAvailableCountries] = useState(Object.keys(COUNTRIES_MAP));
@@ -229,7 +230,7 @@
             useEffect(() => {
                 const initAuth = async () => { try { await signInAnonymously(auth); } catch (e) { console.error(e); } };
                 initAuth();
-                onAuthStateChanged(auth, (u) => { setUser(u); if (u) setMessage("IDCloud Hub Ativo"); });
+                onAuthStateChanged(auth, (u) => { setUser(u); if (u) setMessage("Sistema Ligado"); });
             }, []);
 
             useEffect(() => {
@@ -311,7 +312,7 @@
                 e.preventDefault();
                 const fd = new FormData(e.target);
                 const data = {
-                    title: fd.get('title'), objective: fd.get('objective'), commLink: fd.get('commLink'),
+                    title: fd.get('title'), analyst: fd.get('analyst'), objective: fd.get('objective'), commLink: fd.get('commLink'),
                     countries: selectedCountries, date: fd.get('date'), postTime: fd.get('postTime'),
                     status: fd.get('status'), sentCount: Number(fd.get('sentCount') || 0), 
                     openedCount: Number(fd.get('openedCount') || 0), openRate: autoOpenRate,
@@ -320,7 +321,7 @@
                 setIsModalExternalOpen(false);
                 if (editingExternal) await updateDoc(doc(db, 'artifacts', APP_ID_ROOT, 'public', 'data', 'external', editingExternal.id), data);
                 else await addDoc(collection(db, 'artifacts', APP_ID_ROOT, 'public', 'data', 'external'), data);
-                setMessage("Registro Externo salvo!");
+                setMessage("Comm Externo guardado.");
             };
 
             const handleSaveAgenda = async (e) => {
@@ -337,15 +338,11 @@
                 setIsModalAgendaOpen(false);
                 if (editingAgenda) await updateDoc(doc(db, 'artifacts', APP_ID_ROOT, 'public', 'data', 'agenda', editingAgenda.id), data);
                 else await addDoc(collection(db, 'artifacts', APP_ID_ROOT, 'public', 'data', 'agenda'), data);
-                setMessage("Agenda atualizada.");
+                setMessage("Agenda operacional salva.");
             };
 
             const openCommModal = (c = null) => { setEditingComm(c); setSelectedAnalysts(c?.analysts || []); setSelectedFormats(c?.formats || []); setIsModalCommOpen(true); };
-            const openExternalModal = (e = null) => { 
-                setEditingExternal(e); setSelectedCountries(e?.countries || []); 
-                setSentCount(e?.sentCount || 0); setOpenedCount(e?.openedCount || 0); 
-                setIsModalExternalOpen(true); 
-            };
+            const openExternalModal = (e = null) => { setEditingExternal(e); setSelectedCountries(e?.countries || []); setSentCount(e?.sentCount || 0); setOpenedCount(e?.openedCount || 0); setIsModalExternalOpen(true); };
             const openAgendaModal = (ev = null) => {
                 if (ev) {
                     setEditingAgenda(ev); setLocalBudget(Number(ev.budget || 0)); setHasCoffee(ev.hasCoffee || false);
@@ -395,7 +392,7 @@
                                     <select value={filterMonth} onChange={(e) => setFilterMonth(e.target.value)} className="impact-filter"><option value="Todos">Mês: Todos</option>{MESES_MAP.map(m => <option key={m.val} value={m.val}>{m.label}</option>)}</select>
                                     <button onClick={() => openCommModal()} className="ml-auto bg-[#397394] text-white px-8 py-4 rounded-2xl text-[10px] font-black uppercase flex items-center gap-2 shadow-xl hover:bg-[#2d5c78] transition-all"><Icon name="plus" size={14} /> Novo Comunicado</button>
                                 </div>
-                                <div className="bg-white rounded-[3rem] border border-slate-100 overflow-hidden shadow-sm overflow-x-auto">
+                                <div className="bg-white rounded-[3rem] border border-slate-100 overflow-hidden shadow-sm overflow-x-auto text-left">
                                     <table className="w-full text-left min-w-[900px]">
                                         <thead className="bg-slate-50 border-b text-slate-400 text-[10px] font-black uppercase tracking-widest italic text-left">
                                             <tr><th className="px-10 py-6">Item / Editoria</th><th className="px-10 py-6 text-center">Data / Status</th><th className="px-10 py-6 text-center">Analistas / Canal</th><th className="px-10 py-6 text-right">Impact Score</th><th className="px-10 py-6 w-32"></th></tr>
@@ -438,15 +435,16 @@
                                 </div>
                                 <div className="bg-white rounded-[3rem] border border-slate-100 overflow-hidden shadow-sm overflow-x-auto text-left">
                                     <table className="w-full text-left min-w-[900px]">
-                                        <thead className="bg-slate-50 border-b text-slate-400 text-[10px] font-black uppercase tracking-widest italic">
-                                            <tr><th className="px-10 py-6 text-left">Campanha / Objetivo</th><th className="px-10 py-6 text-center">Público (Países)</th><th className="px-10 py-6 text-center">Data / Status</th><th className="px-10 py-6 text-right">Open Rate</th><th className="px-10 py-6 w-32"></th></tr>
+                                        <thead className="bg-slate-50 border-b text-slate-400 text-[10px] font-black uppercase tracking-widest italic text-left">
+                                            <tr><th className="px-10 py-6">IDCloud / Objetivo</th><th className="px-10 py-6 text-center">Público (Países)</th><th className="px-10 py-6 text-center">Data / Status</th><th className="px-10 py-6 text-right">Open Rate</th><th className="px-10 py-6 w-32"></th></tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-50 text-slate-800">
                                             {filteredExternalComms.map(e => (
                                                 <tr key={e.id} className="hover:bg-slate-50/50 transition-colors group">
                                                     <td className="px-10 py-8">
-                                                        <div className="flex items-center gap-2"><div className="font-black uppercase italic text-lg text-slate-800 leading-none">{e.title}</div>{e.commLink && <a href={e.commLink} target="_blank" className="text-slate-300 hover:text-blue-500 transition-colors"><Icon name="link" size={14} /></a>}</div>
+                                                        <div className="flex items-center gap-2"><div className="font-black uppercase italic text-lg text-slate-900 leading-none">{e.title}</div>{e.commLink && <a href={e.commLink} target="_blank" className="text-slate-300 hover:text-blue-500 transition-colors"><Icon name="link" size={14} /></a>}</div>
                                                         <div className="text-[9px] font-bold text-slate-400 mt-1 uppercase tracking-wider">{e.objective || 'Sem objetivo definido'}</div>
+                                                        <div className="text-[8px] font-black text-[#397394] mt-2 uppercase tracking-tighter">Analista: {e.analyst || '--'}</div>
                                                     </td>
                                                     <td className="px-10 py-8 text-center">
                                                         <div className="flex flex-wrap justify-center gap-2">{e.countries?.map(c => <RoundFlag key={c} country={c} />)}</div>
@@ -469,13 +467,13 @@
                                     <select value={filterYear} onChange={(e) => setFilterYear(e.target.value)} className="impact-filter"><option>2025</option><option>2026</option></select>
                                 </div>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 text-left text-slate-800">
-                                    <div className="p-10 bg-white rounded-[3rem] border border-slate-100 shadow-sm text-left"><div className="p-3 bg-slate-50 rounded-xl w-fit mb-6 text-slate-300 mx-auto sm:mx-0"><Icon name="file-text" size={26} /></div><div className="text-6xl font-black text-slate-900 tracking-tighter leading-none">{statsImpacto.totalPosts}</div><div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic">Total Posts</div></div>
-                                    <div className="p-10 bg-slate-900 rounded-[3rem] shadow-2xl relative overflow-hidden group hover:scale-[1.02] transition-all text-white text-left"><div className="absolute top-8 right-8 bg-emerald-400 text-slate-950 text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter shadow-glow italic">Target</div><div className="p-3 bg-white/10 rounded-xl w-fit mb-6 text-white mx-auto sm:mx-0"><Icon name="trending-up" size={26} /></div><div className="text-6xl font-black tracking-tighter leading-none">{statsImpacto.interactions}</div><div className="text-[9px] font-black uppercase text-slate-500 tracking-widest mt-4 italic text-slate-400">Interações</div></div>
-                                    <div className="p-10 bg-white rounded-[3rem] border border-slate-100 shadow-sm text-slate-900 text-left"><div className="p-3 bg-red-50 rounded-xl w-fit mb-6 text-red-300 mx-auto sm:mx-0"><Icon name="message-circle" size={26} /></div><div className="text-6xl font-black text-slate-900 tracking-tighter leading-none">{statsImpacto.totalComments}</div><div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic text-slate-400">Comments</div></div>
-                                    <div className="p-10 bg-[#f8fafc] rounded-[3rem] border border-slate-100 shadow-sm text-slate-900 text-left"><div className="p-3 bg-slate-900 text-white rounded-xl w-fit mb-6 mx-auto sm:mx-0"><Icon name="zap" size={26} /></div><div className="text-6xl font-black text-slate-900 tracking-tighter leading-none">{statsImpacto.avgScore}%</div><div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic text-slate-400">Score Engaja</div></div>
+                                    <div className="p-10 bg-white rounded-[3rem] border border-slate-100 shadow-sm text-left text-left"><div className="p-3 bg-slate-50 rounded-xl w-fit mb-6 text-slate-300 mx-auto sm:mx-0"><Icon name="file-text" size={26} /></div><div className="text-6xl font-black text-slate-900 tracking-tighter leading-none">{statsImpacto.totalPosts}</div><div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic">Total Posts</div></div>
+                                    <div className="p-10 bg-slate-900 rounded-[3rem] shadow-2xl relative overflow-hidden group hover:scale-[1.02] transition-all text-white text-left text-left"><div className="absolute top-8 right-8 bg-emerald-400 text-slate-950 text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter shadow-glow italic text-left">Target</div><div className="p-3 bg-white/10 rounded-xl w-fit mb-6 text-white mx-auto sm:mx-0"><Icon name="trending-up" size={26} /></div><div className="text-6xl font-black tracking-tighter leading-none">{statsImpacto.interactions}</div><div className="text-[9px] font-black uppercase text-slate-500 tracking-widest mt-4 italic text-slate-400 text-left">Interações</div></div>
+                                    <div className="p-10 bg-white rounded-[3rem] border border-slate-100 shadow-sm text-slate-900 text-left text-left"><div className="p-3 bg-red-50 rounded-xl w-fit mb-6 text-red-300 mx-auto sm:mx-0"><Icon name="message-circle" size={26} /></div><div className="text-6xl font-black text-slate-900 tracking-tighter leading-none">{statsImpacto.totalComments}</div><div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic text-slate-400 text-left">Comments</div></div>
+                                    <div className="p-10 bg-[#f8fafc] rounded-[3rem] border border-slate-100 shadow-sm text-slate-900 text-left text-left"><div className="p-3 bg-slate-900 text-white rounded-xl w-fit mb-6 mx-auto sm:mx-0"><Icon name="zap" size={26} /></div><div className="text-6xl font-black text-slate-900 tracking-tighter leading-none">{statsImpacto.avgScore}%</div><div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic text-slate-400 text-left">Score Engaja</div></div>
                                 </div>
                                 <div className="grid grid-cols-1 gap-8 text-left">
-                                    <LineAreaChart title="Evolução de Comunicados (Curva Orgânica)" data={statsImpacto.monthlyPosts} color="#397394" />
+                                    <LineAreaChart title="Evolução de Comunicados (Volume Mensal)" data={statsImpacto.monthlyPosts} color="#397394" />
                                     <LineAreaChart title="Taxa de Engajamento Mensal (Curva Orgânica)" data={statsImpacto.monthlyEngagement} color="#F77D8D" valueSuffix="%" />
                                 </div>
                             </section>
@@ -497,7 +495,7 @@
                                                         <td className="px-10 py-8 text-slate-800 text-left"><div className="flex items-center gap-2"><div className="font-black uppercase italic text-xl text-slate-800 leading-none">{ev.title}</div>{ev.hasCoffee && <span title="Coffee Break" className="text-xl">☕</span>}</div><div className="text-[9px] font-bold text-slate-400 uppercase mt-2 tracking-widest italic">{ev.sponsor} • {isElected ? <span className="text-[#BED993] font-black uppercase">ELEITO: {ev['vendor'+(ev.selectedVendorIdx+1)]}</span> : 'EQUIPA INTERNA'}</div></td>
                                                         <td className="px-10 py-8 text-center text-xs font-bold text-slate-500 text-left">{ev.date ? new Date(ev.date).toLocaleDateString('pt-BR') : '--'}</td>
                                                         <td className="px-10 py-8 text-center text-left text-slate-800"><span className="px-4 py-1.5 bg-blue-50 text-blue-700 text-[9px] font-black uppercase rounded-full">{ev.status}</span></td>
-                                                        <td className="px-10 py-8 text-right text-slate-300"><div className="flex items-center justify-end gap-2 text-slate-700"><button onClick={() => openAgendaModal(ev)} className="p-3 hover:text-blue-600 transition-all"><Icon name="pencil" size={18} /></button><button onClick={() => deleteDoc(doc(db, 'artifacts', APP_ID_ROOT, 'public', 'data', 'agenda', ev.id))} className="p-3 hover:text-red-500 transition-all text-slate-700"><Icon name="trash-2" size={18} /></button></div></td>
+                                                        <td className="px-10 py-8 text-right text-slate-300 text-left text-left"><button onClick={() => openAgendaModal(ev)} className="p-3 hover:text-blue-600 transition-all"><Icon name="pencil" size={18} /></button><button onClick={() => deleteDoc(doc(db, 'artifacts', APP_ID_ROOT, 'public', 'data', 'agenda', ev.id))} className="p-3 hover:text-red-500 transition-all text-slate-700"><Icon name="trash-2" size={18} /></button></td>
                                                     </tr>
                                                 );
                                             })}
@@ -508,7 +506,7 @@
                         )}
                     </main>
 
-                    {/* MODAL EXTERNAL (Corrigido) */}
+                    {/* MODAL EXTERNAL */}
                     {isModalExternalOpen && (
                         <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[150] flex items-center justify-center p-4">
                             <div className="bg-white w-full max-w-4xl rounded-[3rem] p-12 shadow-2xl modal-animate relative max-h-[90vh] overflow-y-auto custom-scroll text-left">
@@ -519,24 +517,32 @@
                                 <form onSubmit={handleSaveExternal} className="grid grid-cols-1 md:grid-cols-2 gap-12 text-left">
                                     <div className="space-y-8">
                                         <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold">Campanha (IDCloud)</label><input name="title" defaultValue={editingExternal?.title} required className="w-full bg-slate-50 border-none rounded-xl p-5 font-bold outline-none shadow-sm" placeholder="Nome da comunicação" /></div>
+                                        
+                                        <div>
+                                            <div className="flex items-center justify-between gap-3 mb-3 text-left">
+                                                <label className="text-[10px] font-black uppercase text-slate-400 block font-bold">Analista Responsável</label>
+                                                <button type="button" onClick={() => {const a = prompt("Nome do Novo Analista:"); if(a) setAllExtAnalysts([...allExtAnalysts, a])}} className="text-[#397394] hover:scale-110 transition-transform"><Icon name="plus-circle" size={18}/></button>
+                                            </div>
+                                            <select name="analyst" defaultValue={editingExternal?.analyst || allExtAnalysts[0]} className="w-full bg-slate-50 border-none rounded-xl p-5 font-black outline-none shadow-sm">
+                                                {allExtAnalysts.map(a => <option key={a} value={a}>{a}</option>)}
+                                            </select>
+                                        </div>
+
                                         <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block italic font-bold">Objetivo (Camada PMM)</label><input name="objective" defaultValue={editingExternal?.objective} required className="w-full bg-slate-50 border-none rounded-xl p-5 font-bold outline-none shadow-sm" placeholder="Propósito da mensagem" /></div>
                                         <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold">Link da Comunicação</label><div className="relative"><input name="commLink" defaultValue={editingExternal?.commLink} className="w-full bg-slate-50 border-none rounded-xl p-5 pl-12 font-bold outline-none shadow-sm" placeholder="URL do conteúdo" /><Icon name="link" size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" /></div></div>
                                         
                                         <div>
-                                            <div className="flex items-center justify-between gap-3 mb-3">
-                                                <label className="text-[10px] font-black uppercase text-slate-400 block font-bold">Público (Países)</label>
-                                                <button type="button" onClick={() => {const c = prompt("Nome do País:"); if(c) {setAvailableCountries([...availableCountries, c]); COUNTRIES_MAP[c] = "🌐";}}} className="text-[#397394] hover:scale-110 transition-transform"><Icon name="plus-circle" size={18}/></button>
-                                            </div>
+                                            <div className="flex items-center mb-3 text-left"><label className="text-[10px] font-black uppercase text-slate-400 block font-bold">Público (Países)</label></div>
                                             <div className="flex flex-wrap gap-2">{availableCountries.map(c => (<div key={c} onClick={() => setSelectedCountries(prev => prev.includes(c) ? prev.filter(x => x !== c) : [...prev, c])} className={`checkbox-flag ${selectedCountries.includes(c) ? 'active' : ''}`}><RoundFlag country={c} /></div>))}</div>
                                         </div>
                                     </div>
 
                                     <div className="space-y-8">
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold">Data de Envio</label><input name="date" type="date" defaultValue={editingExternal?.date} required className="w-full bg-slate-50 border-none rounded-xl p-4 font-bold outline-none shadow-sm" /></div>
-                                            <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold">Hora</label><input name="postTime" type="time" defaultValue={editingExternal?.postTime} className="w-full bg-slate-50 border-none rounded-xl p-4 font-bold outline-none shadow-sm" /></div>
+                                        <div className="grid grid-cols-2 gap-4 text-left">
+                                            <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold text-left">Data de Envio</label><input name="date" type="date" defaultValue={editingExternal?.date} required className="w-full bg-slate-50 border-none rounded-xl p-4 font-bold outline-none shadow-sm" /></div>
+                                            <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold text-left">Hora</label><input name="postTime" type="time" defaultValue={editingExternal?.postTime} className="w-full bg-slate-50 border-none rounded-xl p-4 font-bold outline-none shadow-sm" /></div>
                                         </div>
-                                        <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold">Status</label><select name="status" defaultValue={editingExternal?.status || 'Aguardando Envio'} className="w-full bg-slate-50 border-none rounded-xl p-4 font-black outline-none shadow-sm">{EXTERNAL_STATUS_OPTIONS.map(s => <option key={s}>{s}</option>)}</select></div>
+                                        <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold text-left">Status</label><select name="status" defaultValue={editingExternal?.status || 'Aguardando Envio'} className="w-full bg-slate-50 border-none rounded-xl p-4 font-black outline-none shadow-sm">{EXTERNAL_STATUS_OPTIONS.map(s => <option key={s}>{s}</option>)}</select></div>
 
                                         <div className="bg-[#f8fafc] p-10 rounded-[3rem] border border-slate-100 space-y-6 shadow-inner text-center">
                                             <div className="text-[10px] font-black uppercase text-slate-400 tracking-widest italic flex items-center justify-center gap-2">Performance do Outbound</div>
@@ -564,16 +570,16 @@
                                 <h3 className="text-3xl font-black italic uppercase leading-none tracking-tighter mb-10 text-slate-800 uppercase">registro de comunicação</h3>
                                 <form onSubmit={handleSaveComm} className="grid grid-cols-1 md:grid-cols-2 gap-10">
                                     <div className="space-y-8 text-left">
-                                        <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold">Título do Post</label><input name="title" defaultValue={editingComm?.title} required className="w-full bg-slate-50 border-none rounded-2xl p-5 font-bold text-lg outline-none shadow-sm" /></div>
+                                        <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold text-left">Título do Post</label><input name="title" defaultValue={editingComm?.title} required className="w-full bg-slate-50 border-none rounded-2xl p-5 font-bold text-lg outline-none shadow-sm" /></div>
                                         <div>
-                                            <div className="flex items-center justify-between gap-3 mb-3">
+                                            <div className="flex items-center justify-between gap-3 mb-3 text-left">
                                                 <label className="text-[10px] font-black uppercase text-slate-400 block font-bold">Analistas</label>
                                                 <button type="button" onClick={() => {const a = prompt("Nome do Analista:"); if(a) setAllAnalysts([...allAnalysts, a])}} className="text-[#397394] hover:scale-110 transition-transform"><Icon name="plus-circle" size={18} /></button>
                                             </div>
                                             <div className="flex flex-wrap gap-2">{allAnalysts.map(a => (<div key={a} onClick={() => toggleAnalyst(a)} className={`checkbox-flag ${selectedAnalysts.includes(a) ? 'active' : ''}`}><Icon name={selectedAnalysts.includes(a) ? "check-circle-2" : "circle"} size={14} />{a}</div>))}</div>
                                         </div>
-                                        <div className="grid grid-cols-2 gap-4"><div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold">Data</label><input name="date" type="date" defaultValue={editingComm?.date} required className="w-full bg-slate-50 border-none rounded-xl p-4 font-bold outline-none shadow-sm" /></div><div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold">Hora</label><input name="postTime" type="time" defaultValue={editingComm?.postTime} className="w-full bg-slate-50 border-none rounded-xl p-4 font-bold outline-none shadow-sm" /></div></div>
-                                        <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold">Canal</label><select name="channelName" defaultValue={editingComm?.channelName || channelsList[0]} className="w-full bg-slate-50 border-none rounded-xl p-5 font-black outline-none shadow-sm">{channelsList.map(ch => <option key={ch} value={ch}>{ch}</option>)}</select></div>
+                                        <div className="grid grid-cols-2 gap-4 text-left"><div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold text-left">Data</label><input name="date" type="date" defaultValue={editingComm?.date} required className="w-full bg-slate-50 border-none rounded-xl p-4 font-bold outline-none shadow-sm" /></div><div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold text-left">Hora</label><input name="postTime" type="time" defaultValue={editingComm?.postTime} className="w-full bg-slate-50 border-none rounded-xl p-4 font-bold outline-none shadow-sm" /></div></div>
+                                        <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold text-left">Canal</label><select name="channelName" defaultValue={editingComm?.channelName || channelsList[0]} className="w-full bg-slate-50 border-none rounded-xl p-5 font-black outline-none shadow-sm">{channelsList.map(ch => <option key={ch} value={ch}>{ch}</option>)}</select></div>
                                     </div>
                                     <div className="space-y-8">
                                         <div className="bg-[#f8fafc] p-10 rounded-[3rem] border border-slate-100 space-y-8 shadow-inner text-center">
@@ -583,13 +589,13 @@
                                                 <div><label className="text-[8px] uppercase text-slate-400 block italic text-center">Reações</label><input name="reactions" type="number" defaultValue={editingComm?.reactions || 0} className="w-full bg-white border border-slate-100 rounded-xl p-4 font-black text-center outline-none shadow-sm" /></div>
                                                 <div><label className="text-[8px] uppercase text-slate-400 block italic text-center">Comments</label><input name="comments" type="number" defaultValue={editingComm?.comments || 0} className="w-full bg-white border border-slate-100 rounded-xl p-4 font-black text-center outline-none shadow-sm" /></div>
                                             </div>
-                                            <div className="mt-6"><label className="text-[10px] font-black uppercase text-slate-400 block mb-2 italic text-center">Base Canal</label><input name="population" type="number" defaultValue={editingComm?.population} placeholder="Preencher" className="w-full bg-white border-none rounded-2xl p-4 font-black text-center outline-none shadow-sm" /></div>
+                                            <div className="mt-6"><label className="text-[10px] font-black uppercase text-slate-400 block mb-2 italic text-center text-left">Base Canal</label><input name="population" type="number" defaultValue={editingComm?.population} placeholder="Preencher" className="w-full bg-white border-none rounded-2xl p-4 font-black text-center outline-none shadow-sm" /></div>
                                         </div>
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold">Editoria</label><select name="editoria" defaultValue={editingComm?.editoria || EDITORIAS_LIST[0]} className="w-full bg-slate-50 border-none rounded-xl p-4 font-black shadow-sm">{EDITORIAS_LIST.map(e => <option key={e}>{e}</option>)}</select></div>
-                                            <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold">Status</label><select name="status" defaultValue={editingComm?.status || "Aguardando Envio"} className="w-full bg-slate-50 border-none rounded-xl p-4 font-bold shadow-sm">{STATUS_OPTIONS.map(s => <option key={s}>{s}</option>)}</select></div>
+                                        <div className="grid grid-cols-2 gap-4 text-left">
+                                            <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold text-left">Editoria</label><select name="editoria" defaultValue={editingComm?.editoria || EDITORIAS_LIST[0]} className="w-full bg-slate-50 border-none rounded-xl p-4 font-black shadow-sm">{EDITORIAS_LIST.map(e => <option key={e}>{e}</option>)}</select></div>
+                                            <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold text-left">Status</label><select name="status" defaultValue={editingComm?.status || "Aguardando Envio"} className="w-full bg-slate-50 border-none rounded-xl p-4 font-bold shadow-sm">{STATUS_OPTIONS.map(s => <option key={s}>{s}</option>)}</select></div>
                                         </div>
-                                        <div className="space-y-4 text-left"><label className="text-[10px] font-black uppercase text-slate-400 block italic font-bold">Flags</label><div className="grid grid-cols-3 gap-3">{FORMATOS_LIST.map(f => (<div key={f} onClick={() => toggleFormat(f)} className={`p-4 rounded-xl border-2 text-center text-[10px] font-black cursor-pointer transition-all ${selectedFormats.includes(f) ? 'bg-[#397394] border-[#397394] text-white shadow-lg scale-105' : 'bg-white border-slate-50 text-slate-400'}`}>{f}</div>))}</div></div>
+                                        <div className="space-y-4 text-left"><label className="text-[10px] font-black uppercase text-slate-400 block italic font-bold text-left">Flags</label><div className="grid grid-cols-3 gap-3">{FORMATOS_LIST.map(f => (<div key={f} onClick={() => toggleFormat(f)} className={`p-4 rounded-xl border-2 text-center text-[10px] font-black cursor-pointer transition-all ${selectedFormats.includes(f) ? 'bg-[#397394] border-[#397394] text-white shadow-lg scale-105' : 'bg-white border-slate-50 text-slate-400'}`}>{f}</div>))}</div></div>
                                         <button type="submit" className="w-full py-6 bg-black text-white rounded-[2rem] font-black uppercase text-xs tracking-[0.3em] active:scale-[0.98] shadow-2xl italic">SALVAR REGISTRO</button>
                                     </div>
                                 </form>
@@ -597,27 +603,27 @@
                         </div>
                     )}
 
-                    {/* MODAL AGENDA (Mantido) */}
+                    {/* MODAL AGENDA */}
                     {isModalAgendaOpen && (
                         <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[150] flex items-center justify-center p-4">
                             <div className="bg-white w-full max-w-6xl rounded-[4rem] p-12 shadow-2xl modal-animate relative max-h-[95vh] overflow-y-auto custom-scroll text-left">
                                 <button type="button" onClick={() => setIsModalAgendaOpen(false)} className="btn-close-modal"><Icon name="x" size={28} /></button>
                                 <header className="mb-10 border-b border-slate-50 pb-8 text-left"><h3 className="text-5xl font-black italic uppercase tracking-tighter leading-none text-slate-900">Ajustar Planeamento</h3></header>
                                 <form onSubmit={handleSaveAgenda} className="grid grid-cols-1 lg:grid-cols-12 gap-10">
-                                    <div className="lg:col-span-5 space-y-6 bg-slate-50 p-10 rounded-[3rem] border border-slate-100 shadow-inner">
-                                        <div><label className="text-[10px] font-black uppercase text-slate-400 block font-bold mb-2">Atividade</label><input name="atividade" defaultValue={editingAgenda?.title} required className="w-full h-16 bg-white border-none rounded-xl px-6 font-black italic uppercase text-xl shadow-sm outline-none" /></div>
-                                        <div className="grid grid-cols-2 gap-4"><div><label className="text-[10px] font-black uppercase text-slate-400 block font-bold mb-2">Data</label><input name="date" type="date" defaultValue={editingAgenda?.date} required className="w-full h-14 bg-white border-none rounded-xl px-4 font-bold shadow-sm outline-none" /></div><div><label className="text-[10px] font-black uppercase text-slate-400 block font-bold mb-2">Status</label><select name="status" defaultValue={editingAgenda?.status || 'Agendado'} className="w-full h-14 bg-white border-none rounded-xl px-4 font-bold shadow-sm outline-none"><option>Agendado</option><option>Realizado</option><option>Cancelado</option></select></div></div>
-                                        <div><label className="text-[10px] font-black uppercase text-slate-400 block font-bold mb-2">Sponsor</label><input name="sponsor" defaultValue={editingAgenda?.sponsor} required className="w-full h-14 bg-white border-none rounded-xl px-6 font-bold shadow-sm outline-none" /></div>
-                                        <div className="bg-blue-50/50 p-6 rounded-2xl border border-blue-100">
-                                            <label className="text-[10px] font-black uppercase text-[#397394] block font-bold mb-2">Budget Disponível (R$)</label>
+                                    <div className="lg:col-span-5 space-y-6 bg-slate-50 p-10 rounded-[3rem] border border-slate-100 shadow-inner text-left">
+                                        <div><label className="text-[10px] font-black uppercase text-slate-400 block font-bold mb-2 text-left">Atividade</label><input name="atividade" defaultValue={editingAgenda?.title} required className="w-full h-16 bg-white border-none rounded-xl px-6 font-black italic uppercase text-xl shadow-sm outline-none" /></div>
+                                        <div className="grid grid-cols-2 gap-4 text-left"><div><label className="text-[10px] font-black uppercase text-slate-400 block font-bold mb-2 text-left">Data</label><input name="date" type="date" defaultValue={editingAgenda?.date} required className="w-full h-14 bg-white border-none rounded-xl px-4 font-bold shadow-sm outline-none" /></div><div><label className="text-[10px] font-black uppercase text-slate-400 block font-bold mb-2 text-left">Status</label><select name="status" defaultValue={editingAgenda?.status || 'Agendado'} className="w-full h-14 bg-white border-none rounded-xl px-4 font-bold shadow-sm outline-none"><option>Agendado</option><option>Realizado</option><option>Cancelado</option></select></div></div>
+                                        <div><label className="text-[10px] font-black uppercase text-slate-400 block font-bold mb-2 text-left">Sponsor</label><input name="sponsor" defaultValue={editingAgenda?.sponsor} required className="w-full h-14 bg-white border-none rounded-xl px-6 font-bold shadow-sm outline-none" /></div>
+                                        <div className="bg-blue-50/50 p-6 rounded-2xl border border-blue-100 text-left">
+                                            <label className="text-[10px] font-black uppercase text-[#397394] block font-bold mb-2 text-left">Budget Disponível (R$)</label>
                                             <input type="number" step="0.01" value={localBudget} onChange={(e) => setLocalBudget(Number(e.target.value))} className="w-full h-14 bg-white border-none rounded-xl px-6 font-black text-2xl text-[#397394] shadow-sm outline-none" />
                                         </div>
                                     </div>
                                     <div className="lg:col-span-7 bg-slate-900 rounded-[4rem] p-12 flex flex-col justify-between min-h-[600px] text-white text-center">
-                                        <div className="opacity-30 border border-dashed border-white/20 rounded-[3rem] p-20 flex flex-col items-center">
+                                        <div className="opacity-30 border border-dashed border-white/20 rounded-[3rem] p-20 flex flex-col items-center text-center">
                                             <Icon name="users" size={60} className="mb-6 text-white" />
                                             <h4 className="font-black uppercase tracking-[0.4em]">Decisão Técnica</h4>
-                                            <p className="text-[10px] font-bold uppercase mt-4 italic leading-relaxed text-slate-400">Fluxo estratégico de talentos internos e fornecedores.</p>
+                                            <p className="text-[10px] font-bold uppercase mt-4 italic leading-relaxed text-slate-400">Fluxo estratégico de alocação de recursos em operação.</p>
                                         </div>
                                         <button type="submit" className="w-full h-24 bg-white text-black rounded-[2.5rem] font-black uppercase text-xs tracking-[0.3em] shadow-2xl active:scale-[0.95] flex items-center justify-center gap-5 italic mt-10">
                                             <Icon name="check-circle-2" size={22} /> CONFIRMAR PLANEAMENTO
