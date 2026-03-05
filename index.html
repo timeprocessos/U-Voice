@@ -116,7 +116,7 @@
         const MESES_ABREV = ["JAN", "FEV", "MAR", "ABR", "MAI", "JUN", "JUL", "AGO", "SET", "OUT", "NOV", "DEZ"];
         const ANALYSTS_LIST = ["Ariel Mori Dell Aringa", "Diego Francisco Rocha"];
 
-        // --- COMPONENTES AUXILIARES ---
+        // --- COMPONENTES AUXILIARES (Definidos antes do App para evitar ReferenceError) ---
         const Icon = ({ name, size = 18, className = "" }) => {
             const iconRef = useRef(null);
             useEffect(() => {
@@ -131,11 +131,13 @@
             if (!name) return <div className="analyst-avatar bg-slate-300">?</div>;
             
             // Lógica de Cores Fixas baseada nas Iniciais solicitadas
-            const initials = name.split(' ').map(n => n[0]).filter((_, i, arr) => i === 0 || i === arr.length - 1).join('').toUpperCase();
+            // AM (Ariel Mori) -> Verde, DR (Diego Rocha) -> Azul
+            const initials = name.includes("Ariel") ? "AM" : name.includes("Diego") ? "DR" : 
+                             name.split(' ').map(n => n[0]).filter((_, i, arr) => i === 0 || i === arr.length - 1).join('').toUpperCase();
             
-            let color = "#94a3b8"; // Default Slate
-            if (initials === "AM") color = "#BED993"; // Verde Ariel
-            if (initials === "DR") color = "#397394"; // Azul Diego
+            let color = "#94a3b8"; 
+            if (initials === "AM") color = "#BED993"; 
+            if (initials === "DR") color = "#397394"; 
             
             return (
                 <div className="analyst-avatar" style={{ backgroundColor: color }}>
@@ -261,6 +263,24 @@
                 return () => { unsubC(); unsubA(); unsubE(); };
             }, [user]);
 
+            const openCommModal = (c = null) => { setEditingComm(c); setSelectedAnalysts(c?.analysts || []); setSelectedFormats(c?.formats || []); setIsModalCommOpen(true); };
+            const openExternalModal = (e = null) => { 
+                setEditingExternal(e); setSelectedCountries(e?.countries || []); 
+                setSentCount(e?.sentCount || 0); setOpenedCount(e?.openedCount || 0); 
+                setIsModalExternalOpen(true); 
+            };
+            const openAgendaModal = (ev = null) => {
+                if (ev) {
+                    setEditingAgenda(ev); setLocalBudget(Number(ev.budget || 0)); setHasCoffee(ev.hasCoffee || false);
+                    setVendorToggle(ev.hasVendor || false); setSelectedVendorIdx(ev.selectedVendorIdx >= 0 ? ev.selectedVendorIdx : null);
+                    setLocalVendors([{ name: ev.vendor1 || '', value: Number(ev.vendorValue1 || 0) }, { name: ev.vendor2 || '', value: Number(ev.vendorValue2 || 0) }, { name: ev.vendor3 || '', value: Number(ev.vendorValue3 || 0) }]);
+                } else {
+                    setEditingAgenda(null); setLocalBudget(0); setHasCoffee(false); setVendorToggle(false); setSelectedVendorIdx(null);
+                    setLocalVendors([{ name: '', value: 0 }, { name: '', value: 0 }, { name: '', value: 0 }]);
+                }
+                setIsModalAgendaOpen(true);
+            };
+
             const filteredInternalComms = useMemo(() => {
                 return comms.filter(c => {
                     const d = new Date(c.date);
@@ -332,7 +352,6 @@
                 setMessage("Agenda operacional salva.");
             };
 
-            // Lógica de Exclusão com Confirmação
             const promptDelete = (id, collection) => {
                 setTargetDelete({ id, collection });
                 setIsDeleteModalOpen(true);
@@ -347,6 +366,9 @@
                 setIsDeleteModalOpen(false);
                 setTargetDelete(null);
             };
+
+            const toggleAnalyst = (name) => setSelectedAnalysts(prev => prev.includes(name) ? prev.filter(n => n !== name) : [...prev, name]);
+            const toggleFormat = (f) => setSelectedFormats(prev => prev.includes(f) ? prev.filter(item => item !== f) : [...prev, f]);
 
             return (
                 <div className="min-h-screen pb-32 text-left">
@@ -440,7 +462,7 @@
                                     <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 rounded-xl border border-slate-100 text-slate-400"><Icon name="filter" size={14} /><span className="text-[10px] font-black uppercase tracking-widest italic text-slate-400">Ciclo</span></div>
                                     <select value={filterYear} onChange={(e) => setFilterYear(e.target.value)} className="impact-filter"><option>2025</option><option>2026</option></select>
                                 </div>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 text-left text-slate-800 text-left">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 text-left text-slate-800">
                                     <div className="p-10 bg-white rounded-[3rem] border border-slate-100 shadow-sm"><div className="p-3 bg-slate-50 rounded-xl w-fit mb-6 text-slate-300 mx-auto sm:mx-0"><Icon name="file-text" size={26} /></div><div className="text-6xl font-black text-slate-900 tracking-tighter leading-none">{statsImpacto.totalPosts}</div><div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic">Total Posts</div></div>
                                     <div className="p-10 bg-slate-900 rounded-[3rem] shadow-2xl relative overflow-hidden group hover:scale-[1.02] transition-all text-white"><div className="absolute top-8 right-8 bg-emerald-400 text-slate-950 text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter shadow-glow italic">Target</div><div className="p-3 bg-white/10 rounded-xl w-fit mb-6 text-white mx-auto sm:mx-0"><Icon name="trending-up" size={26} /></div><div className="text-6xl font-black tracking-tighter leading-none">{statsImpacto.interactions}</div><div className="text-[9px] font-black uppercase text-slate-500 tracking-widest mt-4 italic text-slate-400">Interações</div></div>
                                     <div className="p-10 bg-white rounded-[3rem] border border-slate-100 shadow-sm text-slate-900"><div className="p-3 bg-red-50 rounded-xl w-fit mb-6 text-red-300 mx-auto sm:mx-0"><Icon name="message-circle" size={26} /></div><div className="text-6xl font-black text-slate-900 tracking-tighter leading-none">{statsImpacto.totalComments}</div><div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic text-slate-400">Comments</div></div>
@@ -464,7 +486,7 @@
                                                     <td className="px-10 py-8 text-slate-800 text-left"><div className="flex items-center gap-2"><div className="font-black uppercase italic text-xl text-slate-800 leading-none">{ev.title}</div>{ev.hasCoffee && <span title="Coffee Break" className="text-xl">☕</span>}</div><div className="text-[9px] font-bold text-slate-400 uppercase mt-2 tracking-widest italic">{ev.sponsor} • {ev.hasVendor && ev.selectedVendorIdx >= 0 ? <span className="text-[#BED993] font-black uppercase">ELEITO: {ev['vendor'+(ev.selectedVendorIdx+1)]}</span> : 'EQUIPA INTERNA'}</div></td>
                                                     <td className="px-10 py-8 text-center text-xs font-bold text-slate-500 text-left">{ev.date ? new Date(ev.date).toLocaleDateString('pt-BR') : '--'}</td>
                                                     <td className="px-10 py-8 text-center text-left text-slate-800"><span className="px-4 py-1.5 bg-blue-50 text-blue-700 text-[9px] font-black uppercase rounded-full">{ev.status}</span></td>
-                                                    <td className="px-10 py-8 text-right text-slate-300 text-left text-left"><button onClick={() => openAgendaModal(ev)} className="p-3 hover:text-blue-600 transition-all"><Icon name="pencil" size={18} /></button><button onClick={() => promptDelete(ev.id, 'agenda')} className="p-3 hover:text-red-500 transition-all text-slate-700"><Icon name="trash-2" size={18} /></button></td>
+                                                    <td className="px-10 py-8 text-right text-slate-300 text-left"><button onClick={() => openAgendaModal(ev)} className="p-3 hover:text-blue-600 transition-all"><Icon name="pencil" size={18} /></button><button onClick={() => promptDelete(ev.id, 'agenda')} className="p-3 hover:text-red-500 transition-all text-slate-700"><Icon name="trash-2" size={18} /></button></td>
                                                 </tr>
                                             ))}
                                         </tbody>
@@ -526,44 +548,44 @@
                                             <div className="flex items-center justify-between gap-3 mb-3 text-left text-left"><label className="text-[10px] font-black uppercase text-slate-400 block font-bold">Analistas</label><button type="button" onClick={() => {const a = prompt("Nome do Analista:"); if(a) setAllAnalysts([...allAnalysts, a])}} className="text-[#397394] hover:scale-110 transition-transform"><Icon name="plus-circle" size={18} /></button></div>
                                             <div className="flex flex-wrap gap-2">{allAnalysts.map(a => (<div key={a} onClick={() => toggleAnalyst(a)} className={`checkbox-flag ${selectedAnalysts.includes(a) ? 'active' : ''}`}><Icon name={selectedAnalysts.includes(a) ? "check-circle-2" : "circle"} size={14} />{a}</div>))}</div>
                                         </div>
-                                        <div className="grid grid-cols-2 gap-4 text-left text-left"><div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold">Data</label><input name="date" type="date" defaultValue={editingComm?.date} required className="w-full bg-slate-50 border-none rounded-xl p-4 font-bold outline-none shadow-sm" /></div><div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold">Hora</label><input name="postTime" type="time" defaultValue={editingComm?.postTime} className="w-full bg-slate-50 border-none rounded-xl p-4 font-bold outline-none shadow-sm" /></div></div>
-                                        <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold text-left">Canal</label><select name="channelName" defaultValue={editingComm?.channelName || channelsList[0]} className="w-full bg-slate-50 border-none rounded-xl p-5 font-black outline-none shadow-sm">{ANALYSTS_LIST.map(ch => <option key={ch} value={ch}>{ch}</option>)}</select></div>
+                                        <div className="grid grid-cols-2 gap-4 text-left text-left"><div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold text-left text-left">Data</label><input name="date" type="date" defaultValue={editingComm?.date} required className="w-full bg-slate-50 border-none rounded-xl p-4 font-bold outline-none shadow-sm" /></div><div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold text-left text-left">Hora</label><input name="postTime" type="time" defaultValue={editingComm?.postTime} className="w-full bg-slate-50 border-none rounded-xl p-4 font-bold outline-none shadow-sm" /></div></div>
+                                        <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold text-left">Canal</label><select name="channelName" defaultValue={editingComm?.channelName || channelsList[0]} className="w-full bg-slate-50 border-none rounded-xl p-5 font-black outline-none shadow-sm">{allAnalysts.map(ch => <option key={ch} value={ch}>{ch}</option>)}</select></div>
                                     </div>
                                     <div className="space-y-8">
                                         <div className="bg-[#f8fafc] p-10 rounded-[3rem] border border-slate-100 space-y-8 shadow-inner text-center">
                                             <div className="text-[10px] font-black uppercase text-[#397394] tracking-widest italic flex items-center justify-center gap-2">Impacto Interno</div>
-                                            <div className="grid grid-cols-3 gap-4 text-left">
+                                            <div className="grid grid-cols-3 gap-4 text-left text-left text-center">
                                                 <div><label className="text-[8px] uppercase text-slate-400 block italic text-center">Reach</label><input name="views" type="number" defaultValue={editingComm?.views || 0} className="w-full bg-white border border-slate-100 rounded-xl p-4 font-black text-center outline-none shadow-sm" /></div>
                                                 <div><label className="text-[8px] uppercase text-slate-400 block italic text-center">Reações</label><input name="reactions" type="number" defaultValue={editingComm?.reactions || 0} className="w-full bg-white border border-slate-100 rounded-xl p-4 font-black text-center outline-none shadow-sm" /></div>
                                                 <div><label className="text-[8px] uppercase text-slate-400 block italic text-center">Comments</label><input name="comments" type="number" defaultValue={editingComm?.comments || 0} className="w-full bg-white border border-slate-100 rounded-xl p-4 font-black text-center outline-none shadow-sm" /></div>
                                             </div>
-                                            <div className="mt-6 text-left"><label className="text-[10px] font-black uppercase text-slate-400 block mb-2 italic text-center text-left">Base Canal</label><input name="population" type="number" defaultValue={editingComm?.population} placeholder="Preencher" className="w-full bg-white border-none rounded-2xl p-4 font-black text-center outline-none shadow-sm" /></div>
+                                            <div className="mt-6 text-left"><label className="text-[10px] font-black uppercase text-slate-400 block mb-2 italic text-center text-left text-left">Base Canal</label><input name="population" type="number" defaultValue={editingComm?.population} placeholder="Preencher" className="w-full bg-white border-none rounded-2xl p-4 font-black text-center outline-none shadow-sm" /></div>
                                         </div>
-                                        <div className="grid grid-cols-2 gap-4 text-left">
-                                            <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold">Editoria</label><select name="editoria" defaultValue={editingComm?.editoria || EDITORIAS_LIST[0]} className="w-full bg-slate-50 border-none rounded-xl p-4 font-black shadow-sm">{EDITORIAS_LIST.map(e => <option key={e}>{e}</option>)}</select></div>
-                                            <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold">Status</label><select name="status" defaultValue={editingComm?.status || "Aguardando Envio"} className="w-full bg-slate-50 border-none rounded-xl p-4 font-bold shadow-sm">{STATUS_OPTIONS.map(s => <option key={s}>{s}</option>)}</select></div>
+                                        <div className="grid grid-cols-2 gap-4 text-left text-left">
+                                            <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold text-left text-left text-left">Editoria</label><select name="editoria" defaultValue={editingComm?.editoria || EDITORIAS_LIST[0]} className="w-full bg-slate-50 border-none rounded-xl p-4 font-black shadow-sm">{EDITORIAS_LIST.map(e => <option key={e}>{e}</option>)}</select></div>
+                                            <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold text-left text-left text-left">Status</label><select name="status" defaultValue={editingComm?.status || "Aguardando Envio"} className="w-full bg-slate-50 border-none rounded-xl p-4 font-bold shadow-sm">{STATUS_OPTIONS.map(s => <option key={s}>{s}</option>)}</select></div>
                                         </div>
-                                        <div className="space-y-4 text-left text-left"><label className="text-[10px] font-black uppercase text-slate-400 block italic font-bold">Flags</label><div className="grid grid-cols-3 gap-3">{FORMATOS_LIST.map(f => (<div key={f} onClick={() => toggleFormat(f)} className={`p-4 rounded-xl border-2 text-center text-[10px] font-black cursor-pointer transition-all ${selectedFormats.includes(f) ? 'bg-[#397394] border-[#397394] text-white shadow-lg scale-105' : 'bg-white border-slate-50 text-slate-400'}`}>{f}</div>))}</div></div>
-                                        <button type="submit" className="w-full py-6 bg-black text-white rounded-[2rem] font-black uppercase text-xs tracking-[0.3em] active:scale-[0.98] shadow-2xl italic text-left text-center">SALVAR REGISTRO</button>
+                                        <div className="space-y-4 text-left text-left"><label className="text-[10px] font-black uppercase text-slate-400 block italic font-bold text-left text-left text-left">Flags</label><div className="grid grid-cols-3 gap-3">{FORMATOS_LIST.map(f => (<div key={f} onClick={() => toggleFormat(f)} className={`p-4 rounded-xl border-2 text-center text-[10px] font-black cursor-pointer transition-all ${selectedFormats.includes(f) ? 'bg-[#397394] border-[#397394] text-white shadow-lg scale-105' : 'bg-white border-slate-50 text-slate-400'}`}>{f}</div>))}</div></div>
+                                        <button type="submit" className="w-full py-6 bg-black text-white rounded-[2rem] font-black uppercase text-xs tracking-[0.4em] active:scale-[0.98] shadow-2xl italic text-left text-center">SALVAR REGISTRO</button>
                                     </div>
                                 </form>
                             </div>
                         </div>
                     )}
 
-                    {/* MODAL AGENDA (Mantido) */}
+                    {/* MODAL AGENDA */}
                     {isModalAgendaOpen && (
-                        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[150] flex items-center justify-center p-4">
+                        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[150] flex items-center justify-center p-4 text-left">
                             <div className="bg-white w-full max-w-6xl rounded-[4rem] p-12 shadow-2xl modal-animate relative max-h-[95vh] overflow-y-auto custom-scroll text-left text-left text-left">
                                 <button type="button" onClick={() => setIsModalAgendaOpen(false)} className="btn-close-modal"><Icon name="x" size={28} /></button>
                                 <header className="mb-10 border-b border-slate-50 pb-8 text-left text-left text-left"><h3 className="text-5xl font-black italic uppercase tracking-tighter leading-none text-slate-900 text-left text-left">Ajustar Planeamento</h3></header>
                                 <form onSubmit={handleSaveAgenda} className="grid grid-cols-1 lg:grid-cols-12 gap-10">
                                     <div className="lg:col-span-5 space-y-6 bg-slate-50 p-10 rounded-[3rem] border border-slate-100 shadow-inner text-left text-left text-left text-left">
-                                        <div><label className="text-[10px] font-black uppercase text-slate-400 block font-bold mb-2 text-left">Atividade</label><input name="atividade" defaultValue={editingAgenda?.title} required className="w-full h-16 bg-white border-none rounded-xl px-6 font-black italic uppercase text-xl shadow-sm outline-none text-left" /></div>
-                                        <div className="grid grid-cols-2 gap-4 text-left text-left"><div><label className="text-[10px] font-black uppercase text-slate-400 block font-bold mb-2 text-left">Data</label><input name="date" type="date" defaultValue={editingAgenda?.date} required className="w-full h-14 bg-white border-none rounded-xl px-4 font-bold shadow-sm outline-none text-left" /></div><div><label className="text-[10px] font-black uppercase text-slate-400 block font-bold mb-2 text-left text-left">Status</label><select name="status" defaultValue={editingAgenda?.status || 'Agendado'} className="w-full h-14 bg-white border-none rounded-xl px-4 font-bold shadow-sm outline-none text-left"><option>Agendado</option><option>Realizado</option><option>Cancelado</option></select></div></div>
-                                        <div><label className="text-[10px] font-black uppercase text-slate-400 block font-bold mb-2 text-left">Sponsor</label><input name="sponsor" defaultValue={editingAgenda?.sponsor} required className="w-full h-14 bg-white border-none rounded-xl px-6 font-bold shadow-sm outline-none text-left text-left" /></div>
+                                        <div><label className="text-[10px] font-black uppercase text-slate-400 block font-bold mb-2 text-left text-left text-left">Atividade</label><input name="atividade" defaultValue={editingAgenda?.title} required className="w-full h-16 bg-white border-none rounded-xl px-6 font-black italic uppercase text-xl shadow-sm outline-none text-left" /></div>
+                                        <div className="grid grid-cols-2 gap-4 text-left text-left text-left text-left"><div><label className="text-[10px] font-black uppercase text-slate-400 block font-bold mb-2 text-left text-left text-left">Data</label><input name="date" type="date" defaultValue={editingAgenda?.date} required className="w-full h-14 bg-white border-none rounded-xl px-4 font-bold shadow-sm outline-none text-left" /></div><div><label className="text-[10px] font-black uppercase text-slate-400 block font-bold mb-2 text-left text-left text-left text-left">Status</label><select name="status" defaultValue={editingAgenda?.status || 'Agendado'} className="w-full h-14 bg-white border-none rounded-xl px-4 font-bold shadow-sm outline-none text-left"><option>Agendado</option><option>Realizado</option><option>Cancelado</option></select></div></div>
+                                        <div><label className="text-[10px] font-black uppercase text-slate-400 block font-bold mb-2 text-left text-left text-left">Sponsor</label><input name="sponsor" defaultValue={editingAgenda?.sponsor} required className="w-full h-14 bg-white border-none rounded-xl px-6 font-bold shadow-sm outline-none text-left" /></div>
                                         <div className="bg-blue-50/50 p-6 rounded-2xl border border-blue-100 text-left text-left">
-                                            <label className="text-[10px] font-black uppercase text-[#397394] block font-bold mb-2 text-left">Budget Disponível (R$)</label>
+                                            <label className="text-[10px] font-black uppercase text-[#397394] block font-bold mb-2 text-left text-left text-left">Budget Disponível (R$)</label>
                                             <input type="number" step="0.01" value={localBudget} onChange={(e) => setLocalBudget(Number(e.target.value))} className="w-full h-14 bg-white border-none rounded-xl px-6 font-black text-2xl text-[#397394] shadow-sm outline-none text-left" />
                                         </div>
                                     </div>
