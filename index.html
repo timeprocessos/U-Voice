@@ -47,6 +47,8 @@
         }
         @keyframes blinker { from { opacity: 1; } to { opacity: 0.5; } }
 
+        .message-box { position: fixed; bottom: 85px; left: 50%; transform: translateX(-50%); background: #1e293b; color: white; padding: 12px 24px; border-radius: 12px; z-index: 200; font-weight: 900; font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; box-shadow: 0 20px 40px rgba(0,0,0,0.3); }
+
         .round-flag-container {
             width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center;
             border-radius: 50%; background: #fff; border: 1px solid #e2e8f0; font-size: 14px;
@@ -67,15 +69,6 @@
             flex-shrink: 0; border: 2px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.1);
             overflow: hidden;
         }
-
-        .message-box { position: fixed; bottom: 85px; left: 50%; transform: translateX(-50%); background: #1e293b; color: white; padding: 12px 24px; border-radius: 12px; z-index: 200; font-weight: 900; font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; box-shadow: 0 20px 40px rgba(0,0,0,0.3); }
-        
-        .scrollbar-hide::-webkit-scrollbar { display: none; }
-        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
-        
-        /* Ajuste fino para a linha do tempo do modal */
-        .timeline-step-border { border-left: 2px solid #e2e8f0; margin-left: 1rem; padding-left: 2rem; padding-bottom: 2rem; }
-        .timeline-step-border:last-child { border-left: 2px solid transparent; }
     </style>
 </head>
 <body>
@@ -84,7 +77,7 @@
     <script type="text/babel" data-type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, doc, onSnapshot, deleteDoc, addDoc, updateDoc, Timestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, doc, onSnapshot, deleteDoc, addDoc, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyCRNpfVN3n_Ue9kocKSU7EGlp9ElBJWvRg",
@@ -118,44 +111,7 @@
         const ANALYSTS_LIST = ["Ariel Mori Dell Aringa", "Diego Francisco Rocha"];
         const CHANNELS_LIST = ["#news-ops-all-team", "#news-cx-team", "#news-analysis-team", "#news-onboarding-team", "#news-ops-leaders"];
 
-        // --- UTILITÁRIOS (DECLARADOS NO TOPO PARA EVITAR REFERENCEERROR) ---
-        const utils = {
-            addDays: (date, days) => {
-                const d = new Date(date + 'T12:00:00');
-                d.setDate(d.getDate() + parseInt(days));
-                return d;
-            },
-            formatDate: (date) => date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' }),
-            formatLocalDate: (dateStr) => {
-                if(!dateStr) return '--';
-                const parts = dateStr.split('-');
-                if(parts.length !== 3) return dateStr;
-                return `${parts[2]}/${parts[1]}/${parts[0]}`;
-            },
-            getRawDate: (date) => {
-                if (!date) return "";
-                return new Date(date).toISOString().split('T')[0];
-            },
-            isToday: (someDate) => {
-                const today = new Date();
-                return someDate.getDate() === today.getDate() &&
-                       someDate.getMonth() === today.getMonth() &&
-                       someDate.getFullYear() === today.getFullYear();
-            },
-            getNPSCategory: (value) => {
-                if (value <= 6) return { label: 'DETRATORES', color: 'bg-red-500', text: 'text-red-500', bg: 'bg-red-50', icon: 'frown' };
-                if (value <= 8) return { label: 'NEUTROS', color: 'bg-teal-500', text: 'text-teal-600', bg: 'bg-teal-50', icon: 'meh' };
-                return { label: 'PROMOTORES', color: 'bg-green-500', text: 'text-green-600', bg: 'bg-green-50', icon: 'smile' };
-            },
-            checkIsDelayed: (date, time, status) => {
-                if (status === 'Enviado' || status === 'Cancelado' || !date) return false;
-                const scheduledTime = time || "00:00";
-                const scheduledDate = new Date(`${date}T${scheduledTime}`);
-                return scheduledDate < new Date();
-            }
-        };
-
-        // --- COMPONENTES AUXILIARES ---
+        // --- COMPONENTES AUXILIARES (FUNCTION DECLARATIONS NO TOPO) ---
         function Icon({ name, size = 18, className = "", forceKey }) {
             const iconRef = useRef(null);
             useEffect(() => {
@@ -171,7 +127,7 @@
 
         function UnicoLogo({ size = 34 }) {
             return (
-                <div className="bg-black rounded-xl flex items-center justify-center shadow-lg shrink-0" style={{ width: size, height: size }}>
+                <div className="bg-black rounded-xl flex items-center justify-center shadow-lg" style={{ width: size, height: size }}>
                     <svg width={size * 0.6} height={size * 0.6} viewBox="0 0 100 100" fill="none">
                         <path d="M20 20V55C20 71.5685 33.4315 85 50 85C66.5685 85 80 71.5685 80 55V20H65V55C65 63.2843 58.2843 70 50 70C41.7157 70 35 63.2843 35 55V20H20Z" fill="white"/>
                     </svg>
@@ -204,6 +160,20 @@
             return <div className="analyst-avatar rounded-full" style={{ backgroundColor: color }}>{initials}</div>;
         }
 
+        function checkIsDelayed(date, time, status) {
+            if (status === 'Enviado' || status === 'Cancelado' || !date) return false;
+            const scheduledTime = time || "00:00";
+            const scheduledDate = new Date(`${date}T${scheduledTime}`);
+            return scheduledDate < new Date();
+        }
+
+        function formatLocalDate(dateStr) {
+            if(!dateStr) return '--';
+            const parts = dateStr.split('-');
+            if(parts.length !== 3) return dateStr;
+            return `${parts[2]}/${parts[1]}/${parts[0]}`;
+        }
+
         function LineAreaChart({ data, title, color = "#397394", valueSuffix = "" }) {
             const chartHeight = 220; const chartWidth = 800;
             const paddingX = 40; const paddingY = 60;
@@ -229,7 +199,7 @@
             const curvedPath = getCurvedPath(points);
             const areaPath = `${curvedPath} L ${points[points.length-1].x} ${chartHeight - paddingY} L ${points[0].x} ${chartHeight - paddingY} Z`;
             return (
-                <div className="bg-white p-8 rounded-[3rem] border border-slate-100 shadow-sm w-full transition-all text-left text-slate-800">
+                <div className="bg-white p-8 rounded-[3rem] border border-slate-100 shadow-sm w-full transition-all text-left">
                     <h4 className="text-[11px] font-black uppercase text-slate-400 mb-8 tracking-[0.2em] italic">{title}</h4>
                     <div className="relative w-full overflow-x-auto custom-scroll pb-4">
                         <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} className="w-full min-w-[600px] h-auto overflow-visible">
@@ -251,62 +221,42 @@
             const [comms, setComms] = useState([]);
             const [agenda, setAgenda] = useState([]);
             const [externalComms, setExternalComms] = useState([]);
-            const [reguas, setReguas] = useState([]);
             const [message, setMessage] = useState("");
             
-            // Estados de Modais
             const [isModalCommOpen, setIsModalCommOpen] = useState(false);
             const [isModalExternalOpen, setIsModalExternalOpen] = useState(false);
             const [isModalAgendaOpen, setIsModalAgendaOpen] = useState(false);
-            const [isModalReguaOpen, setIsModalReguaOpen] = useState(false);
             const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
             
             const [editingComm, setEditingComm] = useState(null);
             const [editingExternal, setEditingExternal] = useState(null);
             const [editingAgenda, setEditingAgenda] = useState(null);
-            const [editingReguaId, setEditingReguaId] = useState(null);
             const [targetDelete, setTargetDelete] = useState(null);
 
-            // Analistas e Filtros
             const [allAnalysts, setAllAnalysts] = useState(ANALYSTS_LIST);
+            const [allExtAnalysts, setAllExtAnalysts] = useState(ANALYSTS_LIST);
+            const [channelsList, setChannelsList] = useState(CHANNELS_LIST);
             const [selectedAnalysts, setSelectedAnalysts] = useState([]);
             const [selectedFormats, setSelectedFormats] = useState([]);
             const [selectedCountries, setSelectedCountries] = useState([]);
 
-            // Filtros Internos
+            const [sortOrder, setSortOrder] = useState('desc');
             const [filterYear, setFilterYear] = useState("2026");
             const [filterMonth, setFilterMonth] = useState("Todos");
-            const [sortOrder, setSortOrder] = useState('desc');
-
-            // Filtros Agenda
+            
             const [agendaFilterYear, setAgendaFilterYear] = useState("2026");
             const [agendaFilterMonth, setAgendaFilterMonth] = useState("Todos");
 
-            // Filtros Externo
+            const [extSortOrder, setExtSortOrder] = useState('desc');
             const [extFilterYear, setExtFilterYear] = useState("2026");
             const [extFilterMonth, setExtFilterMonth] = useState("Todos");
-            const [extSortOrder, setExtSortOrder] = useState('desc');
-
-            // Filtros Planejamento
-            const [filterPubPlanejamento, setFilterPubPlanejamento] = useState('Todos');
-            const [filterMesPlanejamento, setFilterMesPlanejamento] = useState('Todos');
-            const [filterAnoPlanejamento, setFilterAnoPlanejamento] = useState('2026');
+            const [extFilterCountry, setExtFilterCountry] = useState("Todos");
 
             const [localBudget, setLocalBudget] = useState(0);
             const [hasCoffee, setHasCoffee] = useState(false);
             const [vendorToggle, setVendorToggle] = useState(false);
             const [selectedVendorIdx, setSelectedVendorIdx] = useState(null);
             const [localVendors, setLocalVendors] = useState([{ name: '', value: 0 }, { name: '', value: 0 }, { name: '', value: 0 }]);
-
-            // ESTADO INICIAL DO PLANEJAMENTO ATUALIZADO (com dataFinal)
-            const initialReguaForm = {
-                nome: '', objetivo: 'Engajamento', publico: 'Público Geral', 
-                dataInicio: utils.getRawDate(new Date()), 
-                dataFinal: '', 
-                incluirNPS: false, valorNPS: 10,
-                passos: [{ titulo: '', canal: 'Slack', delayDias: 10, briefing: '', concluido: false }]
-            };
-            const [reguaFormData, setReguaFormData] = useState(initialReguaForm);
 
             const [sentCount, setSentCount] = useState(0);
             const [openedCount, setOpenedCount] = useState(0);
@@ -323,19 +273,33 @@
                 const unsubC = onSnapshot(collection(db, 'artifacts', APP_ID_ROOT, 'public', 'data', 'comms'), (snap) => setComms(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
                 const unsubA = onSnapshot(collection(db, 'artifacts', APP_ID_ROOT, 'public', 'data', 'agenda'), (snap) => setAgenda(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
                 const unsubE = onSnapshot(collection(db, 'artifacts', APP_ID_ROOT, 'public', 'data', 'external'), (snap) => setExternalComms(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
-                const unsubR = onSnapshot(collection(db, 'artifacts', APP_ID_ROOT, 'public', 'data', 'reguas_planejamento'), (snap) => setReguas(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
-                return () => { unsubC(); unsubA(); unsubE(); unsubR(); };
+                return () => { unsubC(); unsubA(); unsubE(); };
             }, [user]);
 
-            const promptDelete = (id, col) => { setTargetDelete({ id, collection: col }); setIsDeleteModalOpen(true); };
+            // Handlers de Exclusão
+            const promptDelete = (id, col) => { 
+                setTargetDelete({ id, collection: col }); 
+                setIsDeleteModalOpen(true); 
+            };
+
             const executeDelete = async () => {
                 if (!targetDelete) return;
-                try { await deleteDoc(doc(db, 'artifacts', APP_ID_ROOT, 'public', 'data', targetDelete.collection, targetDelete.id)); setMessage("Removido!"); } catch (e) { setMessage("Erro!"); }
-                setIsDeleteModalOpen(false); setTargetDelete(null);
+                try { 
+                    await deleteDoc(doc(db, 'artifacts', APP_ID_ROOT, 'public', 'data', targetDelete.collection, targetDelete.id)); 
+                    setMessage("Removido!"); 
+                } catch (e) { 
+                    setMessage("Erro!"); 
+                }
+                setIsDeleteModalOpen(false); 
+                setTargetDelete(null);
             };
 
             const openCommModal = (c = null) => { setEditingComm(c); setSelectedAnalysts(c?.analysts || []); setSelectedFormats(c?.formats || []); setIsModalCommOpen(true); };
-            const openExternalModal = (e = null) => { setEditingExternal(e); setSelectedCountries(e?.countries || []); setSentCount(e?.sentCount || 0); setOpenedCount(e?.openedCount || 0); setIsModalExternalOpen(true); };
+            const openExternalModal = (e = null) => { 
+                setEditingExternal(e); setSelectedCountries(e?.countries || []); 
+                setSentCount(e?.sentCount || 0); setOpenedCount(e?.openedCount || 0); 
+                setIsModalExternalOpen(true); 
+            };
             const openAgendaModal = (ev = null) => {
                 if (ev) {
                     setEditingAgenda(ev); setLocalBudget(Number(ev.budget || 0)); setHasCoffee(ev.hasCoffee || false);
@@ -347,13 +311,10 @@
                 }
                 setIsModalAgendaOpen(true);
             };
-            const openReguaModal = (r = null) => {
-                if (r) { setEditingReguaId(r.id); setReguaFormData({ ...r, dataFinal: r.dataFinal || '' }); } 
-                else { setEditingReguaId(null); setReguaFormData(initialReguaForm); }
-                setIsModalReguaOpen(true);
-            };
 
-            const toggleAnalyst = (name) => setSelectedAnalysts(prev => prev.includes(name) ? prev.filter(n => n !== name) : [...prev, name]);
+            const toggleAnalyst = (name) => {
+                setSelectedAnalysts(prev => prev.includes(name) ? prev.filter(n => n !== name) : [...prev, name]);
+            };
             const toggleFormat = (f) => setSelectedFormats(prev => prev.includes(f) ? prev.filter(item => item !== f) : [...prev, f]);
 
             const handleSaveComm = async (e) => {
@@ -383,35 +344,12 @@
                 else await addDoc(collection(db, 'artifacts', APP_ID_ROOT, 'public', 'data', 'agenda'), data);
             };
 
-            const handleSaveRegua = async (e) => {
-                e.preventDefault();
-                const data = { ...reguaFormData, updatedAt: Timestamp.now() };
-                setIsModalReguaOpen(false);
-                if (editingReguaId) await updateDoc(doc(db, 'artifacts', APP_ID_ROOT, 'public', 'data', 'reguas_planejamento', editingReguaId), data);
-                else await addDoc(collection(db, 'artifacts', APP_ID_ROOT, 'public', 'data', 'reguas_planejamento'), { ...data, createdAt: Timestamp.now() });
-            };
-
-            const toggleReguaStep = async (reguaId, steps, idx) => {
-                const newSteps = [...steps];
-                newSteps[idx].concluido = !newSteps[idx].concluido;
-                await updateDoc(doc(db, 'artifacts', APP_ID_ROOT, 'public', 'data', 'reguas_planejamento', reguaId), { passos: newSteps, updatedAt: Timestamp.now() });
-            };
-
-            const calculateTimeline = (regua) => {
-                let current = 0; const today = new Date(); today.setHours(0,0,0,0);
-                const steps = regua.passos.map(p => {
-                    current += parseInt(p.delayDias || 0);
-                    const dateObj = utils.addDays(regua.dataInicio, current);
-                    const dateStripped = new Date(dateObj); dateStripped.setHours(0,0,0,0);
-                    let status = 'Agendado';
-                    if (p.concluido) status = 'Enviado';
-                    else if (utils.isToday(dateObj)) status = 'Hoje';
-                    else if (dateStripped < today) status = 'Atrasado';
-                    return { ...p, dateObj, dateStr: utils.formatDate(dateObj), status };
-                });
-                const lastDate = steps.length > 0 ? steps[steps.length - 1].dateStr : null;
-                const progress = Math.round((steps.filter(s => s.concluido).length / steps.length) * 100) || 0;
-                return { steps, lastDate, progress };
+            const renderBudgetLogic = (vendorValue) => {
+                if (!localBudget || !vendorValue || localBudget <= 0) return null;
+                const pct = (vendorValue / localBudget) * 100;
+                if (pct < 100) return <span className="text-[11px] font-black text-emerald-500 uppercase tracking-tighter">({(100 - pct).toFixed(1)}% de economia)</span>;
+                if (pct === 100) return <span className="text-[11px] font-black text-blue-500 uppercase tracking-tighter">(100% do recurso)</span>;
+                return <span className="text-[11px] font-black text-red-500 uppercase tracking-tighter">({(pct - 100).toFixed(1)}% acima do orçado)</span>;
             };
 
             const filteredInternalComms = useMemo(() => {
@@ -424,9 +362,10 @@
             const filteredExternalComms = useMemo(() => {
                 return externalComms.filter(e => {
                     const d = new Date(e.date);
-                    return d.getFullYear().toString() === extFilterYear && (extFilterMonth === "Todos" || d.getMonth().toString() === extFilterMonth);
+                    const countryMatch = extFilterCountry === "Todos" || (e.countries && e.countries.includes(extFilterCountry));
+                    return d.getFullYear().toString() === extFilterYear && (extFilterMonth === "Todos" || d.getMonth().toString() === extFilterMonth) && countryMatch;
                 }).sort((a, b) => extSortOrder === 'desc' ? new Date(b.date) - new Date(a.date) : new Date(a.date) - new Date(b.date));
-            }, [externalComms, extFilterYear, extFilterMonth, extSortOrder]);
+            }, [externalComms, extFilterYear, extFilterMonth, extFilterCountry, extSortOrder]);
 
             const filteredAgenda = useMemo(() => {
                 return agenda.filter(ev => {
@@ -436,33 +375,17 @@
                 }).sort((a, b) => new Date(b.date) - new Date(a.date));
             }, [agenda, agendaFilterYear, agendaFilterMonth]);
 
-            const filteredReguas = useMemo(() => {
-                return reguas.filter(r => {
-                    const date = new Date(r.dataInicio + 'T12:00:00');
-                    const mes = date.getMonth();
-                    const ano = date.getFullYear().toString();
-                    const matchPub = filterPubPlanejamento === 'Todos' || r.publico === filterPubPlanejamento;
-                    const matchMes = filterMesPlanejamento === 'Todos' || mes === parseInt(filterMesPlanejamento);
-                    const matchAno = filterAnoPlanejamento === 'Todos' || ano === filterAnoPlanejamento;
-                    return matchPub && matchMes && matchAno;
-                });
-            }, [reguas, filterPubPlanejamento, filterMesPlanejamento, filterAnoPlanejamento]);
-
             const statsImpacto = useMemo(() => {
-                const sentInt = comms.filter(c => c.status === 'Enviado' && new Date(c.date).getFullYear().toString() === filterYear);
-                const sentExt = externalComms.filter(e => e.status === 'Enviado' && new Date(e.date).getFullYear().toString() === filterYear);
-                
-                const scoreSum = sentInt.reduce((acc, c) => {
+                const sent = comms.filter(c => c.status === 'Enviado' && new Date(c.date).getFullYear().toString() === filterYear);
+                const totalPosts = sent.length;
+                const scoreSum = sent.reduce((acc, c) => {
                     const pop = Number(c.population) || 0; if (pop === 0) return acc;
                     return acc + (((Number(c.reactions || 0) * 1) + (Number(c.comments || 0) * 2)) / pop) * 100;
                 }, 0);
-                
-                const totalReachOut = sentExt.reduce((acc, e) => acc + (Number(e.sentCount) || 0), 0);
-                const avgOpenRate = sentExt.length > 0 ? (sentExt.reduce((acc, e) => acc + (Number(e.openRate) || 0), 0) / sentExt.length).toFixed(1) : "0.0";
-
+                const avgScore = sent.length > 0 ? (scoreSum / sent.length).toFixed(1) : "0.0";
                 const monthlyPosts = {}; const monthlyEngagement = {};
                 MESES_ABREV.forEach((mes, idx) => {
-                    const mPosts = sentInt.filter(c => new Date(c.date).getMonth() === idx);
+                    const mPosts = sent.filter(c => new Date(c.date).getMonth() === idx);
                     monthlyPosts[mes] = mPosts.length;
                     if (mPosts.length > 0) {
                         const mSum = mPosts.reduce((acc, c) => {
@@ -472,32 +395,8 @@
                         monthlyEngagement[mes] = (mSum / mPosts.length).toFixed(1);
                     } else monthlyEngagement[mes] = 0;
                 });
-
-                return { 
-                    totalPosts: sentInt.length, interactions: sentInt.reduce((acc, c) => acc + (Number(c.reactions) || 0) + (Number(c.comments) || 0), 0), 
-                    avgScore: sentInt.length > 0 ? (scoreSum / sentInt.length).toFixed(1) : "0.0",
-                    totalExternal: sentExt.length, totalReachOut, avgOpenRate,
-                    monthlyPosts, monthlyEngagement 
-                };
-            }, [comms, externalComms, filterYear]);
-
-            // Estatísticas rápidas de planejamento para o rodapé
-            const planningStats = useMemo(() => {
-                let atrasadas = 0;
-                let enviosHoje = 0;
-                let totalEnvios = 0;
-                
-                reguas.forEach(r => {
-                    const tl = calculateTimeline(r);
-                    tl.steps.forEach(s => {
-                        if (s.status === 'Atrasado') atrasadas++;
-                        if (s.status === 'Hoje' || s.dateStr === utils.formatDate(new Date())) enviosHoje++;
-                        if (s.concluido) totalEnvios++;
-                    });
-                });
-
-                return { atrasadas, enviosHoje, totalEnvios, regrasAtivas: reguas.length };
-            }, [reguas]);
+                return { totalPosts: sent.length, interactions: sent.reduce((acc, c) => acc + (Number(c.reactions) || 0) + (Number(c.comments) || 0), 0), totalComments: sent.reduce((acc, c) => acc + (Number(c.comments) || 0), 0), avgScore, monthlyPosts, monthlyEngagement };
+            }, [comms, filterYear]);
 
             return (
                 <div className="min-h-screen pb-32 text-left">
@@ -505,16 +404,16 @@
                     <nav className="bg-white border-b px-4 sm:px-10 py-5 flex justify-between items-center sticky top-0 z-50 shadow-sm">
                         <div className="flex items-center gap-3"><UnicoLogo size={42} /><h1 className="text-xl sm:text-2xl font-black italic uppercase tracking-tighter leading-none text-slate-900">U-Voice</h1></div>
                         <div className="flex bg-slate-100 p-1 rounded-full gap-1">
-                            {['comunicados', 'external', 'agenda', 'planejamento', 'impacto'].map(tab => (
+                            {['comunicados', 'external', 'agenda', 'impacto'].map(tab => (
                                 <button key={tab} onClick={() => setActiveTab(tab)} className={`px-6 py-2.5 rounded-full text-[9px] sm:text-[10px] font-black uppercase transition-all whitespace-nowrap ${activeTab === tab ? 'bg-black text-white shadow-lg' : 'text-slate-400 hover:text-slate-600'}`}>{tab === 'external' ? 'Comm Externo' : tab}</button>
                             ))}
                         </div>
                     </nav>
 
-                    <main className="max-w-7xl mx-auto px-6 sm:px-10 py-10">
-                        <header className="mb-12 text-left">
+                    <main className="max-w-7xl mx-auto px-6 sm:px-10 py-10 text-left">
+                        <header className="mb-12">
                             <h2 className="text-5xl sm:text-8xl font-black italic tracking-tighter leading-tight text-slate-900 uppercase">
-                                {activeTab === 'comunicados' ? 'flow.feed' : activeTab === 'external' ? 'Comm.Externo' : activeTab === 'agenda' ? 'next.steps' : activeTab === 'planejamento' ? 'strategy.journey' : 'impact.metrics'}
+                                {activeTab === 'comunicados' ? 'flow.feed' : activeTab === 'external' ? 'Comm.Externo' : activeTab === 'agenda' ? 'next.steps' : 'impact.metrics'}
                             </h2>
                             <p className="text-slate-400 font-black uppercase text-xs tracking-[0.4em] mt-4 ml-1 italic leading-none">Gestão Estratégica Operacional</p>
                         </header>
@@ -526,28 +425,45 @@
                                     <button onClick={() => setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')} className="impact-filter"><Icon name={sortOrder === 'desc' ? "sort-desc" : "sort-asc"} size={14} /><span>{sortOrder === 'desc' ? 'Recentes' : 'Antigos'}</span></button>
                                     <select value={filterYear} onChange={(e) => setFilterYear(e.target.value)} className="impact-filter"><option>2025</option><option>2026</option></select>
                                     <select value={filterMonth} onChange={(e) => setFilterMonth(e.target.value)} className="impact-filter"><option value="Todos">Mês: Todos</option>{MESES_MAP.map(m => <option key={m.val} value={m.val}>{m.label}</option>)}</select>
-                                    <button onClick={() => openCommModal()} className="ml-auto bg-[#397394] text-white px-8 py-4 rounded-2xl text-[10px] font-black uppercase flex items-center justify-center gap-2 shadow-xl hover:bg-[#2d5c78] transition-all"><Icon name="plus" size={14} /> Novo Comunicado</button>
+                                    <button onClick={() => openCommModal()} className="ml-auto bg-[#397394] text-white px-8 py-4 rounded-2xl text-[10px] font-black uppercase flex items-center gap-2 shadow-xl hover:bg-[#2d5c78] transition-all"><Icon name="plus" size={14} /> Novo Comunicado</button>
                                 </div>
                                 <div className="bg-white rounded-[3rem] border border-slate-100 overflow-hidden shadow-sm overflow-x-auto text-left">
                                     <table className="w-full text-left min-w-[900px]">
-                                        <thead className="bg-slate-50 border-b text-slate-400 text-[10px] font-black uppercase tracking-widest italic">
+                                        <thead className="bg-slate-50 border-b text-slate-400 text-[10px] font-black uppercase tracking-widest italic text-left">
                                             <tr><th className="px-10 py-6 text-left">Item / Editoria</th><th className="px-10 py-6 text-center">Data / Status</th><th className="px-10 py-6 text-center">Analistas / Canal</th><th className="px-10 py-6 text-right">Impact Score</th><th className="px-10 py-6 w-32"></th></tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-50 text-slate-800">
-                                            {filteredInternalComms.map(c => (
-                                                <tr key={c.id} className="hover:bg-slate-50/50 transition-colors group">
-                                                    <td className="px-10 py-8"><div className="flex items-center gap-4"><ChannelIndicator /><div><div className="font-black uppercase italic text-lg text-slate-900 leading-none">{c.title}</div><div className="text-[9px] font-black text-[#397394] mt-1 bg-blue-50 px-2 py-0.5 rounded uppercase italic w-fit">{c.editoria}</div></div></div></td>
-                                                    <td className="px-10 py-8 text-center text-[10px] font-bold"><div>{utils.formatLocalDate(c.date)} {c.postTime || ''}</div><div className="flex flex-col gap-1 items-center mt-1"><span className={`status-pill ${c.status === 'Enviado' ? 'status-sent' : 'status-pending'}`}>{c.status}</span>{utils.checkIsDelayed(c.date, c.postTime, c.status) && <span className="status-pill status-delayed">ATRASADO</span>}</div></td>
-                                                    <td className="px-10 py-8 text-center text-[10px] font-bold"><div>{c.analysts?.join(', ')}</div><span className="text-slate-400 italic">{c.channelName}</span></td>
-                                                    <td className="px-10 py-8 text-right font-black text-2xl tracking-tighter text-slate-900">
-                                                        {(() => { const pop = Number(c.population) || 0; if (pop === 0) return "0.0"; return ((((Number(c.reactions || 0) * 1) + (Number(c.comments || 0) * 2)) / pop) * 100).toFixed(1); })()}%
-                                                    </td>
-                                                    <td className="px-10 py-8 text-right flex items-center justify-end gap-1">
-                                                        <button onClick={() => openCommModal(c)} className="p-3 text-slate-400 hover:text-blue-600 transition-all"><Icon name="pencil" size={18} /></button>
-                                                        <button onClick={() => promptDelete(c.id, 'comms')} className="p-3 text-slate-400 hover:text-red-500 transition-all"><Icon name="trash-2" size={18} /></button>
-                                                    </td>
-                                                </tr>
-                                            ))}
+                                            {filteredInternalComms.map(c => {
+                                                const isDelayed = checkIsDelayed(c.date, c.postTime, c.status);
+                                                return (
+                                                    <tr key={c.id} className="hover:bg-slate-50/50 transition-colors group">
+                                                        <td className="px-10 py-8 text-left">
+                                                            <div className="flex items-center gap-4 text-left">
+                                                                <ChannelIndicator />
+                                                                <div>
+                                                                    <div className="font-black uppercase italic text-lg text-slate-900 leading-none">{c.title}</div>
+                                                                    <div className="text-[9px] font-black text-[#397394] mt-1 bg-blue-50 px-2 py-0.5 rounded uppercase italic w-fit">{c.editoria}</div>
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-10 py-8 text-center text-[10px] font-bold">
+                                                            <div>{formatLocalDate(c.date)} {c.postTime || ''}</div>
+                                                            <div className="flex flex-col gap-1 items-center mt-1">
+                                                                <span className={`status-pill ${c.status === 'Enviado' ? 'status-sent' : 'status-pending'}`}>{c.status}</span>
+                                                                {isDelayed && <span className="status-pill status-delayed">ATRASADO</span>}
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-10 py-8 text-center text-[10px] font-bold"><div>{c.analysts?.join(', ')}</div><span className="text-slate-400 italic">{c.channelName}</span></td>
+                                                        <td className="px-10 py-8 text-right font-black text-2xl tracking-tighter text-slate-900">
+                                                            {(() => { const pop = Number(c.population) || 0; if (pop === 0) return "0.0"; return ((((Number(c.reactions || 0) * 1) + (Number(c.comments || 0) * 2)) / pop) * 100).toFixed(1); })()}%
+                                                        </td>
+                                                        <td className="px-10 py-8 text-right flex items-center justify-end gap-1">
+                                                            <button onClick={() => openCommModal(c)} className="p-3 text-slate-400 hover:text-blue-600 transition-colors"><Icon name="pencil" size={18} /></button>
+                                                            <button onClick={() => promptDelete(c.id, 'comms')} className="p-3 text-slate-400 hover:text-red-500 transition-colors"><Icon name="trash-2" size={18} /></button>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
                                         </tbody>
                                     </table>
                                 </div>
@@ -555,9 +471,9 @@
                         )}
 
                         {activeTab === 'external' && (
-                            <section className="animate-in fade-in duration-500 text-left">
-                                <div className="flex flex-wrap items-center gap-3 mb-10 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm text-left">
-                                    <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 rounded-xl text-slate-400 border border-slate-100"><Icon name="filter" size={14} /><span className="text-[10px] font-black uppercase text-left">Filtros</span></div>
+                            <section className="animate-in fade-in duration-500">
+                                <div className="flex flex-wrap items-center gap-3 mb-10 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm sticky top-[85px] z-40 text-left">
+                                    <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 rounded-xl text-slate-400 border border-slate-100"><Icon name="filter" size={14} /><span className="text-[10px] font-black uppercase">Filtros</span></div>
                                     <button onClick={() => setExtSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')} className="impact-filter"><Icon name={extSortOrder === 'desc' ? "sort-desc" : "sort-asc"} size={14} /><span>{extSortOrder === 'desc' ? 'Recentes' : 'Antigos'}</span></button>
                                     <select value={extFilterYear} onChange={(e) => setExtFilterYear(e.target.value)} className="impact-filter"><option>2025</option><option>2026</option></select>
                                     <select value={extFilterMonth} onChange={(e) => setExtFilterMonth(e.target.value)} className="impact-filter"><option value="Todos">Mês: Todos</option>{MESES_MAP.map(m => <option key={m.val} value={m.val}>{m.label}</option>)}</select>
@@ -565,19 +481,19 @@
                                 </div>
                                 <div className="bg-white rounded-[3rem] border border-slate-100 overflow-hidden shadow-sm overflow-x-auto text-left">
                                     <table className="w-full text-left min-w-[900px]">
-                                        <thead className="bg-slate-50 border-b text-slate-400 text-[10px] font-black uppercase tracking-widest italic">
+                                        <thead className="bg-slate-50 border-b text-slate-400 text-[10px] font-black uppercase tracking-widest italic text-left">
                                             <tr><th className="px-10 py-6 text-left">Campanha / Objetivo</th><th className="px-10 py-6 text-center">Público (Países)</th><th className="px-10 py-6 text-center">Data / Status</th><th className="px-10 py-6 text-right">Open Rate</th><th className="px-10 py-6 w-32"></th></tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-50 text-slate-800">
                                             {filteredExternalComms.map(e => (
-                                                <tr key={e.id} className="hover:bg-slate-50/50 transition-colors group">
-                                                    <td className="px-10 py-8"><div className="flex items-center gap-4"><AnalystAvatar name={e.analyst} /><div><div className="flex items-center gap-2 font-black uppercase italic text-lg text-slate-900 leading-none">{e.title}{e.commLink && <a href={e.commLink} target="_blank" className="text-slate-300 hover:text-blue-500"><Icon name="link" size={14} /></a>}</div><div className="text-[9px] font-bold text-slate-400 mt-1 uppercase tracking-wider">{e.objective || 'Sem objetivo'}</div><div className="text-[8px] font-black text-[#397394] mt-2 uppercase tracking-tighter">Analista: {e.analyst || '--'}</div></div></div></td>
+                                                <tr key={e.id} className="hover:bg-slate-50/50 transition-colors group text-left">
+                                                    <td className="px-10 py-8"><div className="flex items-center gap-4 text-left"><AnalystAvatar name={e.analyst} /><div><div className="flex items-center gap-2 font-black uppercase italic text-lg text-slate-900 leading-none">{e.title}{e.commLink && <a href={e.commLink} target="_blank" className="text-slate-300 hover:text-blue-500"><Icon name="link" size={14} /></a>}</div><div className="text-[9px] font-bold text-slate-400 mt-1 uppercase tracking-wider">{e.objective || 'Sem objetivo'}</div><div className="text-[8px] font-black text-[#397394] mt-2 uppercase tracking-tighter">Analista: {e.analyst || '--'}</div></div></div></td>
                                                     <td className="px-10 py-8 text-center text-left"><div className="flex flex-wrap justify-center gap-2">{e.countries?.map(c => <RoundFlag key={c} country={c} />)}</div></td>
-                                                    <td className="px-10 py-8 text-center text-[10px] font-bold"><div>{utils.formatLocalDate(e.date)} {e.postTime || ''}</div><span className={`status-pill ${e.status === 'Enviado' ? 'status-sent' : e.status === 'Erro' ? 'status-error' : 'status-pending'}`}>{e.status}</span></td>
+                                                    <td className="px-10 py-8 text-center text-[10px] font-bold"><div>{formatLocalDate(e.date)} {e.postTime || ''}</div><span className={`status-pill ${e.status === 'Enviado' ? 'status-sent' : e.status === 'Erro' ? 'status-error' : 'status-pending'}`}>{e.status}</span></td>
                                                     <td className="px-10 py-8 text-right font-black text-2xl tracking-tighter text-slate-900">{e.openRate}% <div className="text-[8px] text-slate-300 font-bold uppercase tracking-widest mt-1">Base: {e.sentCount}</div></td>
                                                     <td className="px-10 py-8 text-right flex items-center justify-end gap-1">
-                                                        <button onClick={() => openExternalModal(e)} className="p-3 text-slate-400 hover:text-blue-600 transition-all"><Icon name="pencil" size={18} /></button>
-                                                        <button onClick={() => promptDelete(e.id, 'external')} className="p-3 text-slate-400 hover:text-red-500 transition-all"><Icon name="trash-2" size={18} /></button>
+                                                        <button onClick={() => openExternalModal(e)} className="p-3 text-slate-400 hover:text-blue-600 transition-colors"><Icon name="pencil" size={18} /></button>
+                                                        <button onClick={() => promptDelete(e.id, 'external')} className="p-3 text-slate-400 hover:text-red-500 transition-colors"><Icon name="trash-2" size={18} /></button>
                                                     </td>
                                                 </tr>
                                             ))}
@@ -588,26 +504,12 @@
                         )}
 
                         {activeTab === 'impacto' && (
-                            <section className="animate-in fade-in duration-500 space-y-16">
+                            <section className="animate-in fade-in duration-500 space-y-12 text-left">
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 text-left">
-                                    <div className="p-10 bg-white rounded-[3rem] border border-slate-100 shadow-sm"><div className="text-6xl font-black text-slate-900 tracking-tighter leading-none">{statsImpacto.totalPosts}</div><div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic">Total Posts (Feed)</div></div>
-                                    <div className="p-10 bg-slate-900 rounded-[3rem] shadow-2xl relative overflow-hidden group hover:scale-[1.02] transition-all text-white"><div className="p-3 bg-white/10 rounded-xl w-fit mb-6 text-white"><Icon name="trending-up" size={26} /></div><div className="text-6xl font-black tracking-tighter leading-none">{statsImpacto.interactions}</div><div className="text-[9px] font-black uppercase text-slate-500 tracking-widest mt-4 italic">Interações Totais</div></div>
-                                    <div className="p-10 bg-[#f8fafc] rounded-[3rem] border border-slate-100 shadow-sm text-slate-900"><div className="text-6xl font-black text-slate-900 tracking-tighter leading-none">{statsImpacto.avgScore}%</div><div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic">Internal Score</div></div>
-                                    <div className="p-10 bg-white rounded-[3rem] border border-slate-100 shadow-sm text-slate-900"><div className="text-6xl font-black text-slate-900 tracking-tighter leading-none">{statsImpacto.totalExternal}</div><div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic">Campanhas Outbound</div></div>
-                                </div>
-
-                                <div className="bg-slate-50/50 p-12 rounded-[4rem] border border-slate-100">
-                                    <h3 className="text-xl font-black italic uppercase tracking-tighter text-slate-800 mb-10 flex items-center gap-3"><Icon name="send" size={24} className="text-[#397394]" /> Performance de Outbound</h3>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-12 text-left">
-                                        <div className="flex flex-col">
-                                            <div className="text-[9px] font-black uppercase text-slate-400 tracking-[0.2em] mb-4">Alcance Total da Base</div>
-                                            <div className="text-8xl font-black text-slate-900 tracking-tighter leading-none">{statsImpacto.totalReachOut.toLocaleString()}</div>
-                                        </div>
-                                        <div className="flex flex-col">
-                                            <div className="text-[9px] font-black uppercase text-slate-400 tracking-[0.2em] mb-4">Média de Taxa de Abertura</div>
-                                            <div className="text-8xl font-black text-slate-900 tracking-tighter leading-none">{statsImpacto.avgOpenRate}%</div>
-                                        </div>
-                                    </div>
+                                    <div className="p-10 bg-white rounded-[3rem] border border-slate-100 shadow-sm"><div className="text-6xl font-black text-slate-900 tracking-tighter leading-none">{statsImpacto.totalPosts}</div><div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic">Total Posts</div></div>
+                                    <div className="p-10 bg-slate-900 rounded-[3rem] shadow-2xl relative overflow-hidden group hover:scale-[1.02] transition-all text-white"><div className="p-3 bg-white/10 rounded-xl w-fit mb-6 text-white mx-auto sm:mx-0"><Icon name="trending-up" size={26} /></div><div className="text-6xl font-black tracking-tighter leading-none">{statsImpacto.interactions}</div><div className="text-[9px] font-black uppercase text-slate-500 tracking-widest mt-4 italic">Interações</div></div>
+                                    <div className="p-10 bg-white rounded-[3rem] border border-slate-100 shadow-sm text-slate-900"><div className="text-6xl font-black text-slate-900 tracking-tighter leading-none">{statsImpacto.totalComments}</div><div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic">Comments</div></div>
+                                    <div className="p-10 bg-[#f8fafc] rounded-[3rem] border border-slate-100 shadow-sm text-slate-900"><div className="text-6xl font-black text-slate-900 tracking-tighter leading-none">{statsImpacto.avgScore}%</div><div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic">Score Engaja</div></div>
                                 </div>
                                 <div className="grid grid-cols-1 gap-8 text-left"><LineAreaChart title="Evolução de Comunicados (Volume Mensal)" data={statsImpacto.monthlyPosts} color="#397394" /><LineAreaChart title="Taxa de Engajamento Mensal (Curva Orgânica)" data={statsImpacto.monthlyEngagement} color="#F77D8D" valueSuffix="%" /></div>
                             </section>
@@ -615,26 +517,26 @@
 
                         {activeTab === 'agenda' && (
                             <section className="animate-in fade-in duration-500 text-left">
-                                <div className="flex flex-wrap items-center gap-3 mb-10 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm sticky top-[85px] z-40">
-                                    <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 rounded-xl text-slate-400 border border-slate-100"><Icon name="filter" size={14} /><span className="text-[10px] font-black uppercase text-left">Filtros Agenda</span></div>
+                                <div className="flex flex-wrap items-center gap-3 mb-10 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm sticky top-[85px] z-40 text-left">
+                                    <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 rounded-xl text-slate-400 border border-slate-100"><Icon name="filter" size={14} /><span className="text-[10px] font-black uppercase">Filtros Agenda</span></div>
                                     <select value={agendaFilterYear} onChange={(e) => setAgendaFilterYear(e.target.value)} className="impact-filter"><option>2025</option><option>2026</option></select>
                                     <select value={agendaFilterMonth} onChange={(e) => setAgendaFilterMonth(e.target.value)} className="impact-filter"><option value="Todos">Mês: Todos</option>{MESES_MAP.map(m => <option key={m.val} value={m.val}>{m.label}</option>)}</select>
-                                    <button onClick={() => openAgendaModal()} className="ml-auto bg-[#397394] text-white px-8 py-4 rounded-2xl text-[10px] font-black uppercase flex items-center justify-center gap-2 shadow-xl hover:bg-[#2d5c78] transition-all"><Icon name="calendar" size={14} /> Novo Planejamento</button>
+                                    <button onClick={() => openAgendaModal()} className="ml-auto bg-[#397394] text-white px-8 py-4 rounded-2xl text-[10px] font-black uppercase flex items-center justify-center gap-2 shadow-xl hover:bg-[#2d5c78] transition-all text-left"><Icon name="calendar" size={14} /> Novo Planejamento</button>
                                 </div>
                                 <div className="bg-white rounded-[3rem] border border-slate-100 overflow-hidden shadow-sm overflow-x-auto text-slate-700 text-left">
                                     <table className="w-full text-left min-w-[750px]">
-                                        <thead className="bg-slate-50 border-b text-slate-400 text-[10px] font-black uppercase tracking-widest italic">
+                                        <thead className="bg-slate-50 border-b text-slate-400 text-[10px] font-black uppercase tracking-widest italic text-left">
                                             <tr><th className="px-10 py-6 text-left">Atividade / Sponsor</th><th className="px-10 py-6 text-center">Data</th><th className="px-10 py-6 text-center text-left">STATUS</th><th className="px-10 py-6 w-32"></th></tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-50">
                                             {filteredAgenda.map(ev => (
-                                                <tr key={ev.id} className={`hover:bg-slate-50 transition-colors group ${ev.hasVendor && ev.selectedVendorIdx >= 0 ? 'row-green-effect' : ''}`}>
-                                                    <td className="px-10 py-8 text-slate-800 text-left"><div className="flex items-center gap-2 text-left"><div className="font-black uppercase italic text-xl text-slate-800 leading-none">{ev.title}</div>{ev.meetingLink && <a href={ev.meetingLink} target="_blank" title="Abrir Reunião" className="text-[#397394] hover:scale-110 transition-transform ml-1"><Icon name="video" size={16} /></a>}</div><div className="text-[9px] font-bold text-slate-400 uppercase mt-2 tracking-widest italic">{ev.sponsor} {ev.hasVendor && ev.selectedVendorIdx >= 0 && <span className="text-[#BED993] font-black uppercase ml-2">• Vendor Atribuído</span>}</div></td>
-                                                    <td className="px-10 py-8 text-center text-xs font-bold text-slate-500">{ev.date ? utils.formatLocalDate(ev.date) : '--'}</td>
+                                                <tr key={ev.id} className={`hover:bg-slate-50 transition-colors group ${ev.hasVendor && ev.selectedVendorIdx >= 0 ? 'row-green-effect' : ''} text-left`}>
+                                                    <td className="px-10 py-8 text-slate-800 text-left"><div className="flex items-center gap-2 text-left"><div className="font-black uppercase italic text-xl text-slate-800 leading-none text-left">{ev.title}</div>{ev.meetingLink && <a href={ev.meetingLink} target="_blank" title="Abrir Reunião" className="text-[#397394] hover:scale-110 transition-transform ml-1"><Icon name="video" size={16} /></a>}</div><div className="text-[9px] font-bold text-slate-400 uppercase mt-2 tracking-widest italic text-left">{ev.sponsor} {ev.hasVendor && ev.selectedVendorIdx >= 0 && <span className="text-[#BED993] font-black uppercase ml-2">• Vendor Atribuído</span>}</div></td>
+                                                    <td className="px-10 py-8 text-center text-xs font-bold text-slate-500">{ev.date ? formatLocalDate(ev.date) : '--'}</td>
                                                     <td className="px-10 py-8 text-center text-left"><span className="px-4 py-1.5 bg-blue-50 text-blue-700 text-[9px] font-black uppercase rounded-full">{ev.status}</span></td>
                                                     <td className="px-10 py-8 text-right flex items-center justify-end gap-1">
-                                                        <button onClick={() => openAgendaModal(ev)} className="p-3 hover:text-blue-600 transition-all"><Icon name="pencil" size={18} /></button>
-                                                        <button onClick={() => promptDelete(ev.id, 'agenda')} className="p-3 text-slate-400 hover:text-red-500 transition-all"><Icon name="trash-2" size={18} /></button>
+                                                        <button onClick={() => openAgendaModal(ev)} className="p-3 hover:text-blue-600 transition-all text-left"><Icon name="pencil" size={18} /></button>
+                                                        <button onClick={() => promptDelete(ev.id, 'agenda')} className="p-3 hover:text-red-500 transition-all text-slate-700"><Icon name="trash-2" size={18} /></button>
                                                     </td>
                                                 </tr>
                                             ))}
@@ -643,360 +545,99 @@
                                 </div>
                             </section>
                         )}
-
-                        {activeTab === 'planejamento' && (
-                            <section className="animate-in fade-in duration-500 space-y-10 text-left">
-                                <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm flex flex-wrap items-end gap-6">
-                                    <div className="flex-1 min-w-[200px] space-y-1.5">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 text-left">Público / Segmento</label>
-                                        <select value={filterPubPlanejamento} onChange={e => setFilterPubPlanejamento(e.target.value)} className="w-full bg-slate-50 border-none text-sm font-bold rounded-xl px-4 py-3 outline-none">
-                                            <option value="Todos">Todos</option>
-                                            {[...new Set(reguas.map(r => r.publico))].map(p => <option key={p} value={p}>{p}</option>)}
-                                        </select>
-                                    </div>
-                                    <div className="w-48 space-y-1.5">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 text-left">Mês Início</label>
-                                        <select value={filterMesPlanejamento} onChange={e => setFilterMesPlanejamento(e.target.value)} className="w-full bg-slate-50 border-none text-sm font-bold rounded-xl px-4 py-3 outline-none">
-                                            <option value="Todos">Todos</option>
-                                            {MESES_MAP.map(m => <option key={m.val} value={m.val}>{m.label}</option>)}
-                                        </select>
-                                    </div>
-                                    <button onClick={() => openReguaModal()} className="bg-slate-900 text-white px-8 py-4 rounded-2xl text-[10px] font-black uppercase flex items-center justify-center gap-2 shadow-xl hover:bg-slate-800 transition-all text-left"><Icon name="plus" size={14} /> Novo Planejamento</button>
-                                </div>
-
-                                <div className="space-y-12">
-                                    {filteredReguas.map(regua => {
-                                        const { steps, lastDate, progress } = calculateTimeline(regua);
-                                        const nps = regua.incluirNPS ? utils.getNPSCategory(regua.valorNPS) : null;
-                                        
-                                        // Pega a Data Final se existir, senão usa a data do último passo
-                                        const displayEndDate = regua.dataFinal ? utils.formatDate(new Date(regua.dataFinal + 'T12:00:00')) : lastDate;
-
-                                        return (
-                                            <div key={regua.id} className="bg-white rounded-[2rem] border border-slate-100 overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-700 group">
-                                                <div className="px-8 py-8 border-b border-slate-50 flex flex-wrap items-center justify-between gap-8 bg-slate-50/20">
-                                                    <div className="flex items-center gap-6">
-                                                        <div className={`w-16 h-16 rounded-[1.5rem] flex items-center justify-center text-white shadow-xl transition-transform bg-indigo-600 shadow-indigo-200`}>
-                                                            <Icon name='users' size={28} />
-                                                        </div>
-                                                        <div className="space-y-1.5 text-left">
-                                                            <h3 className="text-xl font-black text-slate-900 tracking-tight">{regua.nome}</h3>
-                                                            <div className="flex items-center gap-4 text-sm">
-                                                                <span className="font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5 text-[10px]"><Icon name="users" size={14} className="text-indigo-400" /> {regua.publico}</span>
-                                                                <div className="flex items-center gap-2 bg-white px-3 py-1 rounded-full border border-slate-100 text-[10px] font-black text-slate-700 shadow-sm">
-                                                                    <Icon name="calendar" size={12} className="text-slate-300" /> {utils.formatDate(new Date(regua.dataInicio + 'T12:00:00'))} <Icon name="arrow-right" size={12} className="mx-1 text-slate-200" /> <span className="text-indigo-600">{displayEndDate}</span>
-                                                                </div>
-                                                                {nps && <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase text-slate-600 border border-slate-200 shadow-sm bg-white`}><span className={`w-2 h-2 rounded-full ${nps.color}`}></span> <span>NPS {regua.valorNPS}</span></div>}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    <div className="flex items-center gap-8">
-                                                        <div className="flex flex-col items-end gap-1.5">
-                                                            <div className="text-[9px] font-black text-slate-300 uppercase tracking-tighter text-left">Status da Jornada</div>
-                                                            <div className="w-48 h-2 bg-slate-100 rounded-full overflow-hidden p-0"><div className="h-full bg-indigo-500 rounded-full transition-all duration-1000 ease-out" style={{ width: `${progress}%` }}></div></div>
-                                                            <div className="text-[9px] font-black text-indigo-500 uppercase tracking-widest text-left">{progress}% CONCLUÍDO</div>
-                                                        </div>
-                                                        <div className="flex items-center gap-2 text-left">
-                                                            <button onClick={() => openReguaModal(regua)} className="p-2.5 text-slate-400 hover:text-slate-800 transition-all"><Icon name="pencil" size={20} /></button>
-                                                            <button onClick={() => promptDelete(regua.id, 'reguas_planejamento')} className="p-2.5 text-slate-400 hover:text-red-500 transition-all"><Icon name="trash-2" size={20} /></button>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                <div className="p-8 overflow-x-auto scrollbar-hide">
-                                                    <div className="flex items-center gap-4 min-w-max text-left">
-                                                        {steps.map((passo, idx) => (
-                                                            <React.Fragment key={idx}>
-                                                                <div className="w-72 flex-none relative">
-                                                                    <div className="mb-3 h-6 flex items-center gap-2 text-left">
-                                                                        {passo.status === 'Atrasado' && <div className="bg-rose-50 text-rose-500 text-[9px] font-black px-2.5 py-1 rounded-lg uppercase flex items-center gap-1"><Icon name="alert-triangle" size={10} /> EM ATRASO</div>}
-                                                                        {passo.status === 'Hoje' && <div className="bg-indigo-50 text-indigo-600 text-[9px] font-black px-2.5 py-1 rounded-lg uppercase flex items-center gap-1"><Icon name="clock" size={10} /> HOJE</div>}
-                                                                        {passo.status === 'Enviado' && <div className="bg-emerald-50 text-emerald-600 text-[9px] font-black px-2.5 py-1 rounded-lg uppercase flex items-center gap-1"><Icon name="check" size={10} /> ENVIADO</div>}
-                                                                    </div>
-                                                                    <div className={`p-6 rounded-[1.5rem] border-2 transition-all relative ${passo.concluido ? 'border-emerald-100 bg-emerald-50/30' : passo.status === 'Atrasado' ? 'border-rose-100 bg-white shadow-xl shadow-rose-50/50' : 'border-slate-50 bg-[#F8FAFC]/50 hover:bg-white hover:shadow-xl'}`}>
-                                                                        <div className="flex items-center justify-between mb-5">
-                                                                            <div className={`p-2 rounded-xl shadow-sm ${passo.canal === 'Slack' ? 'bg-[#4A154B] text-white' : passo.canal === 'Email' ? 'bg-blue-500 text-white' : 'bg-slate-200 text-slate-600'}`}>
-                                                                                <Icon name={passo.canal === 'Slack' ? 'hash' : 'mail'} size={18} />
-                                                                            </div>
-                                                                            <button onClick={() => toggleReguaStep(regua.id, regua.passos, idx)} className={`w-8 h-8 rounded-full border-2 flex items-center justify-center transition-all ${passo.concluido ? 'bg-emerald-500 border-emerald-500 text-white shadow-md' : 'bg-white border-slate-200 text-slate-300 hover:border-indigo-500 hover:text-indigo-500'}`}><Icon name="check" size={16} /></button>
-                                                                        </div>
-                                                                        <h4 className={`font-black text-sm mb-3 leading-tight h-10 line-clamp-2 ${passo.concluido ? 'text-slate-400' : 'text-slate-900'}`}>"{passo.titulo}"</h4>
-                                                                        <div className="flex items-center justify-between pt-4 border-t border-slate-100 text-left">
-                                                                            <div className="text-left"><span className="text-[9px] font-black text-slate-300 uppercase block mb-0.5 tracking-tighter">DATA PREVISTA</span><span className="text-xs font-black text-slate-700">{passo.dateStr}</span></div>
-                                                                            <div className="bg-black text-[10px] font-black text-white px-2.5 py-1 rounded-md shadow-sm">T + {passo.delayDias}D</div>
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                                {idx < steps.length - 1 && <div className="text-slate-200"><Icon name="chevron-right" size={24} /></div>}
-                                                            </React.Fragment>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                                
-                                {/* BARRA DE ESTATÍSTICAS INFERIOR */}
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mt-12 bg-white p-8 rounded-[2rem] border border-slate-100 shadow-sm text-left">
-                                    <div className="flex items-center gap-6 border-r border-slate-100 pr-6">
-                                        <div className="text-5xl font-black text-rose-500 tracking-tighter">{planningStats.atrasadas}</div>
-                                        <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-tight">Ações Pendentes<br/>(Atrasadas)</div>
-                                    </div>
-                                    <div className="flex items-center gap-6 border-r border-slate-100 px-6">
-                                        <div className="text-5xl font-black text-indigo-500 tracking-tighter">{planningStats.enviosHoje}</div>
-                                        <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-tight">Interações para o<br/>dia de Hoje</div>
-                                    </div>
-                                    <div className="flex items-center gap-6 border-r border-slate-100 px-6">
-                                        <div className="text-5xl font-black text-emerald-500 tracking-tighter">{planningStats.totalEnvios}</div>
-                                        <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-tight">Total de Envios<br/>Realizados</div>
-                                    </div>
-                                    <div className="flex items-center gap-6 pl-6 bg-slate-900 p-4 rounded-2xl text-white">
-                                        <div className="text-5xl font-black tracking-tighter">{planningStats.regrasAtivas}</div>
-                                        <div className="text-[10px] font-black text-slate-300 uppercase tracking-widest leading-tight">Regras Estratégicas<br/>Ativas</div>
-                                    </div>
-                                </div>
-                            </section>
-                        )}
                     </main>
 
-{/* MODAL COMUNICADOS */}
-{isModalCommOpen && (
-    <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[150] flex items-center justify-center p-4">
-        <div className="bg-white w-full max-w-4xl rounded-[2rem] p-10 shadow-2xl modal-animate relative max-h-[95vh] overflow-y-auto custom-scroll text-left">
-            <button type="button" onClick={() => setIsModalCommOpen(false)} className="absolute top-8 right-8 text-slate-400 hover:text-slate-800 flex items-center gap-2 text-[10px] font-black uppercase bg-slate-100 px-4 py-2 rounded-xl"><Icon name="x" size={16} /></button>
-            <h2 className="text-3xl font-black mb-10 flex items-center gap-3 text-slate-900 tracking-tighter"><div className="p-2 bg-slate-900 text-white rounded-xl"><Icon name="message-square" size={24}/></div> {editingComm ? 'Editar Comunicado' : 'Novo Comunicado'}</h2>
-            
-            <form onSubmit={handleSaveComm} className="space-y-8">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Título / Assunto</label>
-                        <input name="title" required defaultValue={editingComm?.title || ''} className="w-full bg-slate-50 border border-slate-100 rounded-xl p-4 outline-none font-bold text-slate-800" />
-                    </div>
-                    <div className="space-y-2">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Canal</label>
-                        <select name="channelName" defaultValue={editingComm?.channelName || CHANNELS_LIST[0]} className="w-full bg-slate-50 border border-slate-100 rounded-xl p-4 outline-none font-bold text-slate-800">
-                            {CHANNELS_LIST.map(c => <option key={c} value={c}>{c}</option>)}
-                        </select>
-                    </div>
-                    <div className="space-y-2">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Data</label>
-                        <input type="date" name="date" required defaultValue={editingComm?.date || utils.getRawDate(new Date())} className="w-full bg-slate-50 border border-slate-100 rounded-xl p-4 outline-none font-bold text-slate-800" />
-                    </div>
-                    <div className="space-y-2">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Horário</label>
-                        <input type="time" name="postTime" defaultValue={editingComm?.postTime || ''} className="w-full bg-slate-50 border border-slate-100 rounded-xl p-4 outline-none font-bold text-slate-800" />
-                    </div>
-                    <div className="space-y-2">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Editoria</label>
-                        <select name="editoria" defaultValue={editingComm?.editoria || EDITORIAS_LIST[0]} className="w-full bg-slate-50 border border-slate-100 rounded-xl p-4 outline-none font-bold text-slate-800">
-                            {EDITORIAS_LIST.map(e => <option key={e} value={e}>{e}</option>)}
-                        </select>
-                    </div>
-                    <div className="space-y-2">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</label>
-                        <select name="status" defaultValue={editingComm?.status || STATUS_OPTIONS[0]} className="w-full bg-slate-50 border border-slate-100 rounded-xl p-4 outline-none font-bold text-slate-800">
-                            {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
-                        </select>
-                    </div>
-                </div>
-
-                <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 space-y-4">
-                    <h3 className="text-[12px] font-black text-slate-800 uppercase tracking-widest">Métricas de Engajamento</h3>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <div className="space-y-2">
-                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">População</label>
-                            <input type="number" name="population" defaultValue={editingComm?.population || 0} className="w-full bg-white border border-slate-200 rounded-xl p-3 outline-none font-bold text-slate-800" />
-                        </div>
-                        <div className="space-y-2">
-                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Views</label>
-                            <input type="number" name="views" defaultValue={editingComm?.views || 0} className="w-full bg-white border border-slate-200 rounded-xl p-3 outline-none font-bold text-slate-800" />
-                        </div>
-                        <div className="space-y-2">
-                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Reações</label>
-                            <input type="number" name="reactions" defaultValue={editingComm?.reactions || 0} className="w-full bg-white border border-slate-200 rounded-xl p-3 outline-none font-bold text-slate-800" />
-                        </div>
-                        <div className="space-y-2">
-                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Comentários</label>
-                            <input type="number" name="comments" defaultValue={editingComm?.comments || 0} className="w-full bg-white border border-slate-200 rounded-xl p-3 outline-none font-bold text-slate-800" />
-                        </div>
-                    </div>
-                </div>
-                
-                <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Analistas Envolvidos</label>
-                    <div className="flex flex-wrap gap-2">
-                        {allAnalysts.map(a => (
-                            <button type="button" key={a} onClick={() => toggleAnalyst(a)} className={`checkbox-flag ${selectedAnalysts.includes(a) ? 'active' : ''}`}>{a}</button>
-                        ))}
-                    </div>
-                </div>
-                <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Formatos</label>
-                    <div className="flex flex-wrap gap-2">
-                        {FORMATOS_LIST.map(f => (
-                            <button type="button" key={f} onClick={() => toggleFormat(f)} className={`checkbox-flag ${selectedFormats.includes(f) ? 'active' : ''}`}>{f}</button>
-                        ))}
-                    </div>
-                </div>
-
-                <div className="flex justify-end pt-6 border-t border-slate-100 gap-4">
-                    <button type="button" onClick={() => setIsModalCommOpen(false)} className="text-[11px] font-black uppercase text-slate-400 hover:text-slate-800 tracking-widest">Cancelar</button>
-                    <button type="submit" className="bg-slate-900 text-white px-8 py-3 rounded-xl font-black text-[11px] uppercase tracking-widest hover:bg-slate-800">Salvar Comunicado</button>
-                </div>
-            </form>
-        </div>
-    </div>
-)}
-
-{/* MODAL EXTERNO */}
-{isModalExternalOpen && (
-    <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[150] flex items-center justify-center p-4">
-        <div className="bg-white w-full max-w-4xl rounded-[2rem] p-10 shadow-2xl modal-animate relative max-h-[95vh] overflow-y-auto custom-scroll text-left">
-            <button type="button" onClick={() => setIsModalExternalOpen(false)} className="absolute top-8 right-8 text-slate-400 hover:text-slate-800 flex items-center gap-2 text-[10px] font-black uppercase bg-slate-100 px-4 py-2 rounded-xl"><Icon name="x" size={16} /></button>
-            <h2 className="text-3xl font-black mb-10 flex items-center gap-3 text-slate-900 tracking-tighter"><div className="p-2 bg-slate-900 text-white rounded-xl"><Icon name="send" size={24}/></div> {editingExternal ? 'Editar Comm. Externo' : 'Novo Comm. Externo'}</h2>
-            
-            <form onSubmit={handleSaveExternal} className="space-y-8">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Título da Campanha</label>
-                        <input name="title" required defaultValue={editingExternal?.title || ''} className="w-full bg-slate-50 border border-slate-100 rounded-xl p-4 outline-none font-bold text-slate-800" />
-                    </div>
-                    <div className="space-y-2">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Analista Responsável</label>
-                        <select name="analyst" defaultValue={editingExternal?.analyst || allAnalysts[0]} className="w-full bg-slate-50 border border-slate-100 rounded-xl p-4 outline-none font-bold text-slate-800">
-                            {allAnalysts.map(a => <option key={a} value={a}>{a}</option>)}
-                        </select>
-                    </div>
-                    <div className="space-y-2">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Objetivo</label>
-                        <input name="objective" defaultValue={editingExternal?.objective || ''} className="w-full bg-slate-50 border border-slate-100 rounded-xl p-4 outline-none font-bold text-slate-800" />
-                    </div>
-                    <div className="space-y-2">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Link de Apoio</label>
-                        <input name="commLink" defaultValue={editingExternal?.commLink || ''} className="w-full bg-slate-50 border border-slate-100 rounded-xl p-4 outline-none font-bold text-slate-800" />
-                    </div>
-                    <div className="space-y-2">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Data</label>
-                        <input type="date" name="date" required defaultValue={editingExternal?.date || utils.getRawDate(new Date())} className="w-full bg-slate-50 border border-slate-100 rounded-xl p-4 outline-none font-bold text-slate-800" />
-                    </div>
-                    <div className="space-y-2">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</label>
-                        <select name="status" defaultValue={editingExternal?.status || EXTERNAL_STATUS_OPTIONS[0]} className="w-full bg-slate-50 border border-slate-100 rounded-xl p-4 outline-none font-bold text-slate-800">
-                            {EXTERNAL_STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
-                        </select>
-                    </div>
-                </div>
-
-                <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Países de Destino</label>
-                    <div className="flex flex-wrap gap-2">
-                        {Object.keys(COUNTRIES_MAP).map(c => (
-                            <button type="button" key={c} onClick={() => setSelectedCountries(prev => prev.includes(c) ? prev.filter(x => x !== c) : [...prev, c])} className={`checkbox-flag ${selectedCountries.includes(c) ? 'active' : ''}`}>{COUNTRIES_MAP[c]} {c}</button>
-                        ))}
-                    </div>
-                </div>
-
-                <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 space-y-4">
-                    <h3 className="text-[12px] font-black text-slate-800 uppercase tracking-widest">Métricas de Envio</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Disparos (Sent)</label>
-                            <input type="number" name="sentCount" value={sentCount} onChange={(e) => setSentCount(Number(e.target.value))} className="w-full bg-white border border-slate-200 rounded-xl p-3 outline-none font-bold text-slate-800" />
-                        </div>
-                        <div className="space-y-2">
-                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Aberturas (Opened)</label>
-                            <input type="number" name="openedCount" value={openedCount} onChange={(e) => setOpenedCount(Number(e.target.value))} className="w-full bg-white border border-slate-200 rounded-xl p-3 outline-none font-bold text-slate-800" />
-                        </div>
-                    </div>
-                    <div className="text-[10px] font-black text-slate-500 uppercase">Taxa de Abertura Estimada: <span className="text-indigo-600">{autoOpenRate}%</span></div>
-                </div>
-
-                <div className="flex justify-end pt-6 border-t border-slate-100 gap-4">
-                    <button type="button" onClick={() => setIsModalExternalOpen(false)} className="text-[11px] font-black uppercase text-slate-400 hover:text-slate-800 tracking-widest">Cancelar</button>
-                    <button type="submit" className="bg-slate-900 text-white px-8 py-3 rounded-xl font-black text-[11px] uppercase tracking-widest hover:bg-slate-800">Salvar Envios</button>
-                </div>
-            </form>
-        </div>
-    </div>
-)}
-
-{/* MODAL AGENDA */}
-{isModalAgendaOpen && (
-    <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[150] flex items-center justify-center p-4">
-        <div className="bg-white w-full max-w-4xl rounded-[2rem] p-10 shadow-2xl modal-animate relative max-h-[95vh] overflow-y-auto custom-scroll text-left">
-            <button type="button" onClick={() => setIsModalAgendaOpen(false)} className="absolute top-8 right-8 text-slate-400 hover:text-slate-800 flex items-center gap-2 text-[10px] font-black uppercase bg-slate-100 px-4 py-2 rounded-xl"><Icon name="x" size={16} /></button>
-            <h2 className="text-3xl font-black mb-10 flex items-center gap-3 text-slate-900 tracking-tighter"><div className="p-2 bg-slate-900 text-white rounded-xl"><Icon name="calendar" size={24}/></div> {editingAgenda ? 'Editar Agenda' : 'Nova Atividade'}</h2>
-            
-            <form onSubmit={handleSaveAgenda} className="space-y-8">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Atividade</label>
-                        <input name="atividade" required defaultValue={editingAgenda?.title || ''} className="w-full bg-slate-50 border border-slate-100 rounded-xl p-4 outline-none font-bold text-slate-800" />
-                    </div>
-                    <div className="space-y-2">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Sponsor / Dono</label>
-                        <input name="sponsor" defaultValue={editingAgenda?.sponsor || ''} className="w-full bg-slate-50 border border-slate-100 rounded-xl p-4 outline-none font-bold text-slate-800" />
-                    </div>
-                    <div className="space-y-2">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Data</label>
-                        <input type="date" name="date" required defaultValue={editingAgenda?.date || utils.getRawDate(new Date())} className="w-full bg-slate-50 border border-slate-100 rounded-xl p-4 outline-none font-bold text-slate-800" />
-                    </div>
-                    <div className="space-y-2">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Link da Reunião</label>
-                        <input name="meetingLink" defaultValue={editingAgenda?.meetingLink || ''} className="w-full bg-slate-50 border border-slate-100 rounded-xl p-4 outline-none font-bold text-slate-800" />
-                    </div>
-                    <div className="space-y-2 md:col-span-2">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</label>
-                        <select name="status" defaultValue={editingAgenda?.status || "Agendado"} className="w-full bg-slate-50 border border-slate-100 rounded-xl p-4 outline-none font-bold text-slate-800">
-                            <option value="Agendado">Agendado</option>
-                            <option value="Concluído">Concluído</option>
-                            <option value="Cancelado">Cancelado</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 space-y-4">
-                    <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-[12px] font-black text-slate-800 uppercase tracking-widest">Recursos & Vendor</h3>
-                        <div className="flex gap-4">
-                            <label className="flex items-center gap-2 text-[10px] font-black text-slate-500 uppercase cursor-pointer"><input type="checkbox" checked={hasCoffee} onChange={e => setHasCoffee(e.target.checked)} className="rounded" /> Coffee Break</label>
-                            <label className="flex items-center gap-2 text-[10px] font-black text-slate-500 uppercase cursor-pointer"><input type="checkbox" checked={vendorToggle} onChange={e => setVendorToggle(e.target.checked)} className="rounded" /> Exigir Vendors</label>
-                        </div>
-                    </div>
-                    
-                    <div className="space-y-2 mb-4">
-                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Budget Planejado (R$)</label>
-                        <input type="number" value={localBudget} onChange={e => setLocalBudget(Number(e.target.value))} className="w-full bg-white border border-slate-200 rounded-xl p-3 outline-none font-bold text-slate-800" />
-                    </div>
-
-                    {vendorToggle && (
-                        <div className="space-y-4 pt-4 border-t border-slate-200">
-                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Fornecedores (Selecione o vencedor)</label>
-                            {[0, 1, 2].map(idx => (
-                                <div key={idx} className={`flex items-center gap-4 p-3 rounded-xl border-2 transition-all ${selectedVendorIdx === idx ? 'border-green-500 bg-green-50/30' : 'border-transparent bg-white'}`}>
-                                    <input type="radio" name="vendorWinner" checked={selectedVendorIdx === idx} onChange={() => setSelectedVendorIdx(idx)} className="w-4 h-4 cursor-pointer" />
-                                    <input placeholder={`Nome do Vendor ${idx + 1}`} value={localVendors[idx].name} onChange={e => { const v = [...localVendors]; v[idx].name = e.target.value; setLocalVendors(v); }} className="flex-1 bg-slate-50 border border-slate-100 rounded-lg p-2 text-xs font-bold outline-none" />
-                                    <input type="number" placeholder="Valor (R$)" value={localVendors[idx].value} onChange={e => { const v = [...localVendors]; v[idx].value = Number(e.target.value); setLocalVendors(v); }} className="w-32 bg-slate-50 border border-slate-100 rounded-lg p-2 text-xs font-bold outline-none" />
-                                </div>
-                            ))}
+                    {/* MODAL COMUNICADOS INTERNOS */}
+                    {isModalCommOpen && (
+                        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[150] flex items-center justify-center p-2 sm:p-4 text-left">
+                            <div className="bg-white w-full max-w-4xl rounded-[3rem] p-12 shadow-2xl modal-animate relative max-h-[95vh] overflow-y-auto custom-scroll">
+                                <button type="button" onClick={() => setIsModalCommOpen(false)} className="btn-close-modal"><Icon name="x" size={24} /></button>
+                                <h3 className="text-3xl font-black italic uppercase leading-none tracking-tighter mb-10 text-slate-800 uppercase">registro de comunicação</h3>
+                                <form onSubmit={handleSaveComm} className="grid grid-cols-1 md:grid-cols-2 gap-10 text-left">
+                                    <div className="space-y-8 text-left">
+                                        <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold">Título Post</label><input name="title" defaultValue={editingComm?.title} required className="w-full bg-slate-50 border-none rounded-2xl p-5 font-bold text-lg outline-none shadow-sm" /></div>
+                                        <div>
+                                            <div className="flex items-center justify-between gap-3 mb-3 text-left">
+                                                <label className="text-[10px] font-black uppercase text-slate-400 block font-bold">Analistas</label>
+                                                <button type="button" onClick={() => {const a = prompt("Nome do Novo Analista:"); if(a) setAllAnalysts(prev => [...prev, a])}} className="bg-yellow-400 p-2 rounded-lg text-black hover:scale-110 transition-transform shadow-lg flex items-center justify-center text-left">
+                                                    <Icon name="plus" size={14} className="font-bold" />
+                                                </button>
+                                            </div>
+                                            <div className="flex flex-wrap gap-2 text-left">
+                                                {allAnalysts.map(a => (
+                                                    <div key={a} onClick={() => toggleAnalyst(a)} className={`checkbox-flag ${selectedAnalysts.includes(a) ? 'active' : ''} text-left`}>
+                                                        <Icon name={selectedAnalysts.includes(a) ? "check-circle-2" : "circle"} size={14} className="text-left" forceKey={selectedAnalysts.includes(a) ? 'y' : 'n'} />
+                                                        {a}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        <div className="space-y-4 text-left">
+                                            <label className="text-[10px] font-black uppercase text-slate-400 block font-bold">Canal de Envio (Padrão)</label>
+                                            <div className="p-4 rounded-xl border-2 border-[#4A154B] bg-[#4A154B] text-white shadow-lg flex items-center justify-center gap-3">
+                                                <Icon name="slack" size={18} />
+                                                <span className="text-[10px] font-black uppercase">Slack Only</span>
+                                            </div>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold">Data</label><input name="date" type="date" defaultValue={editingComm?.date} required className="w-full bg-slate-50 border-none rounded-xl p-4 font-bold outline-none shadow-sm" /></div>
+                                            <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold">Hora</label><input name="postTime" type="time" defaultValue={editingComm?.postTime} required className="w-full bg-slate-50 border-none rounded-xl p-4 font-bold outline-none shadow-sm" /></div>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-8 text-left">
+                                        <div className="bg-[#f8fafc] p-10 rounded-[3rem] border border-slate-100 space-y-8 shadow-inner text-center">
+                                            <div className="text-[10px] font-black uppercase text-[#397394] tracking-widest italic flex items-center justify-center gap-2 text-center text-left">Impacto Interno</div>
+                                            <div className="grid grid-cols-3 gap-4 text-left text-left">
+                                                <div><label className="text-[8px] uppercase text-slate-400 block italic text-center">Reach</label><input name="views" type="number" defaultValue={editingComm?.views || 0} className="w-full bg-white border border-slate-100 rounded-xl p-4 font-black text-center outline-none shadow-sm text-left" /></div>
+                                                <div><label className="text-[8px] uppercase text-slate-400 block italic text-center">Reações</label><input name="reactions" type="number" defaultValue={editingComm?.reactions || 0} className="w-full bg-white border border-slate-100 rounded-xl p-4 font-black text-center outline-none shadow-sm text-left" /></div>
+                                                <div><label className="text-[8px] uppercase text-slate-400 block italic text-center">Comments</label><input name="comments" type="number" defaultValue={editingComm?.comments || 0} className="w-full bg-white border border-slate-100 rounded-xl p-4 font-black text-center outline-none shadow-sm text-left" /></div>
+                                            </div>
+                                            <div className="mt-6 text-left text-left"><label className="text-[10px] font-black uppercase text-slate-400 block mb-2 italic text-left">Base Canal</label><input name="population" type="number" defaultValue={editingComm?.population} placeholder="Preencher" className="w-full bg-white border-none rounded-2xl p-4 font-black text-center outline-none shadow-sm text-left" /></div>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold">Editoria</label><select name="editoria" defaultValue={editingComm?.editoria || EDITORIAS_LIST[0]} className="w-full bg-slate-50 border-none rounded-xl p-4 font-black shadow-sm">{EDITORIAS_LIST.map(e => <option key={e}>{e}</option>)}</select></div>
+                                            <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold">Status</label><select name="status" defaultValue={editingComm?.status || "Aguardando Envio"} className="w-full bg-slate-50 border-none rounded-xl p-4 font-bold shadow-sm">{STATUS_OPTIONS.map(s => <option key={s}>{s}</option>)}</select></div>
+                                        </div>
+                                        <button type="submit" className="w-full py-6 bg-black text-white rounded-[2rem] font-black uppercase text-xs tracking-[0.4em] active:scale-[0.98] shadow-2xl italic text-center">SALVAR REGISTRO</button>
+                                    </div>
+                                </form>
+                            </div>
                         </div>
                     )}
-                </div>
 
-                <div className="flex justify-end pt-6 border-t border-slate-100 gap-4">
-                    <button type="button" onClick={() => setIsModalAgendaOpen(false)} className="text-[11px] font-black uppercase text-slate-400 hover:text-slate-800 tracking-widest">Cancelar</button>
-                    <button type="submit" className="bg-slate-900 text-white px-8 py-3 rounded-xl font-black text-[11px] uppercase tracking-widest hover:bg-slate-800">Salvar Atividade</button>
-                </div>
-            </form>
-        </div>
-    </div>
-)}
-
-                                    
-                                    {/* SECTION 4: FOOTER ACTIONS */}
-                                    <div className="flex justify-center md:justify-end items-center gap-6 pt-8 border-t border-slate-100">
-                                        <button type="button" onClick={() => setIsModalReguaOpen(false)} className="text-[11px] font-black uppercase text-slate-400 hover:text-slate-800 tracking-widest">Cancelar</button>
-                                        <button type="submit" className="bg-slate-900 text-white px-10 py-4 rounded-full font-black text-[11px] uppercase tracking-widest hover:bg-indigo-600 shadow-xl transition-all">Confirmar Alterações</button>
+                    {/* MODAL EXTERNOS */}
+                    {isModalExternalOpen && (
+                        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[150] flex items-center justify-center p-4">
+                            <div className="bg-white w-full max-w-4xl rounded-[3rem] p-12 shadow-2xl modal-animate relative max-h-[90vh] overflow-y-auto custom-scroll text-left">
+                                <button type="button" onClick={() => setIsModalExternalOpen(false)} className="btn-close-modal text-left"><Icon name="x" size={24} /></button>
+                                <h3 className="text-3xl font-black italic uppercase tracking-tighter mb-4 text-slate-800 text-left">REGISTRO DE COMUNICAÇÃO EXTERNA</h3>
+                                <p className="text-[10px] font-black uppercase text-[#397394] mb-10 tracking-[0.2em] italic text-left">Product: IDCloud Outbound Flow</p>
+                                <form onSubmit={handleSaveExternal} className="grid grid-cols-1 md:grid-cols-2 gap-12 text-left">
+                                    <div className="space-y-8 text-left text-left">
+                                        <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold text-left">Campanha (IDCloud)</label><input name="title" defaultValue={editingExternal?.title} required className="w-full bg-slate-50 border-none rounded-xl p-5 font-bold outline-none shadow-sm text-left" placeholder="Nome da comunicação" /></div>
+                                        <div>
+                                            <div className="flex items-center justify-between gap-3 mb-3 text-left"><label className="text-[10px] font-black uppercase text-slate-400 block font-bold text-left text-left">Analista Responsável</label><button type="button" onClick={() => {const a = prompt("Nome do Novo Analista:"); if(a) setAllExtAnalysts([...allExtAnalysts, a])}} className="text-[#397394] hover:scale-110 transition-transform text-left"><Icon name="plus-circle" size={18}/></button></div>
+                                            <select name="analyst" defaultValue={editingExternal?.analyst || allExtAnalysts[0]} className="w-full bg-slate-50 border-none rounded-xl p-5 font-black outline-none shadow-sm text-left text-left">{allExtAnalysts.map(a => <option key={a} value={a}>{a}</option>)}</select>
+                                        </div>
+                                        <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block italic font-bold text-left text-left">Objetivo (Camada PMM)</label><input name="objective" defaultValue={editingExternal?.objective} required className="w-full bg-slate-50 border-none rounded-xl p-5 font-bold outline-none shadow-sm text-left" placeholder="Propósito da mensagem" /></div>
+                                        <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold text-left text-left">Link da Comunicação</label><div className="relative text-left"><input name="commLink" defaultValue={editingExternal?.commLink} className="w-full bg-slate-50 border-none rounded-xl p-5 pl-12 font-bold outline-none shadow-sm text-left text-left" placeholder="URL do conteúdo" /><Icon name="link" size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 text-left" /></div></div>
+                                        <div><div className="flex items-center gap-2 mb-3 text-left"><label className="text-[10px] font-black uppercase text-slate-400 block font-bold text-left">Público (Países)</label></div><div className="flex flex-wrap gap-2 text-left">{Object.keys(COUNTRIES_MAP).map(c => (<div key={c} onClick={() => setSelectedCountries(prev => prev.includes(c) ? prev.filter(x => x !== c) : [...prev, c])} className={`checkbox-flag ${selectedCountries.includes(c) ? 'active' : ''} text-left`}><RoundFlag country={c} /></div>))}</div></div>
+                                    </div>
+                                    <div className="space-y-8 text-left text-left text-left">
+                                        <div className="grid grid-cols-2 gap-4 text-left">
+                                            <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold text-left text-left">Data Envio</label><input name="date" type="date" defaultValue={editingExternal?.date} required className="w-full bg-slate-50 border-none rounded-xl p-4 font-bold outline-none shadow-sm text-left text-left" /></div>
+                                            <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold text-left text-left">Hora Envio</label><input name="postTime" type="time" defaultValue={editingExternal?.postTime} required className="w-full bg-slate-50 border-none rounded-xl p-4 font-bold outline-none shadow-sm text-left text-left" /></div>
+                                        </div>
+                                        <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold text-left text-left">Status</label><select name="status" defaultValue={editingExternal?.status || 'Aguardando Envio'} className="w-full bg-slate-50 border-none rounded-xl p-4 font-black outline-none shadow-sm text-left text-left text-left">{EXTERNAL_STATUS_OPTIONS.map(s => <option key={s}>{s}</option>)}</select></div>
+                                        <div className="bg-[#f8fafc] p-10 rounded-[3rem] border border-slate-100 space-y-6 shadow-inner text-center">
+                                            <div className="text-[10px] font-black uppercase text-slate-400 tracking-widest italic flex items-center justify-center gap-2 text-left text-left">Performance Outbound</div>
+                                            <div className="grid grid-cols-2 gap-6 text-left text-left text-left">
+                                                <div><label className="text-[8px] font-black uppercase text-slate-400 mb-2 block text-center text-left text-left">Total Enviados</label><input name="sentCount" type="number" value={sentCount} onChange={(e) => setSentCount(Number(e.target.value))} className="w-full bg-white border-none rounded-xl p-4 font-black text-center text-xl outline-none shadow-sm text-center text-left text-left" /></div>
+                                                <div><label className="text-[8px] font-black uppercase text-slate-400 mb-2 block text-center text-left text-left">Total Aberturas</label><input name="openedCount" type="number" value={openedCount} onChange={(e) => setOpenedCount(Number(e.target.value))} className="w-full bg-white border-none rounded-xl p-4 font-black text-center text-xl outline-none shadow-sm text-center text-left text-left" /></div>
+                                            </div>
+                                            <div className="pt-4 border-t border-slate-200 text-center text-left text-left"><div className="text-[8px] font-black uppercase text-slate-400 mb-2 block text-left">Open Rate Calculado</div><div className="text-4xl font-black text-slate-900 text-left">{autoOpenRate}%</div></div>
+                                        </div>
+                                        <button type="submit" className="w-full py-8 bg-black text-white rounded-[2.5rem] font-black uppercase text-xs tracking-[0.4em] active:scale-[0.98] shadow-2xl italic text-center text-left text-left text-left">REGISTRAR OUTBOUND</button>
                                     </div>
                                 </form>
                             </div>
@@ -1007,19 +648,60 @@
                     {isDeleteModalOpen && (
                         <div className="fixed inset-0 bg-slate-900/90 backdrop-blur-sm z-[300] flex items-center justify-center p-4">
                             <div className="bg-white w-full max-w-md rounded-[2.5rem] p-10 shadow-2xl modal-animate text-center text-left">
-                                <div className="w-20 h-20 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-6 text-center text-left"><Icon name="trash-2" size={40} className="text-center" /></div>
+                                <div className="w-20 h-20 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-6 text-center text-left text-left"><Icon name="trash-2" size={40} className="text-center" /></div>
                                 <h3 className="text-2xl font-black uppercase italic tracking-tighter text-slate-900 mb-2 leading-none text-center">Tem certeza?</h3>
-                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-10 italic text-center">Esta ação é irreversível.</p>
+                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-10 italic text-center text-left">Esta ação é irreversível.</p>
                                 <div className="grid grid-cols-2 gap-4 mt-10 text-center">
-                                    <button onClick={() => setIsDeleteModalOpen(false)} className="py-4 bg-slate-100 text-slate-400 rounded-2xl font-black uppercase text-[10px] tracking-widest italic text-center">Cancelar</button>
-                                    <button onClick={executeDelete} className="py-4 bg-red-500 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-red-600 shadow-lg shadow-red-500/20 italic text-center">Excluir</button>
+                                    <button onClick={() => setIsDeleteModalOpen(false)} className="py-4 bg-slate-100 text-slate-400 rounded-2xl font-black uppercase text-[10px] tracking-widest italic text-center text-left">Cancelar</button>
+                                    <button onClick={executeDelete} className="py-4 bg-red-500 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-red-600 shadow-lg shadow-red-500/20 italic text-center text-left">Excluir</button>
                                 </div>
                             </div>
                         </div>
                     )}
 
-                    <footer className="fixed bottom-0 w-full bg-white/95 backdrop-blur-md border-t border-slate-100 px-6 sm:px-10 py-5 flex flex-col sm:flex-row justify-between items-center text-[8px] sm:text-[9px] text-slate-300 font-black uppercase tracking-[0.4em] z-40 shadow-inner gap-2 text-left">
-                        <div className="flex items-center gap-3 text-slate-400 text-left"><div className={`w-2.5 h-2.5 rounded-full ${user ? 'bg-green-500 shadow-[0_0_12px_rgba(34,197,94,0.3)]' : 'bg-slate-300 animate-pulse'}`}></div><span>© 2026 Unico Ops Hub. Ambiente Gold Ativo.</span></div>
+                    {/* MODAL PLANEJAMENTO */}
+                    {isModalAgendaOpen && (
+                        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[150] flex items-center justify-center p-4 text-left">
+                            <div className="bg-white w-full max-w-4xl rounded-[3rem] p-12 shadow-2xl modal-animate relative max-h-[90vh] overflow-y-auto custom-scroll text-left">
+                                <button type="button" onClick={() => setIsModalAgendaOpen(false)} className="btn-close-modal text-left text-left"><Icon name="x" size={24} /></button>
+                                <h3 className="text-3xl font-black italic uppercase leading-none tracking-tighter mb-10 text-slate-800 text-left text-left">PLANEJAMENTO DE ATIVIDADE</h3>
+                                <form onSubmit={handleSaveAgenda} className="grid grid-cols-1 md:grid-cols-2 gap-10 text-left text-left">
+                                    <div className="space-y-8 text-left text-left text-left text-left">
+                                        <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold text-left text-left">Atividade</label><input name="atividade" defaultValue={editingAgenda?.title} required className="w-full bg-slate-50 border-none rounded-2xl p-5 font-bold outline-none shadow-sm text-left text-left text-left" /></div>
+                                        <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold text-left text-left">Sponsor Responsável</label><input name="sponsor" defaultValue={editingAgenda?.sponsor} required className="w-full bg-slate-50 border-none rounded-2xl p-5 font-bold outline-none shadow-sm text-left text-left text-left" /></div>
+                                        <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold text-left text-left text-left text-left">Descrição / Briefing</label><textarea name="description" defaultValue={editingAgenda?.description} rows="4" className="w-full bg-slate-50 border-none rounded-2xl p-5 font-bold outline-none shadow-sm resize-none text-left text-left text-left text-left"></textarea></div>
+                                        <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold text-left text-left">Link da Reunião</label><div className="relative text-left text-left text-left text-left"><input name="meetingLink" defaultValue={editingAgenda?.meetingLink} className="w-full bg-slate-50 border-none rounded-xl p-5 pl-12 font-bold outline-none shadow-sm text-left text-left text-left text-left" placeholder="URL da videoconferência" /><Icon name="video" size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 text-left text-left text-left" /></div></div>
+                                        <div className="grid grid-cols-2 gap-4 text-left text-left">
+                                            <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold text-left text-left text-left">Data Prevista</label><input name="date" type="date" defaultValue={editingAgenda?.date} required className="w-full bg-slate-50 border-none rounded-xl p-4 font-bold outline-none shadow-sm text-left text-left text-left" /></div>
+                                            <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold text-left text-left text-left">Status</label><select name="status" defaultValue={editingAgenda?.status || 'Planejado'} className="w-full bg-slate-50 border-none rounded-xl p-4 font-black outline-none shadow-sm text-left text-left text-left text-left"><option>Planejado</option><option>Em Progresso</option><option>Concluído</option><option>Cancelado</option></select></div>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-8 text-left text-left text-left text-left text-left">
+                                        <div className="bg-[#f8fafc] p-8 rounded-[3rem] border border-slate-100 shadow-inner text-left text-left text-left text-left">
+                                            <div className="mb-6 text-left text-left text-left text-left text-left text-left"><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block text-left text-left text-left">Budget Alocado (R$)</label><input type="number" value={localBudget} onChange={(e) => setLocalBudget(Number(e.target.value))} className="w-full bg-white border-none rounded-xl p-4 font-black text-xl outline-none shadow-sm text-left text-left text-left text-left" /></div>
+                                            <div className="space-y-4 text-left text-left text-left text-left text-left">
+                                                <div className="flex items-center justify-between text-left text-left text-left text-left text-left"><label className="text-[10px] font-black uppercase text-slate-400 text-left text-left text-left">Fornecedores</label><button type="button" onClick={() => setVendorToggle(!vendorToggle)} className={`w-12 h-6 rounded-full transition-all relative ${vendorToggle ? 'bg-green-500' : 'bg-slate-300'} text-left text-left text-left text-left text-left`}><div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${vendorToggle ? 'right-1' : 'left-1'} text-left text-left text-left text-left text-left`}></div></button></div>
+                                                {vendorToggle && localVendors.map((v, i) => (
+                                                    <div key={i} className={`flex flex-col gap-1 mb-4 text-left p-4 rounded-2xl transition-all border ${selectedVendorIdx === i ? 'bg-[#BED993]/20 border-[#BED993] shadow-sm' : 'border-transparent'} text-left text-left text-left text-left`}>
+                                                        <div className="flex gap-2 items-center text-left text-left text-left text-left text-left text-left">
+                                                            <input value={v.name} onChange={(e) => {const n=[...localVendors]; n[i].name=e.target.value; setLocalVendors(n)}} placeholder={`Fornecedor ${i+1}`} className="flex-1 bg-white p-3 rounded-lg text-[10px] font-bold outline-none border border-slate-100 text-left text-left text-left text-left text-left" />
+                                                            <input type="number" value={v.value} onChange={(e) => {const n=[...localVendors]; n[i].value=Number(e.target.value); setLocalVendors(n)}} className="w-24 bg-white p-3 rounded-lg text-[10px] font-bold outline-none border border-slate-100 text-left text-left text-left text-left text-left" />
+                                                            <button type="button" onClick={() => setSelectedVendorIdx(i)} className={`p-2 rounded-lg transition-all ${selectedVendorIdx === i ? 'bg-[#BED993] text-black shadow-inner' : 'bg-slate-200 text-slate-400 hover:bg-slate-300'} text-left text-left text-left text-left`}><Icon name="check" size={14}/></button>
+                                                        </div>
+                                                        <div className="pl-1 text-left text-left text-left text-left text-left text-left">{renderBudgetLogic(v.value)}</div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        <button type="submit" className="w-full py-6 bg-black text-white rounded-[2rem] font-black uppercase text-xs tracking-[0.4em] active:scale-[0.98] shadow-2xl italic text-center text-left text-left text-left text-left">SALVAR PLANEJAMENTO</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    )}
+
+                    <footer className="fixed bottom-0 w-full bg-white/95 backdrop-blur-md border-t border-slate-100 px-6 sm:px-10 py-5 flex flex-col sm:flex-row justify-between items-center text-[8px] sm:text-[9px] text-slate-300 font-black uppercase tracking-[0.4em] z-40 shadow-inner gap-2 text-left text-left text-left text-left text-left">
+                        <div className="flex items-center gap-3 text-slate-400 text-left text-left text-left text-left text-left text-left text-left text-left"><div className={`w-2.5 h-2.5 rounded-full ${user ? 'bg-green-500 shadow-[0_0_12px_rgba(34,197,94,0.3)]' : 'bg-slate-300 animate-pulse'} text-left text-left text-left text-left text-left text-left`}></div><span>© 2026 Unico Ops Hub. Ambiente Gold Ativo.</span></div>
                     </footer>
                 </div>
             );
@@ -1030,4 +712,3 @@
     </script>
 </body>
 </html>
-
