@@ -143,9 +143,9 @@
                        someDate.getFullYear() === today.getFullYear();
             },
             getNPSCategory: (value) => {
-                if (value <= 6) return { label: 'DETRATORES', color: 'bg-red-500', text: 'text-red-500', bg: 'bg-red-50', icon: 'frown', ring: 'ring-red-200' };
-                if (value <= 8) return { label: 'NEUTROS', color: 'bg-teal-500', text: 'text-teal-500', bg: 'bg-teal-50', icon: 'meh', ring: 'ring-teal-200' };
-                return { label: 'PROMOTORES', color: 'bg-green-500', text: 'text-green-500', bg: 'bg-green-50', icon: 'smile', ring: 'ring-green-200' };
+                if (value <= 6) return { label: 'DETRATORES', color: 'bg-red-500', text: 'text-red-500', bg: 'bg-red-50', icon: 'frown' };
+                if (value <= 8) return { label: 'NEUTROS', color: 'bg-teal-500', text: 'text-teal-600', bg: 'bg-teal-50', icon: 'meh' };
+                return { label: 'PROMOTORES', color: 'bg-green-500', text: 'text-green-600', bg: 'bg-green-50', icon: 'smile' };
             },
             checkIsDelayed: (date, time, status) => {
                 if (status === 'Enviado' || status === 'Cancelado' || !date) return false;
@@ -155,7 +155,7 @@
             }
         };
 
-        // --- COMPONENTES AUXILIARES (FUNCTION DECLARATIONS PARA HOISTING) ---
+        // --- COMPONENTES AUXILIARES ---
         function Icon({ name, size = 18, className = "", forceKey }) {
             const iconRef = useRef(null);
             useEffect(() => {
@@ -298,9 +298,12 @@
             const [selectedVendorIdx, setSelectedVendorIdx] = useState(null);
             const [localVendors, setLocalVendors] = useState([{ name: '', value: 0 }, { name: '', value: 0 }, { name: '', value: 0 }]);
 
+            // ESTADO INICIAL DO PLANEJAMENTO ATUALIZADO (com dataFinal)
             const initialReguaForm = {
                 nome: '', objetivo: 'Engajamento', publico: 'Público Geral', 
-                dataInicio: utils.getRawDate(new Date()), incluirNPS: false, valorNPS: 6,
+                dataInicio: utils.getRawDate(new Date()), 
+                dataFinal: '', 
+                incluirNPS: false, valorNPS: 10,
                 passos: [{ titulo: '', canal: 'Slack', delayDias: 10, briefing: '', concluido: false }]
             };
             const [reguaFormData, setReguaFormData] = useState(initialReguaForm);
@@ -345,7 +348,7 @@
                 setIsModalAgendaOpen(true);
             };
             const openReguaModal = (r = null) => {
-                if (r) { setEditingReguaId(r.id); setReguaFormData({ ...r }); } 
+                if (r) { setEditingReguaId(r.id); setReguaFormData({ ...r, dataFinal: r.dataFinal || '' }); } 
                 else { setEditingReguaId(null); setReguaFormData(initialReguaForm); }
                 setIsModalReguaOpen(true);
             };
@@ -665,6 +668,10 @@
                                     {filteredReguas.map(regua => {
                                         const { steps, lastDate, progress } = calculateTimeline(regua);
                                         const nps = regua.incluirNPS ? utils.getNPSCategory(regua.valorNPS) : null;
+                                        
+                                        // Pega a Data Final se existir, senão usa a data do último passo
+                                        const displayEndDate = regua.dataFinal ? utils.formatDate(new Date(regua.dataFinal + 'T12:00:00')) : lastDate;
+
                                         return (
                                             <div key={regua.id} className="bg-white rounded-[2rem] border border-slate-100 overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-700 group">
                                                 <div className="px-8 py-8 border-b border-slate-50 flex flex-wrap items-center justify-between gap-8 bg-slate-50/20">
@@ -677,7 +684,7 @@
                                                             <div className="flex items-center gap-4 text-sm">
                                                                 <span className="font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5 text-[10px]"><Icon name="users" size={14} className="text-indigo-400" /> {regua.publico}</span>
                                                                 <div className="flex items-center gap-2 bg-white px-3 py-1 rounded-full border border-slate-100 text-[10px] font-black text-slate-700 shadow-sm">
-                                                                    <Icon name="calendar" size={12} className="text-slate-300" /> {utils.formatDate(new Date(regua.dataInicio + 'T12:00:00'))} <Icon name="arrow-right" size={12} className="mx-1 text-slate-200" /> <span className="text-indigo-600">{lastDate}</span>
+                                                                    <Icon name="calendar" size={12} className="text-slate-300" /> {utils.formatDate(new Date(regua.dataInicio + 'T12:00:00'))} <Icon name="arrow-right" size={12} className="mx-1 text-slate-200" /> <span className="text-indigo-600">{displayEndDate}</span>
                                                                 </div>
                                                                 {nps && <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase text-slate-600 border border-slate-200 shadow-sm bg-white`}><span className={`w-2 h-2 rounded-full ${nps.color}`}></span> <span>NPS {regua.valorNPS}</span></div>}
                                                             </div>
@@ -729,7 +736,7 @@
                                     })}
                                 </div>
                                 
-                                {/* BARRA DE ESTATÍSTICAS INFERIOR (Do Vídeo) */}
+                                {/* BARRA DE ESTATÍSTICAS INFERIOR */}
                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mt-12 bg-white p-8 rounded-[2rem] border border-slate-100 shadow-sm text-left">
                                     <div className="flex items-center gap-6 border-r border-slate-100 pr-6">
                                         <div className="text-5xl font-black text-rose-500 tracking-tighter">{planningStats.atrasadas}</div>
@@ -752,7 +759,7 @@
                         )}
                     </main>
 
-                    {/* MODAL PLANEJAMENTO REGUA ATUALIZADO (Como no vídeo) */}
+                    {/* MODAL PLANEJAMENTO REGUA ATUALIZADO */}
                     {isModalReguaOpen && (
                         <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[150] flex items-center justify-center p-4">
                             <div className="bg-white w-full max-w-5xl rounded-[2rem] p-10 shadow-2xl modal-animate relative max-h-[95vh] overflow-y-auto custom-scroll text-left">
@@ -761,8 +768,8 @@
                                 <h2 className="text-3xl font-black mb-10 flex items-center gap-3 text-slate-900 tracking-tighter"><div className="p-2 bg-slate-900 text-white rounded-xl"><Icon name="line-chart" size={24}/></div> {editingReguaId ? 'Editar Planejamento' : 'Novo Planejamento'}</h2>
                                 
                                 <form onSubmit={handleSaveRegua} className="space-y-12 text-left">
-                                    {/* SECTION 1: HEADER INFO */}
-                                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-end">
+                                    {/* SECTION 1: HEADER INFO COM DATA FINAL */}
+                                    <div className="grid grid-cols-1 md:grid-cols-5 gap-6 items-end">
                                         <div className="space-y-2 md:col-span-1">
                                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Nome da Campanha</label>
                                             <input required value={reguaFormData.nome} onChange={e => setReguaFormData({...reguaFormData, nome: e.target.value})} className="w-full bg-slate-50 border border-slate-100 rounded-xl p-4 outline-none font-bold text-slate-800" placeholder="Ex: Liga Operações" />
@@ -775,20 +782,24 @@
                                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Data Inicial</label>
                                             <input type="date" required value={reguaFormData.dataInicio} onChange={e => setReguaFormData({...reguaFormData, dataInicio: e.target.value})} className="w-full bg-slate-50 border border-slate-100 rounded-xl p-4 outline-none font-bold text-slate-800" />
                                         </div>
+                                        <div className="space-y-2 md:col-span-1">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Data Final</label>
+                                            <input type="date" required value={reguaFormData.dataFinal || ''} onChange={e => setReguaFormData({...reguaFormData, dataFinal: e.target.value})} className="w-full bg-slate-50 border border-slate-100 rounded-xl p-4 outline-none font-bold text-slate-800" />
+                                        </div>
                                         <div className="md:col-span-1 flex items-center justify-end gap-3 pb-4">
                                             <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Incluir NPS?</span>
                                             <button type="button" onClick={() => setReguaFormData({...reguaFormData, incluirNPS: !reguaFormData.incluirNPS})} className={`w-12 h-6 rounded-full transition-all relative ${reguaFormData.incluirNPS ? 'bg-indigo-600' : 'bg-slate-300'}`}><div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${reguaFormData.incluirNPS ? 'left-7' : 'left-1'}`}></div></button>
                                         </div>
                                     </div>
 
-                                    {/* SECTION 2: NPS SELECTOR (CONDICIONAL) */}
+                                    {/* SECTION 2: NPS SELECTOR (FIEL A IMAGEM) */}
                                     {reguaFormData.incluirNPS && (
                                         <div className="bg-white border border-slate-200 rounded-[2rem] p-8 shadow-sm">
                                             <div className="flex items-center justify-between mb-8">
                                                 <h3 className="text-[12px] font-black text-slate-800 uppercase tracking-widest flex items-center gap-2"><Icon name="pie-chart" size={16} className="text-indigo-500"/> Definir NPS do Planejamento</h3>
-                                                <div className="text-[10px] font-black uppercase flex items-center gap-2"><span className="text-slate-400">STATUS:</span> <span className={`px-3 py-1 rounded-full text-white ${utils.getNPSCategory(reguaFormData.valorNPS).color}`}>{utils.getNPSCategory(reguaFormData.valorNPS).label}</span></div>
+                                                <div className="text-[10px] font-black uppercase flex items-center gap-2"><span className="text-slate-400">STATUS:</span> <span className={`px-3 py-1 rounded-full ${utils.getNPSCategory(reguaFormData.valorNPS).text} ${utils.getNPSCategory(reguaFormData.valorNPS).bg}`}>{utils.getNPSCategory(reguaFormData.valorNPS).label}</span></div>
                                             </div>
-                                            <div className="flex justify-between items-center relative">
+                                            <div className="flex justify-between items-center relative gap-1">
                                                 {/* Connecting Line background */}
                                                 <div className="absolute top-1/2 left-0 right-0 h-1 bg-slate-100 -translate-y-1/2 z-0 rounded-full"></div>
                                                 {/* Values */}
@@ -796,34 +807,41 @@
                                                     const isActive = reguaFormData.valorNPS === val;
                                                     const isDetrator = val <= 6;
                                                     const isNeutro = val > 6 && val <= 8;
-                                                    const isPromotor = val > 8;
                                                     
-                                                    let btnClass = "w-12 h-12 rounded-full border-2 flex items-center justify-center font-black text-lg z-10 bg-white transition-all cursor-pointer ";
+                                                    let btnClass = "w-14 h-16 rounded-[1rem] border-2 flex flex-col items-center justify-center font-black text-lg z-10 transition-all cursor-pointer bg-white ";
                                                     if (isActive) {
-                                                        if (isDetrator) btnClass += "bg-red-500 border-red-500 text-white shadow-lg shadow-red-200 scale-110";
-                                                        else if (isNeutro) btnClass += "bg-teal-500 border-teal-500 text-white shadow-lg shadow-teal-200 scale-110";
-                                                        else btnClass += "bg-green-500 border-green-500 text-white shadow-lg shadow-green-200 scale-110";
+                                                        if (isDetrator) btnClass += "bg-red-500 border-red-500 text-white scale-110 shadow-xl shadow-red-200";
+                                                        else if (isNeutro) btnClass += "bg-teal-500 border-teal-500 text-white scale-110 shadow-xl shadow-teal-200";
+                                                        else btnClass += "bg-green-500 border-green-500 text-white scale-110 shadow-xl shadow-green-200";
                                                     } else {
-                                                        if (isDetrator) btnClass += "border-red-200 text-red-400 hover:border-red-400 hover:bg-red-50";
-                                                        else if (isNeutro) btnClass += "border-teal-200 text-teal-400 hover:border-teal-400 hover:bg-teal-50";
-                                                        else btnClass += "border-green-200 text-green-400 hover:border-green-400 hover:bg-green-50";
+                                                        btnClass += "border-slate-100 hover:border-slate-300 hover:bg-slate-50 shadow-sm ";
+                                                        if (isDetrator) btnClass += "text-red-500";
+                                                        else if (isNeutro) btnClass += "text-teal-500";
+                                                        else btnClass += "text-green-500";
                                                     }
 
                                                     return (
-                                                        <div key={val} className="flex flex-col items-center gap-2 z-10 bg-white px-1">
-                                                            <Icon name={isDetrator ? "frown" : isNeutro ? "meh" : "smile"} size={14} className={isActive ? 'text-transparent' : 'text-slate-300'} />
-                                                            <button type="button" onClick={() => setReguaFormData({...reguaFormData, valorNPS: val})} className={btnClass}>
-                                                                {val}
-                                                            </button>
-                                                        </div>
+                                                        <button key={val} type="button" onClick={() => setReguaFormData({...reguaFormData, valorNPS: val})} className={btnClass}>
+                                                            <Icon name={isDetrator ? "frown" : isNeutro ? "meh" : "smile"} size={22} className={isActive ? 'text-white' : ''} />
+                                                            <span className="text-sm mt-1">{val}</span>
+                                                        </button>
                                                     )
                                                 })}
                                             </div>
-                                            {/* Labels Bottom */}
-                                            <div className="flex justify-between mt-6 pt-4 border-t border-slate-100 text-[9px] font-black uppercase tracking-widest">
-                                                <div className="text-red-500 w-1/3 text-left">Detratores (0-6)</div>
-                                                <div className="text-teal-500 w-1/3 text-center">Neutros (7-8)</div>
-                                                <div className="text-green-500 w-1/3 text-right">Promotores (9-10)</div>
+                                            {/* Faixas coloridas embaixo */}
+                                            <div className="flex w-full mt-8 gap-3 text-[9px] font-black uppercase tracking-widest text-center">
+                                                <div className="flex-col gap-2 flex" style={{ flex: 7 }}>
+                                                    <div className="h-1.5 w-full bg-red-500 rounded-full"></div>
+                                                    <span className="text-red-500 mt-1 text-left">Detratores (0-6)</span>
+                                                </div>
+                                                <div className="flex-col gap-2 flex" style={{ flex: 2 }}>
+                                                    <div className="h-1.5 w-full bg-teal-500 rounded-full"></div>
+                                                    <span className="text-teal-500 mt-1">Neutros (7-8)</span>
+                                                </div>
+                                                <div className="flex-col gap-2 flex" style={{ flex: 2 }}>
+                                                    <div className="h-1.5 w-full bg-green-500 rounded-full"></div>
+                                                    <span className="text-green-500 mt-1 text-right">Promotores (9-10)</span>
+                                                </div>
                                             </div>
                                         </div>
                                     )}
