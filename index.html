@@ -279,6 +279,7 @@
             const [editingReguaId, setEditingReguaId] = useState(null);
             const [targetDelete, setTargetDelete] = useState(null);
 
+            // Estados locais para cálculos instantâneos do formulário de Comunicado
             const [commReach, setCommReach] = useState(0);
             const [commReactions, setCommReactions] = useState(0);
             const [commComments, setCommComments] = useState(0);
@@ -305,7 +306,6 @@
 
             const [localBudget, setLocalBudget] = useState(0);
             const [vendorToggle, setVendorToggle] = useState(false);
-            // Array para multiplos vendors marcados
             const [selectedVendorIndices, setSelectedVendorIndices] = useState([]);
             const [localVendors, setLocalVendors] = useState([{ name: '', value: 0 }]);
 
@@ -631,8 +631,10 @@
                 const totalReach = sent.reduce((acc, c) => acc + (Number(c.views) || 0), 0);
                 const totalInteractions = sent.reduce((acc, c) => acc + (Number(c.reactions) || 0) + (Number(c.comments) || 0), 0);
                 const totalComments = sent.reduce((acc, c) => acc + (Number(c.comments) || 0), 0);
+                const totalPopulation = sent.reduce((acc, c) => acc + (Number(c.population) || 0), 0);
                 
                 const avgScore = totalReach > 0 ? ((totalInteractions / totalReach) * 100).toFixed(2) : "0.00";
+                const avgTA = totalPopulation > 0 ? ((totalReach / totalPopulation) * 100).toFixed(2) : "0.00";
                 
                 const monthlyPosts = {}; const monthlyEngagement = {};
                 MESES_ABREV.forEach((mes, idx) => {
@@ -644,7 +646,7 @@
                         monthlyEngagement[mes] = mReach > 0 ? ((mInt / mReach) * 100).toFixed(2) : 0;
                     } else monthlyEngagement[mes] = 0;
                 });
-                return { totalPosts: sent.length, interactions: totalInteractions, totalComments, avgScore, monthlyPosts, monthlyEngagement };
+                return { totalPosts: sent.length, interactions: totalInteractions, totalComments, avgScore, avgTA, monthlyPosts, monthlyEngagement };
             }, [comms, filterYear]);
 
             return (
@@ -798,11 +800,12 @@
 
                         {activeTab === 'impacto' && (
                             <section className="animate-in fade-in duration-500 space-y-12">
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                                    <div className="p-10 bg-white rounded-[2rem] sm:rounded-[3rem] border border-slate-100 shadow-sm"><div className="text-6xl font-black text-slate-900 tracking-tighter leading-none">{statsImpacto.totalPosts}</div><div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic">Total Posts</div></div>
-                                    <div className="p-10 bg-slate-900 rounded-[2rem] sm:rounded-[3rem] shadow-2xl relative overflow-hidden group hover:scale-[1.02] transition-all text-white"><div className="p-3 bg-white/10 rounded-xl w-fit mb-6 text-white"><Icon name="trending-up" size={26} /></div><div className="text-6xl font-black tracking-tighter leading-none">{statsImpacto.interactions}</div><div className="text-[9px] font-black uppercase text-slate-500 tracking-widest mt-4 italic">Interações</div></div>
-                                    <div className="p-10 bg-white rounded-[2rem] sm:rounded-[3rem] border border-slate-100 shadow-sm text-slate-900"><div className="text-6xl font-black text-slate-900 tracking-tighter leading-none">{statsImpacto.totalComments}</div><div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic">Comments</div></div>
-                                    <div className="p-10 bg-[#f8fafc] rounded-[2rem] sm:rounded-[3rem] border border-slate-100 shadow-sm text-slate-900"><div className="text-6xl font-black text-slate-900 tracking-tighter leading-none">{statsImpacto.avgScore}%</div><div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic">TER Médio</div></div>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
+                                    <div className="p-8 bg-white rounded-[2rem] border border-slate-100 shadow-sm"><div className="text-5xl font-black text-slate-900 tracking-tighter leading-none">{statsImpacto.totalPosts}</div><div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic">Total Posts</div></div>
+                                    <div className="p-8 bg-slate-900 rounded-[2rem] shadow-2xl relative overflow-hidden group hover:scale-[1.02] transition-all text-white"><div className="p-2.5 bg-white/10 rounded-xl w-fit mb-4 text-white"><Icon name="trending-up" size={20} /></div><div className="text-5xl font-black tracking-tighter leading-none">{statsImpacto.interactions}</div><div className="text-[9px] font-black uppercase text-slate-500 tracking-widest mt-4 italic">Interações</div></div>
+                                    <div className="p-8 bg-white rounded-[2rem] border border-slate-100 shadow-sm text-slate-900"><div className="text-5xl font-black text-slate-900 tracking-tighter leading-none">{statsImpacto.totalComments}</div><div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic">Comments</div></div>
+                                    <div className="p-8 bg-[#f8fafc] rounded-[2rem] border border-slate-100 shadow-sm text-slate-900"><div className="text-5xl font-black text-indigo-600 tracking-tighter leading-none">{statsImpacto.avgScore}%</div><div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic">TER Médio</div></div>
+                                    <div className="p-8 bg-[#f8fafc] rounded-[2rem] border border-slate-100 shadow-sm text-slate-900"><div className="text-5xl font-black text-emerald-600 tracking-tighter leading-none">{statsImpacto.avgTA}%</div><div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic">TA Médio</div></div>
                                 </div>
                                 <div className="grid grid-cols-1 gap-8">
                                     <LineAreaChart title="Evolução de Comunicados (Volume Mensal)" data={statsImpacto.monthlyPosts} color="#397394" />
@@ -1257,7 +1260,7 @@
                                             <div className="text-[10px] font-black uppercase text-[#397394] tracking-widest italic flex items-center justify-center gap-2">Impacto Interno</div>
                                             
                                             <div className="grid grid-cols-3 gap-4">
-                                                <div><label className="text-[8px] uppercase text-slate-400 block italic text-center">Reach</label><input name="views" type="number" value={commReach} onChange={(e) => setCommReach(Number(e.target.value))} className="w-full bg-white border border-slate-100 rounded-xl p-4 font-black text-center outline-none shadow-sm" /></div>
+                                                <div><label className="text-[8px] uppercase text-slate-400 block italic text-center">Alcance</label><input name="views" type="number" value={commReach} onChange={(e) => setCommReach(Number(e.target.value))} className="w-full bg-white border border-slate-100 rounded-xl p-4 font-black text-center outline-none shadow-sm" /></div>
                                                 <div><label className="text-[8px] uppercase text-slate-400 block italic text-center">Reações</label><input name="reactions" type="number" value={commReactions} onChange={(e) => setCommReactions(Number(e.target.value))} className="w-full bg-white border border-slate-100 rounded-xl p-4 font-black text-center outline-none shadow-sm" /></div>
                                                 <div><label className="text-[8px] uppercase text-slate-400 block italic text-center">Comments</label><input name="comments" type="number" value={commComments} onChange={(e) => setCommComments(Number(e.target.value))} className="w-full bg-white border border-slate-100 rounded-xl p-4 font-black text-center outline-none shadow-sm" /></div>
                                             </div>
@@ -1266,11 +1269,25 @@
                                             
                                             <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-200/50">
                                                 <div className="text-center">
-                                                    <span className="text-[8px] font-black uppercase text-slate-400 block mb-1">Taxa de Engaj. (TER)</span>
+                                                    <div className="flex items-center justify-center gap-1 mb-1 relative group cursor-help">
+                                                        <span className="text-[8px] font-black uppercase text-slate-400 block">Taxa de Engaj. (TER)</span>
+                                                        <Icon name="help-circle" size={10} className="text-slate-400 hover:text-indigo-500 transition-colors" />
+                                                        <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 w-48 bg-slate-900 text-white text-[9px] font-medium normal-case tracking-normal p-3 rounded-xl shadow-xl opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 text-center">
+                                                            (Reações + Comentários) ÷ Alcance.<br/>Mede a conversão real de quem viu o post.
+                                                            <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-900"></div>
+                                                        </div>
+                                                    </div>
                                                     <span className="text-2xl font-black text-indigo-600">{commReach > 0 ? (((commReactions + commComments) / commReach) * 100).toFixed(2) : "0.00"}%</span>
                                                 </div>
                                                 <div className="text-center border-l border-slate-200/50">
-                                                    <span className="text-[8px] font-black uppercase text-slate-400 block mb-1">Taxa de Alcance (TA)</span>
+                                                    <div className="flex items-center justify-center gap-1 mb-1 relative group cursor-help">
+                                                        <span className="text-[8px] font-black uppercase text-slate-400 block">Taxa de Alcance (TA)</span>
+                                                        <Icon name="help-circle" size={10} className="text-slate-400 hover:text-emerald-500 transition-colors" />
+                                                        <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 w-48 bg-slate-900 text-white text-[9px] font-medium normal-case tracking-normal p-3 rounded-xl shadow-xl opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 text-center">
+                                                            Alcance ÷ Base Canal.<br/>Mede a penetração da mensagem na audiência total do canal.
+                                                            <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-900"></div>
+                                                        </div>
+                                                    </div>
                                                     <span className="text-2xl font-black text-emerald-600">{commPopulation > 0 ? ((commReach / commPopulation) * 100).toFixed(2) : "0.00"}%</span>
                                                 </div>
                                             </div>
