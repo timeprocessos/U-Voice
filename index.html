@@ -217,7 +217,7 @@
             MESES: ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
         };
 
-        function LineAreaChart({ data, title, color = "#397394", valueSuffix = "" }) {
+        function LineAreaChart({ data, title, color = "#397394", valueSuffix = "", isCurrency = false }) {
             const chartHeight = 220; const chartWidth = 800;
             const paddingX = 40; const paddingY = 60;
             const values = Object.values(data);
@@ -225,7 +225,8 @@
             const keys = Object.keys(data);
             const points = keys.map((key, i) => {
                 const x = (i * (chartWidth - paddingX * 2)) / (keys.length - 1) + paddingX;
-                const y = chartHeight - ((data[key] / maxVal) * (chartHeight - paddingY * 2)) - paddingY;
+                const plottedVal = Math.max(data[key], 0);
+                const y = chartHeight - ((plottedVal / maxVal) * (chartHeight - paddingY * 2)) - paddingY;
                 return { x, y, val: data[key], label: key };
             });
             const getCurvedPath = (pts) => {
@@ -241,6 +242,15 @@
             };
             const curvedPath = getCurvedPath(points);
             const areaPath = `${curvedPath} L ${points[points.length-1].x} ${chartHeight - paddingY} L ${points[0].x} ${chartHeight - paddingY} Z`;
+            
+            const formatDisplayValue = (val) => {
+                if (isCurrency) {
+                    if (Math.abs(val) >= 1000) return (val/1000).toFixed(1).replace('.0', '') + 'k';
+                    return val;
+                }
+                return val + valueSuffix;
+            };
+
             return (
                 <div className="bg-white p-8 rounded-[3rem] border border-slate-100 shadow-sm w-full transition-all text-left">
                     <h4 className="text-[11px] font-black uppercase text-slate-400 mb-8 tracking-[0.2em] italic">{title}</h4>
@@ -249,7 +259,7 @@
                             {[0, 0.5, 1].map((p, i) => (<line key={i} x1={paddingX} y1={chartHeight - paddingY - p * (chartHeight - paddingY * 2)} x2={chartWidth - paddingX} y2={chartHeight - paddingY - p * (chartHeight - paddingY * 2)} stroke="#F1F5F9" strokeWidth="1.5" strokeDasharray="4 4" />))}
                             <path d={areaPath} fill={color} fillOpacity="0.08" /><path d={curvedPath} fill="none" stroke={color} strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
                             {points.map((p, i) => (
-                                <g key={i}><circle cx={p.x} cy={p.y} r="6" fill="white" stroke={color} strokeWidth="4" /><text x={p.x} y={p.y - 22} textAnchor="middle" className="font-black" style={{ fontSize: '14px', fill: '#1e293b' }}>{p.val}{valueSuffix}</text><text x={p.x} y={chartHeight - 15} textAnchor="middle" className="font-bold text-slate-400 uppercase" style={{ fontSize: '9px' }}>{p.label}</text></g>
+                                <g key={i}><circle cx={p.x} cy={p.y} r="6" fill="white" stroke={color} strokeWidth="4" /><text x={p.x} y={p.y - 22} textAnchor="middle" className="font-black" style={{ fontSize: '14px', fill: '#1e293b' }}>{formatDisplayValue(p.val)}</text><text x={p.x} y={chartHeight - 15} textAnchor="middle" className="font-bold text-slate-400 uppercase" style={{ fontSize: '9px' }}>{p.label}</text></g>
                             ))}
                         </svg>
                     </div>
@@ -257,41 +267,90 @@
             );
         }
 
-        function ComparativeBarChart({ data, title }) {
-            const chartHeight = 220; const chartWidth = 800;
-            const paddingX = 40; const paddingY = 60;
-            const maxChartHeight = chartHeight - paddingY * 2;
+        function DoubleLineChart({ data, title }) {
+            const chartHeight = 280; 
+            const chartWidth = 800;
+            const paddingX = 40; 
+            const paddingY = 60; 
             const keys = Object.keys(data);
             
-            if (keys.length === 0) return null;
-            const maxVal = Math.max(...keys.map(k => Math.max(data[k].budget, data[k].cost)), 1) * 1.2;
+            let maxVal = 0;
+            keys.forEach(k => {
+                if (data[k].budget > maxVal) maxVal = data[k].budget;
+                if (data[k].cost > maxVal) maxVal = data[k].cost;
+            });
+            maxVal = Math.max(maxVal, 1) * 1.2;
+
+            const chartBottom = chartHeight - paddingY - 30;
+
+            const getPoints = (type) => keys.map((key, i) => {
+                const x = (i * (chartWidth - paddingX * 2)) / (keys.length - 1) + paddingX;
+                const plottedVal = Math.max(data[key][type], 0);
+                const y = chartBottom - ((plottedVal / maxVal) * (chartBottom - paddingY)); 
+                return { x, y, val: data[key][type], label: key, savingPct: data[key].savingPct };
+            });
+
+            const budgetPoints = getPoints('budget');
+            const costPoints = getPoints('cost');
+
+            const getCurvedPath = (pts) => {
+                if (pts.length < 2) return "";
+                let path = `M ${pts[0].x} ${pts[0].y}`;
+                for (let i = 0; i < pts.length - 1; i++) {
+                    const curr = pts[i]; const next = pts[i+1];
+                    const cp1x = curr.x + (next.x - curr.x) / 3.5;
+                    const cp2x = next.x - (next.x - curr.x) / 3.5;
+                    path += ` C ${cp1x} ${curr.y}, ${cp2x} ${next.y}, ${next.x} ${next.y}`;
+                }
+                return path;
+            };
+
+            const budgetPath = getCurvedPath(budgetPoints);
+            const costPath = getCurvedPath(costPoints);
+            
+            const formatDisplayValue = (val) => {
+                if (Math.abs(val) >= 1000) return (val/1000).toFixed(1).replace('.0', '') + 'k';
+                return val;
+            };
 
             return (
                 <div className="bg-white p-8 rounded-[3rem] border border-slate-100 shadow-sm w-full transition-all text-left">
                     <div className="flex items-center justify-between mb-8">
                         <h4 className="text-[11px] font-black uppercase text-slate-400 tracking-[0.2em] italic">{title}</h4>
                         <div className="flex gap-4">
-                            <span className="flex items-center gap-1.5 text-[9px] font-bold text-slate-400 uppercase tracking-widest"><div className="w-3 h-3 rounded bg-slate-200"></div> Planejado</span>
-                            <span className="flex items-center gap-1.5 text-[9px] font-bold text-slate-400 uppercase tracking-widest"><div className="w-3 h-3 rounded bg-emerald-400 shadow-md shadow-emerald-400/30"></div> Realizado</span>
+                            <span className="flex items-center gap-1.5 text-[9px] font-bold text-slate-400 uppercase tracking-widest"><div className="w-3 h-3 rounded-full bg-slate-300"></div> Orçado</span>
+                            <span className="flex items-center gap-1.5 text-[9px] font-bold text-[#10b981] uppercase tracking-widest"><div className="w-3 h-3 rounded-full bg-[#10b981] shadow-md shadow-[#10b981]/30"></div> Realizado</span>
                         </div>
                     </div>
                     <div className="relative w-full overflow-x-auto custom-scroll pb-4">
                         <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} className="w-full min-w-[600px] h-auto overflow-visible">
-                            {[0, 0.5, 1].map((p, i) => (<line key={`l-${i}`} x1={paddingX} y1={chartHeight - paddingY - p * maxChartHeight} x2={chartWidth - paddingX} y2={chartHeight - paddingY - p * maxChartHeight} stroke="#F1F5F9" strokeWidth="1.5" strokeDasharray="4 4" />))}
-
+                            {[0, 0.5, 1].map((p, i) => (<line key={`grid-${i}`} x1={paddingX} y1={chartBottom - p * (chartBottom - paddingY)} x2={chartWidth - paddingX} y2={chartBottom - p * (chartBottom - paddingY)} stroke="#F1F5F9" strokeWidth="1.5" strokeDasharray="4 4" />))}
+                            
+                            <path d={budgetPath} fill="none" stroke="#cbd5e1" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+                            <path d={costPath} fill="none" stroke="#10b981" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+                            
                             {keys.map((key, i) => {
-                                const x = paddingX + (i * (chartWidth - paddingX * 2)) / Math.max(keys.length - 1, 1);
-                                const budgetH = maxVal > 0 ? (data[key].budget / maxVal) * maxChartHeight : 0;
-                                const costH = maxVal > 0 ? (data[key].cost / maxVal) * maxChartHeight : 0;
-                                const barW = 20;
+                                const bp = budgetPoints[i];
+                                const cp = costPoints[i];
+                                const isSame = Math.abs(bp.y - cp.y) < 5;
                                 
                                 return (
-                                    <g key={i}>
-                                        <rect x={x - barW - 2} y={chartHeight - paddingY - budgetH} width={barW} height={budgetH} fill="#e2e8f0" rx="4" />
-                                        <rect x={x + 2} y={chartHeight - paddingY - costH} width={barW} height={costH} fill="#34d399" rx="4" />
-                                        <text x={x} y={chartHeight - 15} textAnchor="middle" className="font-bold text-slate-400 uppercase" style={{ fontSize: '9px' }}>{key}</text>
+                                    <g key={`group-${i}`}>
+                                        <circle cx={bp.x} cy={bp.y} r="6" fill="white" stroke="#cbd5e1" strokeWidth="4" />
+                                        <circle cx={cp.x} cy={cp.y} r="6" fill="white" stroke="#10b981" strokeWidth="4" />
+                                        
+                                        {bp.val > 0 && !isSame && <text x={bp.x} y={bp.y - 15} textAnchor="middle" className="font-black" style={{ fontSize: '12px', fill: '#94a3b8' }}>{formatDisplayValue(bp.val)}</text>}
+                                        {cp.val > 0 && <text x={cp.x} y={isSame ? cp.y - 15 : cp.y + 22} textAnchor="middle" className="font-black" style={{ fontSize: '14px', fill: '#10b981' }}>{formatDisplayValue(cp.val)}</text>}
+                                        
+                                        <text x={cp.x} y={chartHeight - 35} textAnchor="middle" className="font-black text-slate-800 uppercase" style={{ fontSize: '10px' }}>{cp.label}</text>
+                                        
+                                        {cp.savingPct !== 0 && (
+                                            <text x={cp.x} y={chartHeight - 15} textAnchor="middle" className="font-bold uppercase" style={{ fontSize: '9px', fill: cp.savingPct > 0 ? '#10b981' : '#f43f5e' }}>
+                                                {cp.savingPct > 0 ? `${cp.savingPct.toFixed(1)}% econ.` : `${Math.abs(cp.savingPct).toFixed(1)}% extra`}
+                                            </text>
+                                        )}
                                     </g>
-                                );
+                                )
                             })}
                         </svg>
                     </div>
@@ -764,31 +823,56 @@
 
                 let budgetTotal = 0;
                 let custoReal = 0;
-                const monthlyData = {};
-                MESES_ABREV.forEach(m => monthlyData[m] = { budget: 0, cost: 0 });
+                const monthlyFinanceData = {};
+                MESES_ABREV.forEach(m => monthlyFinanceData[m] = { budget: 0, cost: 0, savingPct: 0 });
 
                 concluidos.forEach(ev => {
                     const b = Number(ev.budget) || 0;
                     let c = 0;
-                    if (ev.hasVendor && ev.vendors && ev.selectedVendorIndices) {
-                        c = ev.vendors.reduce((acc, v, i) => ev.selectedVendorIndices.includes(i) ? acc + Number(v.value) : acc, 0);
+
+                    let vendorsToCalc = ev.vendors || [];
+                    // Fallback para legacy documents que não tem 'vendors'
+                    if (!ev.vendors && ev.vendor1 !== undefined) {
+                         vendorsToCalc = [
+                            { value: Number(ev.vendorValue1 || 0) },
+                            { value: Number(ev.vendorValue2 || 0) },
+                            { value: Number(ev.vendorValue3 || 0) }
+                         ];
                     }
-                    
+
+                    let indices = ev.selectedVendorIndices;
+                    // Fallback para legacy documents que tem apenas 'selectedVendorIdx'
+                    if (!indices && ev.selectedVendorIdx !== undefined && ev.selectedVendorIdx >= 0) {
+                        indices = [ev.selectedVendorIdx];
+                    } else if (!indices) {
+                        indices = [];
+                    }
+
+                    if (ev.hasVendor && vendorsToCalc.length > 0) {
+                        c = vendorsToCalc.reduce((acc, v, i) => indices.includes(i) ? acc + Number(v.value) : acc, 0);
+                    }
+
                     budgetTotal += b;
                     custoReal += c;
 
                     const mesIdx = new Date(ev.date).getMonth();
                     const mesLabel = MESES_ABREV[mesIdx];
-                    if(monthlyData[mesLabel]) {
-                        monthlyData[mesLabel].budget += b;
-                        monthlyData[mesLabel].cost += c;
+                    if(monthlyFinanceData[mesLabel]) {
+                        monthlyFinanceData[mesLabel].budget += b;
+                        monthlyFinanceData[mesLabel].cost += c;
                     }
+                });
+
+                MESES_ABREV.forEach(m => {
+                    const mb = monthlyFinanceData[m].budget;
+                    const mc = monthlyFinanceData[m].cost;
+                    monthlyFinanceData[m].savingPct = mb > 0 ? ((mb - mc) / mb) * 100 : 0;
                 });
 
                 const economiaTotal = budgetTotal - custoReal;
                 const savingPct = budgetTotal > 0 ? (economiaTotal / budgetTotal) * 100 : 0;
 
-                return { budgetTotal, custoReal, economiaTotal, savingPct, monthlyData };
+                return { budgetTotal, custoReal, economiaTotal, savingPct, monthlyFinanceData };
             }, [agenda, impactFilterYear, impactFilterMonth]);
 
             return (
@@ -966,8 +1050,8 @@
                                             <div className="p-8 bg-white rounded-[2rem] border border-slate-100 shadow-sm"><div className="text-5xl font-black text-slate-900 tracking-tighter leading-none">{statsImpacto.totalPosts}</div><div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic">Total Posts</div></div>
                                             <div className="p-8 bg-slate-900 rounded-[2rem] shadow-2xl relative overflow-hidden group hover:scale-[1.02] transition-all text-white"><div className="p-2.5 bg-white/10 rounded-xl w-fit mb-4 text-white"><Icon name="trending-up" size={20} /></div><div className="text-5xl font-black tracking-tighter leading-none">{statsImpacto.interactions}</div><div className="text-[9px] font-black uppercase text-slate-500 tracking-widest mt-4 italic">Interações</div></div>
                                             <div className="p-8 bg-white rounded-[2rem] border border-slate-100 shadow-sm text-slate-900"><div className="text-5xl font-black text-slate-900 tracking-tighter leading-none">{statsImpacto.totalComments}</div><div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic">Comments</div></div>
-                                            <div className="p-8 bg-[#f8fafc] rounded-[2rem] border border-slate-100 shadow-sm text-slate-900"><div className="text-5xl font-black text-indigo-600 tracking-tighter leading-none">{statsImpacto.avgScore}%</div><div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic">TER Médio</div></div>
-                                            <div className="p-8 bg-[#f8fafc] rounded-[2rem] border border-slate-100 shadow-sm text-slate-900"><div className="text-5xl font-black text-emerald-600 tracking-tighter leading-none">{statsImpacto.avgTA}%</div><div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic">TA Médio</div></div>
+                                            <div className="p-8 bg-[#f8fafc] rounded-[2rem] border border-slate-100 shadow-sm text-slate-900"><div className="text-5xl font-black text-indigo-600 tracking-tighter leading-none break-words">{statsImpacto.avgScore}%</div><div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic">TER Médio</div></div>
+                                            <div className="p-8 bg-[#f8fafc] rounded-[2rem] border border-slate-100 shadow-sm text-slate-900"><div className="text-5xl font-black text-emerald-600 tracking-tighter leading-none break-words">{statsImpacto.avgTA}%</div><div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic">TA Médio</div></div>
                                         </div>
                                         <div className="grid grid-cols-1 gap-8 mt-8">
                                             <LineAreaChart title="Evolução de Comunicados (Volume Mensal)" data={statsImpacto.monthlyPosts} color="#397394" />
@@ -993,11 +1077,11 @@
                                                 <div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic">Total Aberturas</div>
                                             </div>
                                             <div className="p-8 bg-[#f8fafc] rounded-[2rem] border border-slate-100 shadow-sm text-slate-900">
-                                                <div className="text-5xl font-black text-indigo-600 tracking-tighter leading-none">{statsExterno.avgOpenRate}%</div>
+                                                <div className="text-5xl font-black text-indigo-600 tracking-tighter leading-none break-words">{statsExterno.avgOpenRate}%</div>
                                                 <div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic">Open Rate Médio</div>
                                             </div>
                                             <div className="p-8 bg-[#f8fafc] rounded-[2rem] border border-slate-100 shadow-sm text-slate-900">
-                                                <div className="text-5xl font-black text-emerald-600 tracking-tighter leading-none">{statsExterno.avgCTR}%</div>
+                                                <div className="text-5xl font-black text-emerald-600 tracking-tighter leading-none break-words">{statsExterno.avgCTR}%</div>
                                                 <div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic">Taxa de Clique (CTR)</div>
                                             </div>
                                         </div>
@@ -1012,27 +1096,27 @@
                                             <Icon name="dollar-sign" size={22} className="text-amber-500" /> Eficiência Financeira (Savings de Atividades)
                                         </h3>
                                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                                            <div className="p-8 bg-white rounded-[2rem] border border-slate-100 shadow-sm">
-                                                <div className="text-3xl lg:text-4xl font-black text-slate-900 tracking-tighter leading-none truncate">R$ {formatCurrency(statsFinanceiro.budgetTotal)}</div>
+                                            <div className="p-8 bg-white rounded-[2rem] border border-slate-100 shadow-sm flex flex-col justify-center">
+                                                <div className="text-3xl lg:text-4xl font-black text-slate-900 tracking-tighter leading-none break-words">R$ {formatCurrency(statsFinanceiro.budgetTotal)}</div>
                                                 <div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic">Budget Total</div>
                                             </div>
-                                            <div className="p-8 bg-white rounded-[2rem] border border-slate-100 shadow-sm">
-                                                <div className="text-3xl lg:text-4xl font-black text-slate-900 tracking-tighter leading-none truncate">R$ {formatCurrency(statsFinanceiro.custoReal)}</div>
+                                            <div className="p-8 bg-white rounded-[2rem] border border-slate-100 shadow-sm flex flex-col justify-center">
+                                                <div className="text-3xl lg:text-4xl font-black text-slate-900 tracking-tighter leading-none break-words">R$ {formatCurrency(statsFinanceiro.custoReal)}</div>
                                                 <div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic">Custo Real (Fornecedores)</div>
                                             </div>
-                                            <div className="p-8 bg-slate-900 rounded-[2rem] border border-slate-900 shadow-xl text-white">
-                                                <div className={`text-3xl lg:text-4xl font-black tracking-tighter leading-none truncate ${statsFinanceiro.economiaTotal >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>R$ {formatCurrency(Math.abs(statsFinanceiro.economiaTotal))}</div>
+                                            <div className="p-8 bg-slate-900 rounded-[2rem] border border-slate-900 shadow-xl text-white flex flex-col justify-center">
+                                                <div className={`text-3xl lg:text-4xl font-black tracking-tighter leading-none break-words ${statsFinanceiro.economiaTotal >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>R$ {formatCurrency(Math.abs(statsFinanceiro.economiaTotal))}</div>
                                                 <div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic">{statsFinanceiro.economiaTotal >= 0 ? 'Economia Total' : 'Estouro Total'}</div>
                                             </div>
-                                            <div className="p-8 bg-[#f8fafc] rounded-[2rem] border border-slate-100 shadow-sm text-slate-900">
-                                                <div className={`text-5xl font-black tracking-tighter leading-none ${statsFinanceiro.savingPct >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                            <div className="p-8 bg-[#f8fafc] rounded-[2rem] border border-slate-100 shadow-sm text-slate-900 flex flex-col justify-center">
+                                                <div className={`text-4xl lg:text-5xl font-black tracking-tighter leading-none break-words ${statsFinanceiro.savingPct >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
                                                     {Math.abs(statsFinanceiro.savingPct).toFixed(1)}%
                                                 </div>
                                                 <div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic">{statsFinanceiro.savingPct >= 0 ? '% de Saving (Economia)' : '% Acima do Orçado'}</div>
                                             </div>
                                         </div>
                                         <div className="grid grid-cols-1 gap-8 mt-8">
-                                            <ComparativeBarChart title="Orçado vs. Realizado (Mensal)" data={statsFinanceiro.monthlyData} />
+                                            <DoubleLineChart title="Orçado vs. Realizado (Mensal)" data={statsFinanceiro.monthlyFinanceData} />
                                         </div>
                                     </div>
                                 </div>
