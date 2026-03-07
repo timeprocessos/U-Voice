@@ -657,10 +657,15 @@
                 const totalReach = sent.reduce((acc, c) => acc + (Number(c.views) || 0), 0);
                 const totalInteractions = sent.reduce((acc, c) => acc + (Number(c.reactions) || 0) + (Number(c.comments) || 0), 0);
                 const totalComments = sent.reduce((acc, c) => acc + (Number(c.comments) || 0), 0);
-                const totalPopulation = sent.reduce((acc, c) => acc + (Number(c.population) || 0), 0);
                 
+                // Média Ponderada Global (TER)
                 const avgScore = totalReach > 0 ? ((totalInteractions / totalReach) * 100).toFixed(2) : "0.00";
-                const avgTA = totalPopulation > 0 ? ((totalReach / totalPopulation) * 100).toFixed(2) : "0.00";
+                
+                // Média Ponderada Global (TA) ignorando posts não preenchidos (zerados)
+                const validTAPosts = sent.filter(c => Number(c.population) > 0 && Number(c.views) > 0);
+                const totalValidReach = validTAPosts.reduce((acc, c) => acc + Number(c.views), 0);
+                const totalValidPopulation = validTAPosts.reduce((acc, c) => acc + Number(c.population), 0);
+                const avgTA = totalValidPopulation > 0 ? ((totalValidReach / totalValidPopulation) * 100).toFixed(2) : "0.00";
                 
                 const monthlyPosts = {}; const monthlyEngagement = {};
                 MESES_ABREV.forEach((mes, idx) => {
@@ -843,7 +848,7 @@
                             <section className="animate-in fade-in duration-500 space-y-12">
                                 <div>
                                     <h3 className="text-sm sm:text-base font-black text-slate-800 uppercase tracking-widest mb-6 flex items-center gap-2">
-                                        📊 Performance Interna (Slack)
+                                        <Icon name="bar-chart-2" size={22} className="text-indigo-600" /> Performance Interna (Slack)
                                     </h3>
                                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
                                         <div className="p-8 bg-white rounded-[2rem] border border-slate-100 shadow-sm"><div className="text-5xl font-black text-slate-900 tracking-tighter leading-none">{statsImpacto.totalPosts}</div><div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic">Total Posts</div></div>
@@ -864,7 +869,7 @@
 
                                 <div>
                                     <h3 className="text-sm sm:text-base font-black text-slate-800 uppercase tracking-widest mb-6 flex items-center gap-2">
-                                        ✉️ Performance Externa (Outbound & NPS)
+                                        <Icon name="send" size={22} className="text-emerald-600" /> Performance Externa (Outbound & NPS)
                                     </h3>
                                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                                         <div className="p-8 bg-white rounded-[2rem] border border-slate-100 shadow-sm">
