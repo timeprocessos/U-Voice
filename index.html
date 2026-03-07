@@ -257,6 +257,48 @@
             );
         }
 
+        function ComparativeBarChart({ data, title }) {
+            const chartHeight = 220; const chartWidth = 800;
+            const paddingX = 40; const paddingY = 60;
+            const maxChartHeight = chartHeight - paddingY * 2;
+            const keys = Object.keys(data);
+            
+            if (keys.length === 0) return null;
+            const maxVal = Math.max(...keys.map(k => Math.max(data[k].budget, data[k].cost)), 1) * 1.2;
+
+            return (
+                <div className="bg-white p-8 rounded-[3rem] border border-slate-100 shadow-sm w-full transition-all text-left">
+                    <div className="flex items-center justify-between mb-8">
+                        <h4 className="text-[11px] font-black uppercase text-slate-400 tracking-[0.2em] italic">{title}</h4>
+                        <div className="flex gap-4">
+                            <span className="flex items-center gap-1.5 text-[9px] font-bold text-slate-400 uppercase tracking-widest"><div className="w-3 h-3 rounded bg-slate-200"></div> Planejado</span>
+                            <span className="flex items-center gap-1.5 text-[9px] font-bold text-slate-400 uppercase tracking-widest"><div className="w-3 h-3 rounded bg-emerald-400 shadow-md shadow-emerald-400/30"></div> Realizado</span>
+                        </div>
+                    </div>
+                    <div className="relative w-full overflow-x-auto custom-scroll pb-4">
+                        <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} className="w-full min-w-[600px] h-auto overflow-visible">
+                            {[0, 0.5, 1].map((p, i) => (<line key={`l-${i}`} x1={paddingX} y1={chartHeight - paddingY - p * maxChartHeight} x2={chartWidth - paddingX} y2={chartHeight - paddingY - p * maxChartHeight} stroke="#F1F5F9" strokeWidth="1.5" strokeDasharray="4 4" />))}
+
+                            {keys.map((key, i) => {
+                                const x = paddingX + (i * (chartWidth - paddingX * 2)) / Math.max(keys.length - 1, 1);
+                                const budgetH = maxVal > 0 ? (data[key].budget / maxVal) * maxChartHeight : 0;
+                                const costH = maxVal > 0 ? (data[key].cost / maxVal) * maxChartHeight : 0;
+                                const barW = 20;
+                                
+                                return (
+                                    <g key={i}>
+                                        <rect x={x - barW - 2} y={chartHeight - paddingY - budgetH} width={barW} height={budgetH} fill="#e2e8f0" rx="4" />
+                                        <rect x={x + 2} y={chartHeight - paddingY - costH} width={barW} height={costH} fill="#34d399" rx="4" />
+                                        <text x={x} y={chartHeight - 15} textAnchor="middle" className="font-bold text-slate-400 uppercase" style={{ fontSize: '9px' }}>{key}</text>
+                                    </g>
+                                );
+                            })}
+                        </svg>
+                    </div>
+                </div>
+            );
+        }
+
         // --- APP PRINCIPAL ---
         function App() {
             const [user, setUser] = useState(null);
@@ -307,6 +349,9 @@
             const [extFilterYear, setExtFilterYear] = useState(new Date().getFullYear().toString());
             const [extFilterMonth, setExtFilterMonth] = useState("Todos");
             const [extFilterCountry, setExtFilterCountry] = useState("Todos");
+
+            const [impactFilterYear, setImpactFilterYear] = useState(new Date().getFullYear().toString());
+            const [impactFilterMonth, setImpactFilterMonth] = useState("Todos");
 
             const [localBudget, setLocalBudget] = useState(0);
             const [vendorToggle, setVendorToggle] = useState(false);
@@ -650,8 +695,15 @@
             const publicosUnicos = ['Todos', ...new Set(reguas.map(r => r.publico))];
             const anosUnicos = ['Todos', '2024', '2025', '2026'];
 
+            // Lógica de Impacto Consolidada com Filtros Globais e Média Ponderada
             const statsImpacto = useMemo(() => {
-                const sent = comms.filter(c => c.status === 'Enviado' && new Date(c.date).getFullYear().toString() === filterYear);
+                const sent = comms.filter(c => {
+                    if (c.status !== 'Enviado' || !c.date) return false;
+                    const d = new Date(c.date);
+                    const matchYear = d.getFullYear().toString() === impactFilterYear;
+                    const matchMonth = impactFilterMonth === "Todos" || d.getMonth().toString() === impactFilterMonth;
+                    return matchYear && matchMonth;
+                });
                 const totalPosts = sent.length;
                 
                 const totalReach = sent.reduce((acc, c) => acc + (Number(c.views) || 0), 0);
@@ -678,10 +730,16 @@
                     } else monthlyEngagement[mes] = 0;
                 });
                 return { totalPosts: sent.length, interactions: totalInteractions, totalComments, avgScore, avgTA, monthlyPosts, monthlyEngagement };
-            }, [comms, filterYear]);
+            }, [comms, impactFilterYear, impactFilterMonth]);
 
             const statsExterno = useMemo(() => {
-                const ext = externalComms.filter(e => e.status === 'Enviado' && new Date(e.date).getFullYear().toString() === filterYear);
+                const ext = externalComms.filter(e => {
+                    if (e.status !== 'Enviado' || !e.date) return false;
+                    const d = new Date(e.date);
+                    const matchYear = d.getFullYear().toString() === impactFilterYear;
+                    const matchMonth = impactFilterMonth === "Todos" || d.getMonth().toString() === impactFilterMonth;
+                    return matchYear && matchMonth;
+                });
                 
                 const totalSent = ext.reduce((acc, e) => acc + (Number(e.sentCount) || 0), 0);
                 const totalOpened = ext.reduce((acc, e) => acc + (Number(e.openedCount) || 0), 0);
@@ -693,7 +751,45 @@
                 const avgCTR = monitoredSent > 0 ? ((totalClicks / monitoredSent) * 100).toFixed(2) : "0.00";
 
                 return { totalSent, totalOpened, avgOpenRate, avgCTR };
-            }, [externalComms, filterYear]);
+            }, [externalComms, impactFilterYear, impactFilterMonth]);
+
+            const statsFinanceiro = useMemo(() => {
+                const concluidos = agenda.filter(ev => {
+                    if (ev.status !== 'Concluído' || !ev.date) return false;
+                    const d = new Date(ev.date);
+                    const matchYear = d.getFullYear().toString() === impactFilterYear;
+                    const matchMonth = impactFilterMonth === "Todos" || d.getMonth().toString() === impactFilterMonth;
+                    return matchYear && matchMonth;
+                });
+
+                let budgetTotal = 0;
+                let custoReal = 0;
+                const monthlyData = {};
+                MESES_ABREV.forEach(m => monthlyData[m] = { budget: 0, cost: 0 });
+
+                concluidos.forEach(ev => {
+                    const b = Number(ev.budget) || 0;
+                    let c = 0;
+                    if (ev.hasVendor && ev.vendors && ev.selectedVendorIndices) {
+                        c = ev.vendors.reduce((acc, v, i) => ev.selectedVendorIndices.includes(i) ? acc + Number(v.value) : acc, 0);
+                    }
+                    
+                    budgetTotal += b;
+                    custoReal += c;
+
+                    const mesIdx = new Date(ev.date).getMonth();
+                    const mesLabel = MESES_ABREV[mesIdx];
+                    if(monthlyData[mesLabel]) {
+                        monthlyData[mesLabel].budget += b;
+                        monthlyData[mesLabel].cost += c;
+                    }
+                });
+
+                const economiaTotal = budgetTotal - custoReal;
+                const savingPct = budgetTotal > 0 ? (economiaTotal / budgetTotal) * 100 : 0;
+
+                return { budgetTotal, custoReal, economiaTotal, savingPct, monthlyData };
+            }, [agenda, impactFilterYear, impactFilterMonth]);
 
             return (
                 <div className="min-h-screen pb-32 text-left">
@@ -723,6 +819,7 @@
                                     <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 rounded-xl text-slate-400 border border-slate-100"><Icon name="filter" size={14} /><span className="text-[10px] font-black uppercase">Filtros</span></div>
                                     <button onClick={() => setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')} className="impact-filter"><Icon name={sortOrder === 'desc' ? "sort-desc" : "sort-asc"} size={14} /><span>{sortOrder === 'desc' ? 'Recentes' : 'Antigos'}</span></button>
                                     <select value={filterYear} onChange={(e) => setFilterYear(e.target.value)} className="impact-filter">
+                                        <option value="2024">2024</option>
                                         <option value="2025">2025</option>
                                         <option value="2026">2026</option>
                                     </select>
@@ -795,6 +892,7 @@
                                     <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 rounded-xl text-slate-400 border border-slate-100"><Icon name="filter" size={14} /><span className="text-[10px] font-black uppercase">Filtros</span></div>
                                     <button onClick={() => setExtSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')} className="impact-filter"><Icon name={extSortOrder === 'desc' ? "sort-desc" : "sort-asc"} size={14} /><span>{extSortOrder === 'desc' ? 'Recentes' : 'Antigos'}</span></button>
                                     <select value={extFilterYear} onChange={(e) => setExtFilterYear(e.target.value)} className="impact-filter">
+                                        <option value="2024">2024</option>
                                         <option value="2025">2025</option>
                                         <option value="2026">2026</option>
                                     </select>
@@ -845,48 +943,96 @@
                         )}
 
                         {activeTab === 'impacto' && (
-                            <section className="animate-in fade-in duration-500 space-y-12">
-                                <div>
-                                    <h3 className="text-sm sm:text-base font-black text-slate-800 uppercase tracking-widest mb-6 flex items-center gap-2">
-                                        <Icon name="bar-chart-2" size={22} className="text-indigo-600" /> Performance Interna (Slack)
-                                    </h3>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
-                                        <div className="p-8 bg-white rounded-[2rem] border border-slate-100 shadow-sm"><div className="text-5xl font-black text-slate-900 tracking-tighter leading-none">{statsImpacto.totalPosts}</div><div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic">Total Posts</div></div>
-                                        <div className="p-8 bg-slate-900 rounded-[2rem] shadow-2xl relative overflow-hidden group hover:scale-[1.02] transition-all text-white"><div className="p-2.5 bg-white/10 rounded-xl w-fit mb-4 text-white"><Icon name="trending-up" size={20} /></div><div className="text-5xl font-black tracking-tighter leading-none">{statsImpacto.interactions}</div><div className="text-[9px] font-black uppercase text-slate-500 tracking-widest mt-4 italic">Interações</div></div>
-                                        <div className="p-8 bg-white rounded-[2rem] border border-slate-100 shadow-sm text-slate-900"><div className="text-5xl font-black text-slate-900 tracking-tighter leading-none">{statsImpacto.totalComments}</div><div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic">Comments</div></div>
-                                        <div className="p-8 bg-[#f8fafc] rounded-[2rem] border border-slate-100 shadow-sm text-slate-900"><div className="text-5xl font-black text-indigo-600 tracking-tighter leading-none">{statsImpacto.avgScore}%</div><div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic">TER Médio</div></div>
-                                        <div className="p-8 bg-[#f8fafc] rounded-[2rem] border border-slate-100 shadow-sm text-slate-900"><div className="text-5xl font-black text-emerald-600 tracking-tighter leading-none">{statsImpacto.avgTA}%</div><div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic">TA Médio</div></div>
-                                    </div>
-                                    <div className="grid grid-cols-1 gap-8 mt-8">
-                                        <LineAreaChart title="Evolução de Comunicados (Volume Mensal)" data={statsImpacto.monthlyPosts} color="#397394" />
-                                        <LineAreaChart title="Taxa de Engajamento Mensal (Curva Orgânica)" data={statsImpacto.monthlyEngagement} color="#F77D8D" valueSuffix="%" />
-                                    </div>
+                            <section className="animate-in fade-in duration-500">
+                                <div className="flex flex-wrap items-center gap-3 mb-10 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm sticky top-[85px] z-40">
+                                    <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 rounded-xl text-slate-400 border border-slate-100"><Icon name="filter" size={14} /><span className="text-[10px] font-black uppercase">Filtros Impacto</span></div>
+                                    <select value={impactFilterYear} onChange={(e) => setImpactFilterYear(e.target.value)} className="impact-filter">
+                                        <option value="2024">2024</option>
+                                        <option value="2025">2025</option>
+                                        <option value="2026">2026</option>
+                                    </select>
+                                    <select value={impactFilterMonth} onChange={(e) => setImpactFilterMonth(e.target.value)} className="impact-filter">
+                                        <option value="Todos">Mês: Todos</option>
+                                        {MESES_MAP.map(m => <option key={m.val} value={m.val}>{m.label}</option>)}
+                                    </select>
                                 </div>
 
-                                <div className="flex items-center justify-center py-4">
-                                    <div className="w-full border-t-2 border-dashed border-slate-200"></div>
-                                </div>
+                                <div className="space-y-12">
+                                    <div>
+                                        <h3 className="text-sm sm:text-base font-black text-slate-800 uppercase tracking-widest mb-6 flex items-center gap-2">
+                                            <Icon name="bar-chart-2" size={22} className="text-indigo-600" /> Performance Interna (Slack)
+                                        </h3>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
+                                            <div className="p-8 bg-white rounded-[2rem] border border-slate-100 shadow-sm"><div className="text-5xl font-black text-slate-900 tracking-tighter leading-none">{statsImpacto.totalPosts}</div><div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic">Total Posts</div></div>
+                                            <div className="p-8 bg-slate-900 rounded-[2rem] shadow-2xl relative overflow-hidden group hover:scale-[1.02] transition-all text-white"><div className="p-2.5 bg-white/10 rounded-xl w-fit mb-4 text-white"><Icon name="trending-up" size={20} /></div><div className="text-5xl font-black tracking-tighter leading-none">{statsImpacto.interactions}</div><div className="text-[9px] font-black uppercase text-slate-500 tracking-widest mt-4 italic">Interações</div></div>
+                                            <div className="p-8 bg-white rounded-[2rem] border border-slate-100 shadow-sm text-slate-900"><div className="text-5xl font-black text-slate-900 tracking-tighter leading-none">{statsImpacto.totalComments}</div><div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic">Comments</div></div>
+                                            <div className="p-8 bg-[#f8fafc] rounded-[2rem] border border-slate-100 shadow-sm text-slate-900"><div className="text-5xl font-black text-indigo-600 tracking-tighter leading-none">{statsImpacto.avgScore}%</div><div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic">TER Médio</div></div>
+                                            <div className="p-8 bg-[#f8fafc] rounded-[2rem] border border-slate-100 shadow-sm text-slate-900"><div className="text-5xl font-black text-emerald-600 tracking-tighter leading-none">{statsImpacto.avgTA}%</div><div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic">TA Médio</div></div>
+                                        </div>
+                                        <div className="grid grid-cols-1 gap-8 mt-8">
+                                            <LineAreaChart title="Evolução de Comunicados (Volume Mensal)" data={statsImpacto.monthlyPosts} color="#397394" />
+                                            <LineAreaChart title="Taxa de Engajamento Mensal (Curva Orgânica)" data={statsImpacto.monthlyEngagement} color="#F77D8D" valueSuffix="%" />
+                                        </div>
+                                    </div>
 
-                                <div>
-                                    <h3 className="text-sm sm:text-base font-black text-slate-800 uppercase tracking-widest mb-6 flex items-center gap-2">
-                                        <Icon name="send" size={22} className="text-emerald-600" /> Performance Externa (Outbound & NPS)
-                                    </h3>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                                        <div className="p-8 bg-white rounded-[2rem] border border-slate-100 shadow-sm">
-                                            <div className="text-5xl font-black text-slate-900 tracking-tighter leading-none">{statsExterno.totalSent}</div>
-                                            <div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic">Total Enviados</div>
+                                    <div className="flex items-center justify-center py-4">
+                                        <div className="w-full border-t-2 border-dashed border-slate-200"></div>
+                                    </div>
+
+                                    <div>
+                                        <h3 className="text-sm sm:text-base font-black text-slate-800 uppercase tracking-widest mb-6 flex items-center gap-2">
+                                            <Icon name="send" size={22} className="text-emerald-600" /> Performance Externa (Outbound & NPS)
+                                        </h3>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                                            <div className="p-8 bg-white rounded-[2rem] border border-slate-100 shadow-sm">
+                                                <div className="text-5xl font-black text-slate-900 tracking-tighter leading-none">{statsExterno.totalSent}</div>
+                                                <div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic">Total Enviados</div>
+                                            </div>
+                                            <div className="p-8 bg-white rounded-[2rem] border border-slate-100 shadow-sm">
+                                                <div className="text-5xl font-black text-slate-900 tracking-tighter leading-none">{statsExterno.totalOpened}</div>
+                                                <div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic">Total Aberturas</div>
+                                            </div>
+                                            <div className="p-8 bg-[#f8fafc] rounded-[2rem] border border-slate-100 shadow-sm text-slate-900">
+                                                <div className="text-5xl font-black text-indigo-600 tracking-tighter leading-none">{statsExterno.avgOpenRate}%</div>
+                                                <div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic">Open Rate Médio</div>
+                                            </div>
+                                            <div className="p-8 bg-[#f8fafc] rounded-[2rem] border border-slate-100 shadow-sm text-slate-900">
+                                                <div className="text-5xl font-black text-emerald-600 tracking-tighter leading-none">{statsExterno.avgCTR}%</div>
+                                                <div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic">Taxa de Clique (CTR)</div>
+                                            </div>
                                         </div>
-                                        <div className="p-8 bg-white rounded-[2rem] border border-slate-100 shadow-sm">
-                                            <div className="text-5xl font-black text-slate-900 tracking-tighter leading-none">{statsExterno.totalOpened}</div>
-                                            <div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic">Total Aberturas</div>
+                                    </div>
+
+                                    <div className="flex items-center justify-center py-4">
+                                        <div className="w-full border-t-2 border-dashed border-slate-200"></div>
+                                    </div>
+
+                                    <div>
+                                        <h3 className="text-sm sm:text-base font-black text-slate-800 uppercase tracking-widest mb-6 flex items-center gap-2">
+                                            <Icon name="dollar-sign" size={22} className="text-amber-500" /> Eficiência Financeira (Savings de Atividades)
+                                        </h3>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                                            <div className="p-8 bg-white rounded-[2rem] border border-slate-100 shadow-sm">
+                                                <div className="text-3xl lg:text-4xl font-black text-slate-900 tracking-tighter leading-none truncate">R$ {formatCurrency(statsFinanceiro.budgetTotal)}</div>
+                                                <div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic">Budget Total</div>
+                                            </div>
+                                            <div className="p-8 bg-white rounded-[2rem] border border-slate-100 shadow-sm">
+                                                <div className="text-3xl lg:text-4xl font-black text-slate-900 tracking-tighter leading-none truncate">R$ {formatCurrency(statsFinanceiro.custoReal)}</div>
+                                                <div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic">Custo Real (Fornecedores)</div>
+                                            </div>
+                                            <div className="p-8 bg-slate-900 rounded-[2rem] border border-slate-900 shadow-xl text-white">
+                                                <div className={`text-3xl lg:text-4xl font-black tracking-tighter leading-none truncate ${statsFinanceiro.economiaTotal >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>R$ {formatCurrency(Math.abs(statsFinanceiro.economiaTotal))}</div>
+                                                <div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic">{statsFinanceiro.economiaTotal >= 0 ? 'Economia Total' : 'Estouro Total'}</div>
+                                            </div>
+                                            <div className="p-8 bg-[#f8fafc] rounded-[2rem] border border-slate-100 shadow-sm text-slate-900">
+                                                <div className={`text-5xl font-black tracking-tighter leading-none ${statsFinanceiro.savingPct >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                                    {Math.abs(statsFinanceiro.savingPct).toFixed(1)}%
+                                                </div>
+                                                <div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic">{statsFinanceiro.savingPct >= 0 ? '% de Saving (Economia)' : '% Acima do Orçado'}</div>
+                                            </div>
                                         </div>
-                                        <div className="p-8 bg-[#f8fafc] rounded-[2rem] border border-slate-100 shadow-sm text-slate-900">
-                                            <div className="text-5xl font-black text-indigo-600 tracking-tighter leading-none">{statsExterno.avgOpenRate}%</div>
-                                            <div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic">Open Rate Médio</div>
-                                        </div>
-                                        <div className="p-8 bg-[#f8fafc] rounded-[2rem] border border-slate-100 shadow-sm text-slate-900">
-                                            <div className="text-5xl font-black text-emerald-600 tracking-tighter leading-none">{statsExterno.avgCTR}%</div>
-                                            <div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic">Taxa de Clique (CTR)</div>
+                                        <div className="grid grid-cols-1 gap-8 mt-8">
+                                            <ComparativeBarChart title="Orçado vs. Realizado (Mensal)" data={statsFinanceiro.monthlyData} />
                                         </div>
                                     </div>
                                 </div>
@@ -898,6 +1044,7 @@
                                 <div className="flex flex-wrap items-center gap-3 mb-10 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm sticky top-[85px] z-40">
                                     <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 rounded-xl text-slate-400 border border-slate-100"><Icon name="filter" size={14} /><span className="text-[10px] font-black uppercase">Filtros Agenda</span></div>
                                     <select value={agendaFilterYear} onChange={(e) => setAgendaFilterYear(e.target.value)} className="impact-filter">
+                                        <option value="2024">2024</option>
                                         <option value="2025">2025</option>
                                         <option value="2026">2026</option>
                                     </select>
@@ -1649,4 +1796,3 @@
     </script>
 </body>
 </html>
-
