@@ -179,6 +179,18 @@
             if(parts.length !== 3) return dateStr;
             return `${parts[2]}/${parts[1]}/${parts[0]}`;
         }
+        
+        // Utilitários de Formatação de Moeda
+        const parseCurrency = (str) => {
+            if (!str) return 0;
+            const digits = str.replace(/\D/g, '');
+            return Number(digits) / 100;
+        };
+
+        const formatCurrency = (value) => {
+            if (value === null || value === undefined) return '';
+            return value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        };
 
         const reguaUtils = {
             addDays: (date, days) => {
@@ -287,10 +299,13 @@
             const [extFilterCountry, setExtFilterCountry] = useState("Todos");
 
             const [localBudget, setLocalBudget] = useState(0);
-            const [hasCoffee, setHasCoffee] = useState(false);
             const [vendorToggle, setVendorToggle] = useState(false);
-            const [selectedVendorIdx, setSelectedVendorIdx] = useState(null);
+            // Array para multiplos vendors marcados
+            const [selectedVendorIndices, setSelectedVendorIndices] = useState([]);
             const [localVendors, setLocalVendors] = useState([{ name: '', value: 0 }]);
+
+            const [includeAgendaNPS, setIncludeAgendaNPS] = useState(false);
+            const [agendaNPSValue, setAgendaNPSValue] = useState(5);
 
             const initialReguaForm = {
                 nome: '', objetivo: 'Engajamento', publico: 'Público Geral',
@@ -383,10 +398,22 @@
             };
             const openAgendaModal = (ev = null) => {
                 if (ev) {
-                    setEditingAgenda(ev); setLocalBudget(Number(ev.budget || 0)); setHasCoffee(ev.hasCoffee || false);
-                    setVendorToggle(ev.hasVendor || false); setSelectedVendorIdx(ev.selectedVendorIdx >= 0 ? ev.selectedVendorIdx : null);
+                    setEditingAgenda(ev); 
+                    setLocalBudget(Number(ev.budget || 0)); 
+                    setVendorToggle(ev.hasVendor || false); 
                     
-                    // Suporte a legado vs novo modelo dinamico de vendors
+                    setIncludeAgendaNPS(ev.includeNPS || false);
+                    setAgendaNPSValue(ev.npsValue !== undefined ? ev.npsValue : 5);
+                    
+                    // Arrays
+                    if (ev.selectedVendorIndices !== undefined) {
+                        setSelectedVendorIndices(ev.selectedVendorIndices);
+                    } else if (ev.selectedVendorIdx !== undefined && ev.selectedVendorIdx >= 0) {
+                        setSelectedVendorIndices([ev.selectedVendorIdx]);
+                    } else {
+                        setSelectedVendorIndices([]);
+                    }
+
                     if (ev.vendors && Array.isArray(ev.vendors)) {
                         setLocalVendors(ev.vendors);
                     } else if (ev.vendor1 !== undefined) {
@@ -399,8 +426,13 @@
                         setLocalVendors([{ name: '', value: 0 }]);
                     }
                 } else {
-                    setEditingAgenda(null); setLocalBudget(0); setHasCoffee(false); setVendorToggle(false); setSelectedVendorIdx(null);
+                    setEditingAgenda(null); 
+                    setLocalBudget(0); 
+                    setVendorToggle(false); 
+                    setSelectedVendorIndices([]);
                     setLocalVendors([{ name: '', value: 0 }]);
+                    setIncludeAgendaNPS(false);
+                    setAgendaNPSValue(5);
                 }
                 setIsModalAgendaOpen(true);
             };
@@ -408,7 +440,14 @@
             const toggleAnalyst = (name) => {
                 setSelectedAnalysts(prev => prev.includes(name) ? prev.filter(n => n !== name) : [...prev, name]);
             };
-            const toggleFormat = (f) => setSelectedFormats(prev => prev.includes(f) ? prev.filter(item => item !== f) : [...prev, f]);
+            
+            const toggleVendorSelection = (idx) => {
+                if (selectedVendorIndices.includes(idx)) {
+                    setSelectedVendorIndices(selectedVendorIndices.filter(i => i !== idx));
+                } else {
+                    setSelectedVendorIndices([...selectedVendorIndices, idx]);
+                }
+            };
 
             const handleSaveComm = async (e) => {
                 e.preventDefault();
@@ -434,9 +473,11 @@
                 const data = { 
                     title: fd.get('atividade'), date: fd.get('date'), sponsor: fd.get('sponsor'), 
                     description: fd.get('description'), meetingLink: fd.get('meetingLink'), status: fd.get('status'), 
-                    budget: localBudget, hasCoffee: hasCoffee, hasVendor: vendorToggle, 
-                    selectedVendorIdx: selectedVendorIdx !== null ? selectedVendorIdx : -1, 
-                    vendors: localVendors, updatedAt: new Date().toISOString() 
+                    budget: localBudget, hasVendor: vendorToggle, 
+                    selectedVendorIndices: selectedVendorIndices, 
+                    vendors: localVendors, 
+                    includeNPS: includeAgendaNPS, npsValue: agendaNPSValue,
+                    updatedAt: new Date().toISOString() 
                 };
                 setIsModalAgendaOpen(false);
                 if (editingAgenda) await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'agenda', editingAgenda.id), data);
@@ -494,13 +535,23 @@
                 return { steps, lastDate, progress };
             };
 
-            const renderBudgetLogic = (vendorValue) => {
+            const renderIndividualSaving = (vendorValue) => {
                 if (!localBudget || localBudget <= 0 || !vendorValue) return null;
                 const saving = ((localBudget - vendorValue) / localBudget) * 100;
                 if (saving > 0) return <span className="text-[10px] font-black text-emerald-500 uppercase tracking-tighter">({saving.toFixed(1)}% de economia)</span>;
                 if (saving === 0) return <span className="text-[10px] font-black text-blue-500 uppercase tracking-tighter">(100% do recurso)</span>;
                 return <span className="text-[10px] font-black text-red-500 uppercase tracking-tighter">({Math.abs(saving).toFixed(1)}% acima do orçado)</span>;
             };
+
+            // Cálculo global para exibir o resumo total do Saving
+            const custoTotalSelecionado = useMemo(() => {
+                return localVendors.reduce((acc, v, i) => selectedVendorIndices.includes(i) ? acc + Number(v.value) : acc, 0);
+            }, [localVendors, selectedVendorIndices]);
+
+            const totalSaving = useMemo(() => {
+                if (!localBudget || localBudget <= 0) return 0;
+                return ((localBudget - custoTotalSelecionado) / localBudget) * 100;
+            }, [localBudget, custoTotalSelecionado]);
 
             const filteredInternalComms = useMemo(() => {
                 return comms.filter(c => {
@@ -730,14 +781,20 @@
                                         </thead>
                                         <tbody className="divide-y divide-slate-50">
                                             {filteredAgenda.map(ev => (
-                                                <tr key={ev.id} className={`hover:bg-slate-50 transition-colors group ${ev.hasVendor && ev.selectedVendorIdx >= 0 ? 'row-green-effect' : ''}`}>
+                                                <tr key={ev.id} className={`hover:bg-slate-50 transition-colors group ${(ev.selectedVendorIndices && ev.selectedVendorIndices.length > 0) || (ev.hasVendor && ev.selectedVendorIdx >= 0) ? 'row-green-effect' : ''}`}>
                                                     <td className="px-10 py-8 text-slate-800">
                                                         <div className="flex items-center gap-2">
                                                             <div className="font-black uppercase italic text-xl text-slate-800 leading-none">{ev.title}</div>
                                                             {ev.meetingLink && <a href={ev.meetingLink} target="_blank" title="Abrir Reunião" className="text-[#397394] hover:scale-110 transition-transform ml-1"><Icon name="video" size={16} /></a>}
+                                                            {ev.includeNPS && (
+                                                                <div className={`ml-2 flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${reguaUtils.getNPSCategory(ev.npsValue).bg} ${reguaUtils.getNPSCategory(ev.npsValue).text} border border-current shadow-sm`}>
+                                                                    <Icon name={reguaUtils.getNPSCategory(ev.npsValue).iconName} size={12}/> <span>NPS {ev.npsValue}</span>
+                                                                </div>
+                                                            )}
                                                         </div>
                                                         <div className="text-[9px] font-bold text-slate-400 uppercase mt-2 tracking-widest italic">
-                                                            {ev.sponsor} {ev.hasVendor && ev.selectedVendorIdx >= 0 && <span className="text-[#BED993] font-black uppercase ml-2">• Vendor Atribuído</span>}
+                                                            {ev.sponsor} 
+                                                            {((ev.selectedVendorIndices && ev.selectedVendorIndices.length > 0) || (ev.hasVendor && ev.selectedVendorIdx >= 0)) && <span className="text-[#BED993] font-black uppercase ml-2">• Fornecedores Atribuídos</span>}
                                                         </div>
                                                     </td>
                                                     <td className="px-10 py-8 text-center text-xs font-bold text-slate-500">{ev.date ? formatLocalDate(ev.date) : '--'}</td>
@@ -1221,59 +1278,166 @@
                         </div>
                     )}
 
-                    {/* MODAL PLANEJAMENTO */}
+                    {/* MODAL PLANEJAMENTO E AGENDA */}
                     {isModalAgendaOpen && (
                         <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[150] flex items-center justify-center p-4">
                             <div className="bg-white w-full max-w-4xl rounded-[2rem] sm:rounded-[3rem] p-6 sm:p-12 shadow-2xl modal-animate relative max-h-[90vh] overflow-y-auto custom-scroll">
                                 <button type="button" onClick={() => setIsModalAgendaOpen(false)} className="btn-close-modal"><Icon name="x" size={24} /></button>
                                 <h3 className="text-3xl font-black italic uppercase leading-none tracking-tighter mb-10 text-slate-800">PLANEJAMENTO DE ATIVIDADE</h3>
-                                <form onSubmit={handleSaveAgenda} className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                                    <div className="space-y-8">
-                                        <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold">Atividade</label><input name="atividade" defaultValue={editingAgenda?.title} required className="w-full bg-slate-50 border-none rounded-2xl p-5 font-bold outline-none shadow-sm" /></div>
-                                        <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold">Sponsor Responsável</label><input name="sponsor" defaultValue={editingAgenda?.sponsor} required className="w-full bg-slate-50 border-none rounded-2xl p-5 font-bold outline-none shadow-sm" /></div>
-                                        <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold">Descrição / Briefing</label><textarea name="description" defaultValue={editingAgenda?.description} rows="4" className="w-full bg-slate-50 border-none rounded-2xl p-5 font-bold outline-none shadow-sm resize-none"></textarea></div>
-                                        <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold">Link da Reunião</label><div className="relative"><input name="meetingLink" defaultValue={editingAgenda?.meetingLink} className="w-full bg-slate-50 border-none rounded-xl p-5 pl-12 font-bold outline-none shadow-sm" placeholder="URL da videoconferência" /><Icon name="video" size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" /></div></div>
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold">Data Prevista</label><input name="date" type="date" defaultValue={editingAgenda?.date} required className="w-full bg-slate-50 border-none rounded-xl p-4 font-bold outline-none shadow-sm" /></div>
-                                            <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold">Status</label><select name="status" defaultValue={editingAgenda?.status || 'Planejado'} className="w-full bg-slate-50 border-none rounded-xl p-4 font-black outline-none shadow-sm"><option>Planejado</option><option>Em Progresso</option><option>Concluído</option><option>Cancelado</option></select></div>
+                                
+                                <form onSubmit={handleSaveAgenda} className="space-y-10">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                                        <div className="space-y-8">
+                                            <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold">Atividade</label><input name="atividade" defaultValue={editingAgenda?.title} required className="w-full bg-slate-50 border-none rounded-2xl p-5 font-bold outline-none shadow-sm" /></div>
+                                            <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold">Sponsor Responsável</label><input name="sponsor" defaultValue={editingAgenda?.sponsor} required className="w-full bg-slate-50 border-none rounded-2xl p-5 font-bold outline-none shadow-sm" /></div>
+                                            <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold">Descrição / Briefing</label><textarea name="description" defaultValue={editingAgenda?.description} rows="4" className="w-full bg-slate-50 border-none rounded-2xl p-5 font-bold outline-none shadow-sm resize-none"></textarea></div>
+                                            <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold">Link da Reunião</label><div className="relative"><input name="meetingLink" defaultValue={editingAgenda?.meetingLink} className="w-full bg-slate-50 border-none rounded-xl p-5 pl-12 font-bold outline-none shadow-sm" placeholder="URL da videoconferência" /><Icon name="video" size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" /></div></div>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold">Data Prevista</label><input name="date" type="date" defaultValue={editingAgenda?.date} required className="w-full bg-slate-50 border-none rounded-xl p-4 font-bold outline-none shadow-sm" /></div>
+                                                <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold">Status</label><select name="status" defaultValue={editingAgenda?.status || 'Planejado'} className="w-full bg-slate-50 border-none rounded-xl p-4 font-black outline-none shadow-sm"><option>Planejado</option><option>Em Progresso</option><option>Concluído</option><option>Cancelado</option></select></div>
+                                            </div>
                                         </div>
-                                    </div>
-                                    <div className="space-y-8">
-                                        <div className="bg-[#f8fafc] p-6 sm:p-8 rounded-[2rem] sm:rounded-[3rem] border border-slate-100 shadow-inner">
-                                            <div className="mb-6"><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block">Budget Alocado (R$)</label><input type="number" value={localBudget} onChange={(e) => setLocalBudget(Number(e.target.value))} className="w-full bg-white border-none rounded-xl p-4 font-black text-xl outline-none shadow-sm" /></div>
-                                            <div className="space-y-4">
-                                                <div className="flex items-center justify-between"><label className="text-[10px] font-black uppercase text-slate-400">Fornecedores</label><button type="button" onClick={() => setVendorToggle(!vendorToggle)} className={`w-12 h-6 rounded-full transition-all relative ${vendorToggle ? 'bg-green-500' : 'bg-slate-300'}`}><div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${vendorToggle ? 'right-1' : 'left-1'}`}></div></button></div>
-                                                {vendorToggle && (
-                                                    <div className="space-y-3 mt-4">
-                                                        {localVendors.map((v, i) => (
-                                                            <div key={i} className={`flex flex-col gap-1 p-4 rounded-2xl transition-all border ${selectedVendorIdx === i ? 'bg-[#BED993]/20 border-[#BED993] shadow-sm' : 'border-slate-100 bg-white'}`}>
-                                                                <div className="flex gap-2 items-center">
-                                                                    <input value={v.name} onChange={(e) => {const n=[...localVendors]; n[i].name=e.target.value; setLocalVendors(n)}} placeholder={`Fornecedor ${i+1}`} className="flex-1 bg-slate-50 p-3 rounded-lg text-[10px] font-bold outline-none border border-slate-100" />
-                                                                    <input type="number" value={v.value} onChange={(e) => {const n=[...localVendors]; n[i].value=Number(e.target.value); setLocalVendors(n)}} className="w-20 sm:w-24 bg-slate-50 p-3 rounded-lg text-[10px] font-bold outline-none border border-slate-100" />
-                                                                    <button type="button" onClick={() => setSelectedVendorIdx(i)} className={`p-2 rounded-lg transition-all ${selectedVendorIdx === i ? 'bg-[#BED993] text-black shadow-inner' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}><Icon name="check" size={14} forceKey={`check-${selectedVendorIdx === i}`}/></button>
-                                                                    {localVendors.length > 1 && (
+                                        <div className="space-y-8">
+                                            <div className="bg-[#f8fafc] p-6 sm:p-8 rounded-[2rem] sm:rounded-[3rem] border border-slate-100 shadow-inner">
+                                                <div className="mb-6">
+                                                    <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block">Budget Alocado (R$)</label>
+                                                    <div className="relative">
+                                                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-black">R$</span>
+                                                        <input 
+                                                            type="text" 
+                                                            value={formatCurrency(localBudget)} 
+                                                            onChange={(e) => setLocalBudget(parseCurrency(e.target.value))} 
+                                                            className="w-full bg-white border-none rounded-xl p-4 pl-12 font-black text-xl outline-none shadow-sm" 
+                                                        />
+                                                    </div>
+                                                </div>
+                                                <div className="space-y-4">
+                                                    <div className="flex items-center justify-between"><label className="text-[10px] font-black uppercase text-slate-400">Fornecedores</label><button type="button" onClick={() => setVendorToggle(!vendorToggle)} className={`w-12 h-6 rounded-full transition-all relative ${vendorToggle ? 'bg-green-500' : 'bg-slate-300'}`}><div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${vendorToggle ? 'right-1' : 'left-1'}`}></div></button></div>
+                                                    {vendorToggle && (
+                                                        <div className="space-y-3 mt-4">
+                                                            {localVendors.map((v, i) => (
+                                                                <div key={i} className={`flex flex-col gap-1 p-4 rounded-2xl transition-all border ${selectedVendorIndices.includes(i) ? 'bg-[#BED993]/20 border-[#BED993] shadow-sm' : 'border-slate-100 bg-white'}`}>
+                                                                    <div className="flex gap-2 items-center">
+                                                                        <input value={v.name} onChange={(e) => {const n=[...localVendors]; n[i].name=e.target.value; setLocalVendors(n)}} placeholder={`Fornecedor ${i+1}`} className="flex-1 bg-slate-50 p-3 rounded-lg text-[10px] font-bold outline-none border border-slate-100" />
+                                                                        
+                                                                        <div className="relative w-24 sm:w-28 flex-shrink-0">
+                                                                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[10px] font-bold">R$</span>
+                                                                            <input 
+                                                                                type="text" 
+                                                                                value={formatCurrency(v.value)} 
+                                                                                onChange={(e) => {const n=[...localVendors]; n[i].value=parseCurrency(e.target.value); setLocalVendors(n)}} 
+                                                                                className="w-full bg-slate-50 p-3 pl-8 rounded-lg text-[10px] font-bold outline-none border border-slate-100" 
+                                                                            />
+                                                                        </div>
+                                                                        
+                                                                        <button type="button" onClick={() => toggleVendorSelection(i)} className={`p-2 rounded-lg transition-all ${selectedVendorIndices.includes(i) ? 'bg-[#BED993] text-black shadow-inner' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}>
+                                                                            <Icon name="check" size={14} forceKey={`check-${selectedVendorIndices.includes(i)}`}/>
+                                                                        </button>
+                                                                        
                                                                         <button type="button" onClick={() => {
                                                                             const n = localVendors.filter((_, idx) => idx !== i);
                                                                             setLocalVendors(n);
-                                                                            if(selectedVendorIdx === i) setSelectedVendorIdx(null);
-                                                                            else if(selectedVendorIdx > i) setSelectedVendorIdx(selectedVendorIdx - 1);
+                                                                            // Atualiza os indices marcados removendo o deletado e shiftando os maiores
+                                                                            let newIndices = selectedVendorIndices.filter(idx => idx !== i);
+                                                                            newIndices = newIndices.map(idx => idx > i ? idx - 1 : idx);
+                                                                            setSelectedVendorIndices(newIndices);
                                                                         }} className="p-2 text-rose-400 hover:text-rose-600 transition-colors">
                                                                             <Icon name="trash-2" size={16}/>
                                                                         </button>
-                                                                    )}
+                                                                    </div>
+                                                                    <div className="pl-1 mt-1">{renderIndividualSaving(v.value)}</div>
                                                                 </div>
-                                                                <div className="pl-1 mt-1">{renderBudgetLogic(v.value)}</div>
-                                                            </div>
-                                                        ))}
-                                                        <button type="button" onClick={() => setLocalVendors([...localVendors, { name: '', value: 0 }])} className="text-[#397394] text-[10px] font-black flex items-center gap-1 hover:underline mt-2">
-                                                            <Icon name="plus" size={14}/> ADICIONAR FORNECEDOR
-                                                        </button>
-                                                    </div>
-                                                )}
+                                                            ))}
+                                                            
+                                                            <button type="button" onClick={() => setLocalVendors([...localVendors, { name: '', value: 0 }])} className="text-[#397394] text-[10px] font-black flex items-center gap-1 hover:underline mt-2">
+                                                                <Icon name="plus" size={14}/> ADICIONAR FORNECEDOR
+                                                            </button>
+
+                                                            {/* Resumo Consolidado de Savings */}
+                                                            {selectedVendorIndices.length > 0 && localBudget > 0 && (
+                                                                <div className="mt-6 pt-6 border-t border-slate-200">
+                                                                    <div className="flex justify-between items-end">
+                                                                        <div>
+                                                                            <div className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Custo Total Selecionado</div>
+                                                                            <div className="text-xl font-black text-slate-800 tracking-tight">R$ {formatCurrency(custoTotalSelecionado)}</div>
+                                                                        </div>
+                                                                        <div className="text-right">
+                                                                            <div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mb-1">Impacto Final (Saving)</div>
+                                                                            {totalSaving > 0 && <span className="bg-emerald-100 text-emerald-700 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-tighter shadow-inner">{(totalSaving).toFixed(1)}% DE ECONOMIA</span>}
+                                                                            {totalSaving === 0 && <span className="bg-blue-100 text-blue-700 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-tighter shadow-inner">100% DO RECURSO</span>}
+                                                                            {totalSaving < 0 && <span className="bg-rose-100 text-rose-700 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-tighter shadow-inner">{Math.abs(totalSaving).toFixed(1)}% ACIMA DO ORÇADO</span>}
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </div>
                                         </div>
-                                        <button type="submit" className="w-full py-6 bg-black text-white rounded-[2rem] font-black uppercase text-xs tracking-[0.4em] active:scale-[0.98] shadow-2xl italic text-center">SALVAR PLANEJAMENTO</button>
                                     </div>
+                                    
+                                    {/* Linha do NPS (Full Width) */}
+                                    <div className="pt-8 border-t border-slate-100">
+                                        <div className="flex items-center justify-between bg-slate-50 p-4 rounded-2xl border border-slate-100 w-full md:w-1/2 mb-6">
+                                            <span className="text-[10px] font-black text-slate-400 uppercase">Incluir NPS?</span>
+                                            <button type="button" onClick={() => setIncludeAgendaNPS(!includeAgendaNPS)}
+                                                    className={`w-12 h-6 rounded-full transition-all relative ${includeAgendaNPS ? 'bg-indigo-600 shadow-lg shadow-indigo-100' : 'bg-slate-300'}`}>
+                                                <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${includeAgendaNPS ? 'left-7' : 'left-1'}`}></div>
+                                            </button>
+                                        </div>
+
+                                        {includeAgendaNPS && (
+                                            <div className="bg-slate-50 rounded-[2.5rem] p-10 border-2 border-indigo-100/50 animate-in zoom-in-95 duration-200 shadow-inner w-full">
+                                                <div className="flex items-center justify-between mb-8">
+                                                    <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest flex items-center gap-2">
+                                                        <Icon name="smile" size={18} className="text-green-500"/> Definir NPS da Agenda
+                                                    </h3>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase ${reguaUtils.getNPSCategory(agendaNPSValue).bg} ${reguaUtils.getNPSCategory(agendaNPSValue).text}`}>
+                                                            {reguaUtils.getNPSCategory(agendaNPSValue).label}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                
+                                                <div className="flex flex-wrap justify-between gap-2 md:flex-nowrap">
+                                                    {[...Array(11).keys()].map(num => {
+                                                        const cat = reguaUtils.getNPSCategory(num);
+                                                        return (
+                                                            <button key={num} type="button" onClick={() => setAgendaNPSValue(num)}
+                                                                className={`flex-1 min-w-[45px] flex flex-col items-center gap-2 p-3 rounded-2xl transition-all border-2 ${
+                                                                    agendaNPSValue === num 
+                                                                    ? `${cat.color} text-white border-transparent scale-110 shadow-xl z-10` 
+                                                                    : `bg-white ${cat.text} border-slate-100 hover:border-slate-300`
+                                                                }`}>
+                                                                <div className={agendaNPSValue === num ? 'text-white' : cat.text}>
+                                                                    <Icon name={cat.iconName} size={20} forceKey={`agenda-nps-${agendaNPSValue === num ? 'y'+num : 'n'+num}`} />
+                                                                </div>
+                                                                <span className="text-xs font-black">{num}</span>
+                                                            </button>
+                                                        );
+                                                    })}
+                                                </div>
+                                                
+                                                <div className="grid grid-cols-3 mt-6 pt-6 border-t border-slate-200/50">
+                                                    <div className="flex flex-col items-start gap-1">
+                                                        <div className="w-full h-1.5 bg-red-500 rounded-full mb-1"></div>
+                                                        <span className="text-[9px] font-black text-red-500 uppercase tracking-widest">Detratores (0-6)</span>
+                                                    </div>
+                                                    <div className="flex flex-col items-center gap-1">
+                                                        <div className="w-2/3 h-1.5 bg-teal-500 rounded-full mb-1"></div>
+                                                        <span className="text-[9px] font-black text-teal-600 uppercase tracking-widest">Neutros (7-8)</span>
+                                                    </div>
+                                                    <div className="flex flex-col items-end gap-1">
+                                                        <div className="w-2/3 h-1.5 bg-green-500 rounded-full mb-1"></div>
+                                                        <span className="text-[9px] font-black text-green-600 uppercase tracking-widest">Promotores (9-10)</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <button type="submit" className="w-full mt-4 py-6 bg-black text-white rounded-[2rem] font-black uppercase text-xs tracking-[0.4em] active:scale-[0.98] shadow-2xl italic text-center">SALVAR PLANEJAMENTO</button>
                                 </form>
                             </div>
                         </div>
