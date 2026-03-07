@@ -76,22 +76,27 @@
 
     <script type="text/babel" data-type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, onAuthStateChanged, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, doc, onSnapshot, deleteDoc, addDoc, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        const firebaseConfig = {
-            apiKey: "AIzaSyCRNpfVN3n_Ue9kocKSU7EGlp9ElBJWvRg",
-            authDomain: "u-voice-82837.firebaseapp.com",
-            projectId: "u-voice-82837",
-            storageBucket: "u-voice-82837.firebasestorage.app",
-            messagingSenderId: "363918476944",
-            appId: "1:363918476944:web:02fe7e523c4eed24abba15"
-        };
+        // Configuração segura para o ambiente Canvas
+        const firebaseConfig = typeof __firebase_config !== 'undefined' 
+            ? JSON.parse(__firebase_config) 
+            : {
+                apiKey: "AIzaSyCRNpfVN3n_Ue9kocKSU7EGlp9ElBJWvRg",
+                authDomain: "u-voice-82837.firebaseapp.com",
+                projectId: "u-voice-82837",
+                storageBucket: "u-voice-82837.firebasestorage.app",
+                messagingSenderId: "363918476944",
+                appId: "1:363918476944:web:02fe7e523c4eed24abba15"
+            };
 
         const firebaseApp = initializeApp(firebaseConfig);
         const auth = getAuth(firebaseApp);
         const db = getFirestore(firebaseApp);
-        const APP_ID_ROOT = 'u-voice-v26-gold';
+        
+        // Identificador dinâmico do app para o Canvas
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'u-voice-v26-gold';
 
         const { useState, useEffect, useMemo, useRef } = React;
 
@@ -111,14 +116,15 @@
         const ANALYSTS_LIST = ["Ariel Mori Dell Aringa", "Diego Francisco Rocha"];
         const CHANNELS_LIST = ["#news-ops-all-team", "#news-cx-team", "#news-analysis-team", "#news-onboarding-team", "#news-ops-leaders"];
 
-        // --- COMPONENTES AUXILIARES (FUNCTION DECLARATIONS NO TOPO) ---
+        // --- COMPONENTES AUXILIARES ---
         function Icon({ name, size = 18, className = "", forceKey }) {
             const iconRef = useRef(null);
             useEffect(() => {
                 if (window.lucide && iconRef.current) {
                     window.lucide.createIcons({ 
                         attrs: { class: className + " pointer-events-none", style: `width: ${size}px; height: ${size}px;` }, 
-                        name: name 
+                        name: name,
+                        root: iconRef.current.parentElement
                     });
                 }
             }, [name, size, className, forceKey]);
@@ -174,6 +180,31 @@
             return `${parts[2]}/${parts[1]}/${parts[0]}`;
         }
 
+        const reguaUtils = {
+            addDays: (date, days) => {
+                const d = new Date(date + 'T12:00:00');
+                d.setDate(d.getDate() + parseInt(days));
+                return d;
+            },
+            formatDate: (date) => date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' }),
+            getRawDate: (date) => {
+                if (!date) return "";
+                return new Date(date).toISOString().split('T')[0];
+            },
+            isToday: (someDate) => {
+                const today = new Date();
+                return someDate.getDate() === today.getDate() &&
+                       someDate.getMonth() === today.getMonth() &&
+                       someDate.getFullYear() === today.getFullYear();
+            },
+            getNPSCategory: (value) => {
+                if (value <= 6) return { label: 'Detratores', color: 'bg-red-500', text: 'text-red-500', bg: 'bg-red-50', iconName: 'frown' };
+                if (value <= 8) return { label: 'Neutros', color: 'bg-teal-500', text: 'text-teal-500', bg: 'bg-teal-50', iconName: 'meh' };
+                return { label: 'Promotores', color: 'bg-green-500', text: 'text-green-500', bg: 'bg-green-50', iconName: 'smile' };
+            },
+            MESES: ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
+        };
+
         function LineAreaChart({ data, title, color = "#397394", valueSuffix = "" }) {
             const chartHeight = 220; const chartWidth = 800;
             const paddingX = 40; const paddingY = 60;
@@ -221,16 +252,19 @@
             const [comms, setComms] = useState([]);
             const [agenda, setAgenda] = useState([]);
             const [externalComms, setExternalComms] = useState([]);
+            const [reguas, setReguas] = useState([]);
             const [message, setMessage] = useState("");
             
             const [isModalCommOpen, setIsModalCommOpen] = useState(false);
             const [isModalExternalOpen, setIsModalExternalOpen] = useState(false);
             const [isModalAgendaOpen, setIsModalAgendaOpen] = useState(false);
+            const [isReguaEditorOpen, setIsReguaEditorOpen] = useState(false);
             const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
             
             const [editingComm, setEditingComm] = useState(null);
             const [editingExternal, setEditingExternal] = useState(null);
             const [editingAgenda, setEditingAgenda] = useState(null);
+            const [editingReguaId, setEditingReguaId] = useState(null);
             const [targetDelete, setTargetDelete] = useState(null);
 
             const [allAnalysts, setAllAnalysts] = useState(ANALYSTS_LIST);
@@ -241,14 +275,14 @@
             const [selectedCountries, setSelectedCountries] = useState([]);
 
             const [sortOrder, setSortOrder] = useState('desc');
-            const [filterYear, setFilterYear] = useState("2026");
+            const [filterYear, setFilterYear] = useState(new Date().getFullYear().toString());
             const [filterMonth, setFilterMonth] = useState("Todos");
             
-            const [agendaFilterYear, setAgendaFilterYear] = useState("2026");
+            const [agendaFilterYear, setAgendaFilterYear] = useState(new Date().getFullYear().toString());
             const [agendaFilterMonth, setAgendaFilterMonth] = useState("Todos");
 
             const [extSortOrder, setExtSortOrder] = useState('desc');
-            const [extFilterYear, setExtFilterYear] = useState("2026");
+            const [extFilterYear, setExtFilterYear] = useState(new Date().getFullYear().toString());
             const [extFilterMonth, setExtFilterMonth] = useState("Todos");
             const [extFilterCountry, setExtFilterCountry] = useState("Todos");
 
@@ -256,24 +290,71 @@
             const [hasCoffee, setHasCoffee] = useState(false);
             const [vendorToggle, setVendorToggle] = useState(false);
             const [selectedVendorIdx, setSelectedVendorIdx] = useState(null);
-            const [localVendors, setLocalVendors] = useState([{ name: '', value: 0 }, { name: '', value: 0 }, { name: '', value: 0 }]);
+            const [localVendors, setLocalVendors] = useState([{ name: '', value: 0 }]);
+
+            const initialReguaForm = {
+                nome: '', objetivo: 'Engajamento', publico: 'Público Geral',
+                dataInicio: reguaUtils.getRawDate(new Date()), incluirNPS: false, valorNPS: 5,
+                passos: [{ titulo: '', canal: 'Email', delayDias: 0, briefing: '', concluido: false }]
+            };
+            const [reguaFormData, setReguaFormData] = useState(initialReguaForm);
+            
+            const [filterPublicoRegua, setFilterPublicoRegua] = useState('Todos');
+            const [filterMesRegua, setFilterMesRegua] = useState('Todos');
+            const [filterAnoRegua, setFilterAnoRegua] = useState(new Date().getFullYear().toString());
 
             const [sentCount, setSentCount] = useState(0);
             const [openedCount, setOpenedCount] = useState(0);
             const autoOpenRate = useMemo(() => (!sentCount || sentCount === 0) ? 0 : ((openedCount / sentCount) * 100).toFixed(1), [sentCount, openedCount]);
 
+            // Inicialização de Autenticação segura
             useEffect(() => {
-                const initAuth = async () => { try { await signInAnonymously(auth); } catch (e) { console.error(e); } };
+                const initAuth = async () => { 
+                    try { 
+                        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                            await signInWithCustomToken(auth, __initial_auth_token);
+                        } else {
+                            await signInAnonymously(auth); 
+                        }
+                    } catch (e) { 
+                        console.error(e); 
+                    } 
+                };
                 initAuth();
-                onAuthStateChanged(auth, (u) => { setUser(u); if (u) setMessage("Sistemas Ativos"); });
+                const unsubscribe = onAuthStateChanged(auth, (u) => { 
+                    setUser(u); 
+                    if (u) setMessage("Sistemas Ativos"); 
+                });
+                return () => unsubscribe();
             }, []);
 
+            // Carregamento de dados (Firestore)
             useEffect(() => {
                 if (!user) return;
-                const unsubC = onSnapshot(collection(db, 'artifacts', APP_ID_ROOT, 'public', 'data', 'comms'), (snap) => setComms(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
-                const unsubA = onSnapshot(collection(db, 'artifacts', APP_ID_ROOT, 'public', 'data', 'agenda'), (snap) => setAgenda(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
-                const unsubE = onSnapshot(collection(db, 'artifacts', APP_ID_ROOT, 'public', 'data', 'external'), (snap) => setExternalComms(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
-                return () => { unsubC(); unsubA(); unsubE(); };
+                
+                const commsRef = collection(db, 'artifacts', appId, 'public', 'data', 'comms');
+                const agendaRef = collection(db, 'artifacts', appId, 'public', 'data', 'agenda');
+                const extRef = collection(db, 'artifacts', appId, 'public', 'data', 'external');
+                const reguasRef = collection(db, 'artifacts', appId, 'public', 'data', 'reguas_planejamento');
+
+                const unsubC = onSnapshot(commsRef, 
+                    (snap) => setComms(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+                    (err) => console.error("Error loading comms:", err)
+                );
+                const unsubA = onSnapshot(agendaRef, 
+                    (snap) => setAgenda(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+                    (err) => console.error("Error loading agenda:", err)
+                );
+                const unsubE = onSnapshot(extRef, 
+                    (snap) => setExternalComms(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+                    (err) => console.error("Error loading external:", err)
+                );
+                const unsubR = onSnapshot(reguasRef, 
+                    (snap) => setReguas(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+                    (err) => console.error("Error loading reguas:", err)
+                );
+                
+                return () => { unsubC(); unsubA(); unsubE(); unsubR(); };
             }, [user]);
 
             // Handlers de Exclusão
@@ -285,7 +366,7 @@
             const executeDelete = async () => {
                 if (!targetDelete) return;
                 try { 
-                    await deleteDoc(doc(db, 'artifacts', APP_ID_ROOT, 'public', 'data', targetDelete.collection, targetDelete.id)); 
+                    await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', targetDelete.collection, targetDelete.id)); 
                     setMessage("Removido!"); 
                 } catch (e) { 
                     setMessage("Erro!"); 
@@ -304,10 +385,22 @@
                 if (ev) {
                     setEditingAgenda(ev); setLocalBudget(Number(ev.budget || 0)); setHasCoffee(ev.hasCoffee || false);
                     setVendorToggle(ev.hasVendor || false); setSelectedVendorIdx(ev.selectedVendorIdx >= 0 ? ev.selectedVendorIdx : null);
-                    setLocalVendors([{ name: ev.vendor1 || '', value: Number(ev.vendorValue1 || 0) }, { name: ev.vendor2 || '', value: Number(ev.vendorValue2 || 0) }, { name: ev.vendor3 || '', value: Number(ev.vendorValue3 || 0) }]);
+                    
+                    // Suporte a legado vs novo modelo dinamico de vendors
+                    if (ev.vendors && Array.isArray(ev.vendors)) {
+                        setLocalVendors(ev.vendors);
+                    } else if (ev.vendor1 !== undefined) {
+                        setLocalVendors([
+                            { name: ev.vendor1 || '', value: Number(ev.vendorValue1 || 0) },
+                            { name: ev.vendor2 || '', value: Number(ev.vendorValue2 || 0) },
+                            { name: ev.vendor3 || '', value: Number(ev.vendorValue3 || 0) }
+                        ]);
+                    } else {
+                        setLocalVendors([{ name: '', value: 0 }]);
+                    }
                 } else {
                     setEditingAgenda(null); setLocalBudget(0); setHasCoffee(false); setVendorToggle(false); setSelectedVendorIdx(null);
-                    setLocalVendors([{ name: '', value: 0 }, { name: '', value: 0 }, { name: '', value: 0 }]);
+                    setLocalVendors([{ name: '', value: 0 }]);
                 }
                 setIsModalAgendaOpen(true);
             };
@@ -322,8 +415,8 @@
                 const fd = new FormData(e.target);
                 const data = { title: fd.get('title'), channelName: fd.get('channelName'), date: fd.get('date'), postTime: fd.get('postTime'), editoria: fd.get('editoria'), analysts: selectedAnalysts, formats: selectedFormats, deliveryChannel: 'slack', status: fd.get('status'), population: Number(fd.get('population')) || 0, views: Number(fd.get('views') || 0), reactions: Number(fd.get('reactions') || 0), comments: Number(fd.get('comments') || 0), updatedAt: new Date().toISOString() };
                 setIsModalCommOpen(false);
-                if (editingComm) await updateDoc(doc(db, 'artifacts', APP_ID_ROOT, 'public', 'data', 'comms', editingComm.id), data);
-                else await addDoc(collection(db, 'artifacts', APP_ID_ROOT, 'public', 'data', 'comms'), data);
+                if (editingComm) await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'comms', editingComm.id), data);
+                else await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'comms'), data);
             };
 
             const handleSaveExternal = async (e) => {
@@ -331,25 +424,82 @@
                 const fd = new FormData(e.target);
                 const data = { title: fd.get('title'), analyst: fd.get('analyst'), objective: fd.get('objective'), commLink: fd.get('commLink'), countries: selectedCountries, date: fd.get('date'), postTime: fd.get('postTime'), status: fd.get('status'), sentCount: Number(fd.get('sentCount') || 0), openedCount: Number(fd.get('openedCount') || 0), openRate: autoOpenRate, updatedAt: new Date().toISOString() };
                 setIsModalExternalOpen(false);
-                if (editingExternal) await updateDoc(doc(db, 'artifacts', APP_ID_ROOT, 'public', 'data', 'external', editingExternal.id), data);
-                else await addDoc(collection(db, 'artifacts', APP_ID_ROOT, 'public', 'data', 'external'), data);
+                if (editingExternal) await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'external', editingExternal.id), data);
+                else await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'external'), data);
             };
 
             const handleSaveAgenda = async (e) => {
                 e.preventDefault();
                 const fd = new FormData(e.target);
-                const data = { title: fd.get('atividade'), date: fd.get('date'), sponsor: fd.get('sponsor'), description: fd.get('description'), meetingLink: fd.get('meetingLink'), status: fd.get('status'), budget: localBudget, hasCoffee: hasCoffee, hasVendor: vendorToggle, selectedVendorIdx: selectedVendorIdx !== null ? selectedVendorIdx : -1, vendor1: localVendors[0].name, vendorValue1: localVendors[0].value, vendor2: localVendors[1].name, vendorValue2: localVendors[1].value, vendor3: localVendors[2].name, vendorValue3: localVendors[2].value, updatedAt: new Date().toISOString() };
+                const data = { 
+                    title: fd.get('atividade'), date: fd.get('date'), sponsor: fd.get('sponsor'), 
+                    description: fd.get('description'), meetingLink: fd.get('meetingLink'), status: fd.get('status'), 
+                    budget: localBudget, hasCoffee: hasCoffee, hasVendor: vendorToggle, 
+                    selectedVendorIdx: selectedVendorIdx !== null ? selectedVendorIdx : -1, 
+                    vendors: localVendors, updatedAt: new Date().toISOString() 
+                };
                 setIsModalAgendaOpen(false);
-                if (editingAgenda) await updateDoc(doc(db, 'artifacts', APP_ID_ROOT, 'public', 'data', 'agenda', editingAgenda.id), data);
-                else await addDoc(collection(db, 'artifacts', APP_ID_ROOT, 'public', 'data', 'agenda'), data);
+                if (editingAgenda) await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'agenda', editingAgenda.id), data);
+                else await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'agenda'), data);
+            };
+
+            const handleSaveRegua = async (e) => {
+                e.preventDefault();
+                const data = { ...reguaFormData, updatedAt: new Date().toISOString() };
+                setIsReguaEditorOpen(false);
+                if (editingReguaId) await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'reguas_planejamento', editingReguaId), data);
+                else {
+                    data.createdAt = new Date().toISOString();
+                    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'reguas_planejamento'), data);
+                }
+                setEditingReguaId(null);
+                setReguaFormData(initialReguaForm);
+            };
+
+            const handleEditRegua = (regua) => {
+                setEditingReguaId(regua.id);
+                setReguaFormData({ ...regua });
+                setIsReguaEditorOpen(true);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            };
+
+            const toggleStepRegua = async (reguaId, reguaSteps, stepIdx) => {
+                const newSteps = [...reguaSteps];
+                newSteps[stepIdx].concluido = !newSteps[stepIdx].concluido;
+                await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'reguas_planejamento', reguaId), { passos: newSteps, updatedAt: new Date().toISOString() });
+            };
+
+            const calculateTimeline = (regua) => {
+                let current = 0;
+                const today = new Date();
+                today.setHours(0,0,0,0);
+
+                const steps = regua.passos.map(p => {
+                    current += parseInt(p.delayDias || 0);
+                    const dateObj = reguaUtils.addDays(regua.dataInicio, current);
+                    const dateStripped = new Date(dateObj);
+                    dateStripped.setHours(0,0,0,0);
+
+                    let status = 'Agendado';
+                    if (p.concluido) status = 'Enviado';
+                    else if (reguaUtils.isToday(dateObj)) status = 'Hoje';
+                    else if (dateStripped < today) status = 'Atrasado';
+
+                    return { ...p, dateObj, dateStr: reguaUtils.formatDate(dateObj), status };
+                });
+                
+                const lastDate = steps.length > 0 ? steps[steps.length - 1].dateStr : null;
+                const progress = Math.round((steps.filter(s => s.concluido).length / steps.length) * 100) || 0;
+
+                return { steps, lastDate, progress };
             };
 
             const renderBudgetLogic = (vendorValue) => {
-                if (!localBudget || !vendorValue || localBudget <= 0) return null;
-                const pct = (vendorValue / localBudget) * 100;
-                if (pct < 100) return <span className="text-[11px] font-black text-emerald-500 uppercase tracking-tighter">({(100 - pct).toFixed(1)}% de economia)</span>;
-                if (pct === 100) return <span className="text-[11px] font-black text-blue-500 uppercase tracking-tighter">(100% do recurso)</span>;
-                return <span className="text-[11px] font-black text-red-500 uppercase tracking-tighter">({(pct - 100).toFixed(1)}% acima do orçado)</span>;
+                if (!localBudget || localBudget <= 0 || !vendorValue) return null;
+                const saving = ((localBudget - vendorValue) / localBudget) * 100;
+                if (saving > 0) return <span className="text-[10px] font-black text-emerald-500 uppercase tracking-tighter">({saving.toFixed(1)}% de economia)</span>;
+                if (saving === 0) return <span className="text-[10px] font-black text-blue-500 uppercase tracking-tighter">(100% do recurso)</span>;
+                return <span className="text-[10px] font-black text-red-500 uppercase tracking-tighter">({Math.abs(saving).toFixed(1)}% acima do orçado)</span>;
             };
 
             const filteredInternalComms = useMemo(() => {
@@ -374,6 +524,23 @@
                     return d.getFullYear().toString() === agendaFilterYear && (agendaFilterMonth === "Todos" || d.getMonth().toString() === agendaFilterMonth);
                 }).sort((a, b) => new Date(b.date) - new Date(a.date));
             }, [agenda, agendaFilterYear, agendaFilterMonth]);
+
+            const filteredReguas = useMemo(() => {
+                return reguas.filter(r => {
+                    const date = new Date(r.dataInicio + 'T12:00:00');
+                    const mes = date.getMonth();
+                    const ano = date.getFullYear().toString();
+
+                    const matchPublico = filterPublicoRegua === 'Todos' || r.publico === filterPublicoRegua;
+                    const matchMes = filterMesRegua === 'Todos' || mes === parseInt(filterMesRegua);
+                    const matchAno = filterAnoRegua === 'Todos' || ano === filterAnoRegua;
+
+                    return matchPublico && matchMes && matchAno;
+                });
+            }, [reguas, filterPublicoRegua, filterMesRegua, filterAnoRegua]);
+
+            const publicosUnicos = ['Todos', ...new Set(reguas.map(r => r.publico))];
+            const anosUnicos = ['Todos', '2024', '2025', '2026'];
 
             const statsImpacto = useMemo(() => {
                 const sent = comms.filter(c => c.status === 'Enviado' && new Date(c.date).getFullYear().toString() === filterYear);
@@ -403,17 +570,19 @@
                     {message && <div className="message-box" onClick={() => setMessage("")}>{message}</div>}
                     <nav className="bg-white border-b px-4 sm:px-10 py-5 flex justify-between items-center sticky top-0 z-50 shadow-sm">
                         <div className="flex items-center gap-3"><UnicoLogo size={42} /><h1 className="text-xl sm:text-2xl font-black italic uppercase tracking-tighter leading-none text-slate-900">U-Voice</h1></div>
-                        <div className="flex bg-slate-100 p-1 rounded-full gap-1">
-                            {['comunicados', 'external', 'agenda', 'impacto'].map(tab => (
-                                <button key={tab} onClick={() => setActiveTab(tab)} className={`px-6 py-2.5 rounded-full text-[9px] sm:text-[10px] font-black uppercase transition-all whitespace-nowrap ${activeTab === tab ? 'bg-black text-white shadow-lg' : 'text-slate-400 hover:text-slate-600'}`}>{tab === 'external' ? 'Comm Externo' : tab}</button>
+                        <div className="flex bg-slate-100 p-1 rounded-full gap-1 overflow-x-auto max-w-full custom-scroll">
+                            {['comunicados', 'external', 'agenda', 'planejamento', 'impacto'].map(tab => (
+                                <button key={tab} onClick={() => setActiveTab(tab)} className={`px-4 sm:px-6 py-2.5 rounded-full text-[9px] sm:text-[10px] font-black uppercase transition-all whitespace-nowrap ${activeTab === tab ? 'bg-black text-white shadow-lg' : 'text-slate-400 hover:text-slate-600'}`}>
+                                    {tab === 'external' ? 'Comm Externo' : tab}
+                                </button>
                             ))}
                         </div>
                     </nav>
 
-                    <main className="max-w-7xl mx-auto px-6 sm:px-10 py-10 text-left">
+                    <main className="max-w-7xl mx-auto px-6 sm:px-10 py-10">
                         <header className="mb-12">
                             <h2 className="text-5xl sm:text-8xl font-black italic tracking-tighter leading-tight text-slate-900 uppercase">
-                                {activeTab === 'comunicados' ? 'flow.feed' : activeTab === 'external' ? 'Comm.Externo' : activeTab === 'agenda' ? 'next.steps' : 'impact.metrics'}
+                                {activeTab === 'comunicados' ? 'flow.feed' : activeTab === 'external' ? 'Comm.Externo' : activeTab === 'agenda' ? 'next.steps' : activeTab === 'planejamento' ? 'planejamento' : 'impact.metrics'}
                             </h2>
                             <p className="text-slate-400 font-black uppercase text-xs tracking-[0.4em] mt-4 ml-1 italic leading-none">Gestão Estratégica Operacional</p>
                         </header>
@@ -423,22 +592,25 @@
                                 <div className="flex flex-wrap items-center gap-3 mb-10 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm sticky top-[85px] z-40">
                                     <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 rounded-xl text-slate-400 border border-slate-100"><Icon name="filter" size={14} /><span className="text-[10px] font-black uppercase">Filtros</span></div>
                                     <button onClick={() => setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')} className="impact-filter"><Icon name={sortOrder === 'desc' ? "sort-desc" : "sort-asc"} size={14} /><span>{sortOrder === 'desc' ? 'Recentes' : 'Antigos'}</span></button>
-                                    <select value={filterYear} onChange={(e) => setFilterYear(e.target.value)} className="impact-filter"><option>2025</option><option>2026</option></select>
+                                    <select value={filterYear} onChange={(e) => setFilterYear(e.target.value)} className="impact-filter">
+                                        <option value="2025">2025</option>
+                                        <option value="2026">2026</option>
+                                    </select>
                                     <select value={filterMonth} onChange={(e) => setFilterMonth(e.target.value)} className="impact-filter"><option value="Todos">Mês: Todos</option>{MESES_MAP.map(m => <option key={m.val} value={m.val}>{m.label}</option>)}</select>
-                                    <button onClick={() => openCommModal()} className="ml-auto bg-[#397394] text-white px-8 py-4 rounded-2xl text-[10px] font-black uppercase flex items-center gap-2 shadow-xl hover:bg-[#2d5c78] transition-all"><Icon name="plus" size={14} /> Novo Comunicado</button>
+                                    <button onClick={() => openCommModal()} className="ml-auto bg-[#397394] text-white px-6 sm:px-8 py-3 sm:py-4 rounded-2xl text-[10px] font-black uppercase flex items-center gap-2 shadow-xl hover:bg-[#2d5c78] transition-all"><Icon name="plus" size={14} /> Novo Comunicado</button>
                                 </div>
-                                <div className="bg-white rounded-[3rem] border border-slate-100 overflow-hidden shadow-sm overflow-x-auto text-left">
+                                <div className="bg-white rounded-[2rem] sm:rounded-[3rem] border border-slate-100 overflow-hidden shadow-sm overflow-x-auto">
                                     <table className="w-full text-left min-w-[900px]">
-                                        <thead className="bg-slate-50 border-b text-slate-400 text-[10px] font-black uppercase tracking-widest italic text-left">
-                                            <tr><th className="px-10 py-6 text-left">Item / Editoria</th><th className="px-10 py-6 text-center">Data / Status</th><th className="px-10 py-6 text-center">Analistas / Canal</th><th className="px-10 py-6 text-right">Impact Score</th><th className="px-10 py-6 w-32"></th></tr>
+                                        <thead className="bg-slate-50 border-b text-slate-400 text-[10px] font-black uppercase tracking-widest italic">
+                                            <tr><th className="px-10 py-6">Item / Editoria</th><th className="px-10 py-6 text-center">Data / Status</th><th className="px-10 py-6 text-center">Analistas / Canal</th><th className="px-10 py-6 text-right">Impact Score</th><th className="px-10 py-6 w-32"></th></tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-50 text-slate-800">
                                             {filteredInternalComms.map(c => {
                                                 const isDelayed = checkIsDelayed(c.date, c.postTime, c.status);
                                                 return (
                                                     <tr key={c.id} className="hover:bg-slate-50/50 transition-colors group">
-                                                        <td className="px-10 py-8 text-left">
-                                                            <div className="flex items-center gap-4 text-left">
+                                                        <td className="px-10 py-8">
+                                                            <div className="flex items-center gap-4">
                                                                 <ChannelIndicator />
                                                                 <div>
                                                                     <div className="font-black uppercase italic text-lg text-slate-900 leading-none">{c.title}</div>
@@ -472,25 +644,47 @@
 
                         {activeTab === 'external' && (
                             <section className="animate-in fade-in duration-500">
-                                <div className="flex flex-wrap items-center gap-3 mb-10 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm sticky top-[85px] z-40 text-left">
+                                <div className="flex flex-wrap items-center gap-3 mb-10 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm sticky top-[85px] z-40">
                                     <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 rounded-xl text-slate-400 border border-slate-100"><Icon name="filter" size={14} /><span className="text-[10px] font-black uppercase">Filtros</span></div>
                                     <button onClick={() => setExtSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')} className="impact-filter"><Icon name={extSortOrder === 'desc' ? "sort-desc" : "sort-asc"} size={14} /><span>{extSortOrder === 'desc' ? 'Recentes' : 'Antigos'}</span></button>
-                                    <select value={extFilterYear} onChange={(e) => setExtFilterYear(e.target.value)} className="impact-filter"><option>2025</option><option>2026</option></select>
+                                    <select value={extFilterYear} onChange={(e) => setExtFilterYear(e.target.value)} className="impact-filter">
+                                        <option value="2025">2025</option>
+                                        <option value="2026">2026</option>
+                                    </select>
                                     <select value={extFilterMonth} onChange={(e) => setExtFilterMonth(e.target.value)} className="impact-filter"><option value="Todos">Mês: Todos</option>{MESES_MAP.map(m => <option key={m.val} value={m.val}>{m.label}</option>)}</select>
-                                    <button onClick={() => openExternalModal()} className="ml-auto bg-black text-white px-8 py-4 rounded-2xl text-[10px] font-black uppercase flex items-center gap-2 shadow-xl hover:bg-slate-800 transition-all"><Icon name="send" size={14} /> Novo Externo</button>
+                                    <button onClick={() => openExternalModal()} className="ml-auto bg-black text-white px-6 sm:px-8 py-3 sm:py-4 rounded-2xl text-[10px] font-black uppercase flex items-center gap-2 shadow-xl hover:bg-slate-800 transition-all"><Icon name="send" size={14} /> Novo Externo</button>
                                 </div>
-                                <div className="bg-white rounded-[3rem] border border-slate-100 overflow-hidden shadow-sm overflow-x-auto text-left">
+                                <div className="bg-white rounded-[2rem] sm:rounded-[3rem] border border-slate-100 overflow-hidden shadow-sm overflow-x-auto">
                                     <table className="w-full text-left min-w-[900px]">
-                                        <thead className="bg-slate-50 border-b text-slate-400 text-[10px] font-black uppercase tracking-widest italic text-left">
-                                            <tr><th className="px-10 py-6 text-left">Campanha / Objetivo</th><th className="px-10 py-6 text-center">Público (Países)</th><th className="px-10 py-6 text-center">Data / Status</th><th className="px-10 py-6 text-right">Open Rate</th><th className="px-10 py-6 w-32"></th></tr>
+                                        <thead className="bg-slate-50 border-b text-slate-400 text-[10px] font-black uppercase tracking-widest italic">
+                                            <tr><th className="px-10 py-6">Campanha / Objetivo</th><th className="px-10 py-6 text-center">Público (Países)</th><th className="px-10 py-6 text-center">Data / Status</th><th className="px-10 py-6 text-right">Open Rate</th><th className="px-10 py-6 w-32"></th></tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-50 text-slate-800">
                                             {filteredExternalComms.map(e => (
-                                                <tr key={e.id} className="hover:bg-slate-50/50 transition-colors group text-left">
-                                                    <td className="px-10 py-8"><div className="flex items-center gap-4 text-left"><AnalystAvatar name={e.analyst} /><div><div className="flex items-center gap-2 font-black uppercase italic text-lg text-slate-900 leading-none">{e.title}{e.commLink && <a href={e.commLink} target="_blank" className="text-slate-300 hover:text-blue-500"><Icon name="link" size={14} /></a>}</div><div className="text-[9px] font-bold text-slate-400 mt-1 uppercase tracking-wider">{e.objective || 'Sem objetivo'}</div><div className="text-[8px] font-black text-[#397394] mt-2 uppercase tracking-tighter">Analista: {e.analyst || '--'}</div></div></div></td>
-                                                    <td className="px-10 py-8 text-center text-left"><div className="flex flex-wrap justify-center gap-2">{e.countries?.map(c => <RoundFlag key={c} country={c} />)}</div></td>
-                                                    <td className="px-10 py-8 text-center text-[10px] font-bold"><div>{formatLocalDate(e.date)} {e.postTime || ''}</div><span className={`status-pill ${e.status === 'Enviado' ? 'status-sent' : e.status === 'Erro' ? 'status-error' : 'status-pending'}`}>{e.status}</span></td>
-                                                    <td className="px-10 py-8 text-right font-black text-2xl tracking-tighter text-slate-900">{e.openRate}% <div className="text-[8px] text-slate-300 font-bold uppercase tracking-widest mt-1">Base: {e.sentCount}</div></td>
+                                                <tr key={e.id} className="hover:bg-slate-50/50 transition-colors group">
+                                                    <td className="px-10 py-8">
+                                                        <div className="flex items-center gap-4">
+                                                            <AnalystAvatar name={e.analyst} />
+                                                            <div>
+                                                                <div className="flex items-center gap-2 font-black uppercase italic text-lg text-slate-900 leading-none">
+                                                                    {e.title}
+                                                                    {e.commLink && <a href={e.commLink} target="_blank" className="text-slate-300 hover:text-blue-500"><Icon name="link" size={14} /></a>}
+                                                                </div>
+                                                                <div className="text-[9px] font-bold text-slate-400 mt-1 uppercase tracking-wider">{e.objective || 'Sem objetivo'}</div>
+                                                                <div className="text-[8px] font-black text-[#397394] mt-2 uppercase tracking-tighter">Analista: {e.analyst || '--'}</div>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-10 py-8">
+                                                        <div className="flex flex-wrap justify-center gap-2">{e.countries?.map(c => <RoundFlag key={c} country={c} />)}</div>
+                                                    </td>
+                                                    <td className="px-10 py-8 text-center text-[10px] font-bold">
+                                                        <div>{formatLocalDate(e.date)} {e.postTime || ''}</div>
+                                                        <span className={`status-pill ${e.status === 'Enviado' ? 'status-sent' : e.status === 'Erro' ? 'status-error' : 'status-pending'}`}>{e.status}</span>
+                                                    </td>
+                                                    <td className="px-10 py-8 text-right font-black text-2xl tracking-tighter text-slate-900">
+                                                        {e.openRate}% <div className="text-[8px] text-slate-300 font-bold uppercase tracking-widest mt-1">Base: {e.sentCount}</div>
+                                                    </td>
                                                     <td className="px-10 py-8 text-right flex items-center justify-end gap-1">
                                                         <button onClick={() => openExternalModal(e)} className="p-3 text-slate-400 hover:text-blue-600 transition-colors"><Icon name="pencil" size={18} /></button>
                                                         <button onClick={() => promptDelete(e.id, 'external')} className="p-3 text-slate-400 hover:text-red-500 transition-colors"><Icon name="trash-2" size={18} /></button>
@@ -504,38 +698,52 @@
                         )}
 
                         {activeTab === 'impacto' && (
-                            <section className="animate-in fade-in duration-500 space-y-12 text-left">
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 text-left">
-                                    <div className="p-10 bg-white rounded-[3rem] border border-slate-100 shadow-sm"><div className="text-6xl font-black text-slate-900 tracking-tighter leading-none">{statsImpacto.totalPosts}</div><div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic">Total Posts</div></div>
-                                    <div className="p-10 bg-slate-900 rounded-[3rem] shadow-2xl relative overflow-hidden group hover:scale-[1.02] transition-all text-white"><div className="p-3 bg-white/10 rounded-xl w-fit mb-6 text-white mx-auto sm:mx-0"><Icon name="trending-up" size={26} /></div><div className="text-6xl font-black tracking-tighter leading-none">{statsImpacto.interactions}</div><div className="text-[9px] font-black uppercase text-slate-500 tracking-widest mt-4 italic">Interações</div></div>
-                                    <div className="p-10 bg-white rounded-[3rem] border border-slate-100 shadow-sm text-slate-900"><div className="text-6xl font-black text-slate-900 tracking-tighter leading-none">{statsImpacto.totalComments}</div><div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic">Comments</div></div>
-                                    <div className="p-10 bg-[#f8fafc] rounded-[3rem] border border-slate-100 shadow-sm text-slate-900"><div className="text-6xl font-black text-slate-900 tracking-tighter leading-none">{statsImpacto.avgScore}%</div><div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic">Score Engaja</div></div>
+                            <section className="animate-in fade-in duration-500 space-y-12">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                                    <div className="p-10 bg-white rounded-[2rem] sm:rounded-[3rem] border border-slate-100 shadow-sm"><div className="text-6xl font-black text-slate-900 tracking-tighter leading-none">{statsImpacto.totalPosts}</div><div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic">Total Posts</div></div>
+                                    <div className="p-10 bg-slate-900 rounded-[2rem] sm:rounded-[3rem] shadow-2xl relative overflow-hidden group hover:scale-[1.02] transition-all text-white"><div className="p-3 bg-white/10 rounded-xl w-fit mb-6 text-white"><Icon name="trending-up" size={26} /></div><div className="text-6xl font-black tracking-tighter leading-none">{statsImpacto.interactions}</div><div className="text-[9px] font-black uppercase text-slate-500 tracking-widest mt-4 italic">Interações</div></div>
+                                    <div className="p-10 bg-white rounded-[2rem] sm:rounded-[3rem] border border-slate-100 shadow-sm text-slate-900"><div className="text-6xl font-black text-slate-900 tracking-tighter leading-none">{statsImpacto.totalComments}</div><div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic">Comments</div></div>
+                                    <div className="p-10 bg-[#f8fafc] rounded-[2rem] sm:rounded-[3rem] border border-slate-100 shadow-sm text-slate-900"><div className="text-6xl font-black text-slate-900 tracking-tighter leading-none">{statsImpacto.avgScore}%</div><div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic">Score Engaja</div></div>
                                 </div>
-                                <div className="grid grid-cols-1 gap-8 text-left"><LineAreaChart title="Evolução de Comunicados (Volume Mensal)" data={statsImpacto.monthlyPosts} color="#397394" /><LineAreaChart title="Taxa de Engajamento Mensal (Curva Orgânica)" data={statsImpacto.monthlyEngagement} color="#F77D8D" valueSuffix="%" /></div>
+                                <div className="grid grid-cols-1 gap-8">
+                                    <LineAreaChart title="Evolução de Comunicados (Volume Mensal)" data={statsImpacto.monthlyPosts} color="#397394" />
+                                    <LineAreaChart title="Taxa de Engajamento Mensal (Curva Orgânica)" data={statsImpacto.monthlyEngagement} color="#F77D8D" valueSuffix="%" />
+                                </div>
                             </section>
                         )}
 
                         {activeTab === 'agenda' && (
-                            <section className="animate-in fade-in duration-500 text-left">
-                                <div className="flex flex-wrap items-center gap-3 mb-10 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm sticky top-[85px] z-40 text-left">
+                            <section className="animate-in fade-in duration-500">
+                                <div className="flex flex-wrap items-center gap-3 mb-10 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm sticky top-[85px] z-40">
                                     <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 rounded-xl text-slate-400 border border-slate-100"><Icon name="filter" size={14} /><span className="text-[10px] font-black uppercase">Filtros Agenda</span></div>
-                                    <select value={agendaFilterYear} onChange={(e) => setAgendaFilterYear(e.target.value)} className="impact-filter"><option>2025</option><option>2026</option></select>
+                                    <select value={agendaFilterYear} onChange={(e) => setAgendaFilterYear(e.target.value)} className="impact-filter">
+                                        <option value="2025">2025</option>
+                                        <option value="2026">2026</option>
+                                    </select>
                                     <select value={agendaFilterMonth} onChange={(e) => setAgendaFilterMonth(e.target.value)} className="impact-filter"><option value="Todos">Mês: Todos</option>{MESES_MAP.map(m => <option key={m.val} value={m.val}>{m.label}</option>)}</select>
-                                    <button onClick={() => openAgendaModal()} className="ml-auto bg-[#397394] text-white px-8 py-4 rounded-2xl text-[10px] font-black uppercase flex items-center justify-center gap-2 shadow-xl hover:bg-[#2d5c78] transition-all text-left"><Icon name="calendar" size={14} /> Novo Planejamento</button>
+                                    <button onClick={() => openAgendaModal()} className="ml-auto bg-[#397394] text-white px-6 sm:px-8 py-3 sm:py-4 rounded-2xl text-[10px] font-black uppercase flex items-center justify-center gap-2 shadow-xl hover:bg-[#2d5c78] transition-all"><Icon name="calendar" size={14} /> Novo Planejamento</button>
                                 </div>
-                                <div className="bg-white rounded-[3rem] border border-slate-100 overflow-hidden shadow-sm overflow-x-auto text-slate-700 text-left">
+                                <div className="bg-white rounded-[2rem] sm:rounded-[3rem] border border-slate-100 overflow-hidden shadow-sm overflow-x-auto text-slate-700">
                                     <table className="w-full text-left min-w-[750px]">
-                                        <thead className="bg-slate-50 border-b text-slate-400 text-[10px] font-black uppercase tracking-widest italic text-left">
-                                            <tr><th className="px-10 py-6 text-left">Atividade / Sponsor</th><th className="px-10 py-6 text-center">Data</th><th className="px-10 py-6 text-center text-left">STATUS</th><th className="px-10 py-6 w-32"></th></tr>
+                                        <thead className="bg-slate-50 border-b text-slate-400 text-[10px] font-black uppercase tracking-widest italic">
+                                            <tr><th className="px-10 py-6">Atividade / Sponsor</th><th className="px-10 py-6 text-center">Data</th><th className="px-10 py-6 text-center">STATUS</th><th className="px-10 py-6 w-32"></th></tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-50">
                                             {filteredAgenda.map(ev => (
-                                                <tr key={ev.id} className={`hover:bg-slate-50 transition-colors group ${ev.hasVendor && ev.selectedVendorIdx >= 0 ? 'row-green-effect' : ''} text-left`}>
-                                                    <td className="px-10 py-8 text-slate-800 text-left"><div className="flex items-center gap-2 text-left"><div className="font-black uppercase italic text-xl text-slate-800 leading-none text-left">{ev.title}</div>{ev.meetingLink && <a href={ev.meetingLink} target="_blank" title="Abrir Reunião" className="text-[#397394] hover:scale-110 transition-transform ml-1"><Icon name="video" size={16} /></a>}</div><div className="text-[9px] font-bold text-slate-400 uppercase mt-2 tracking-widest italic text-left">{ev.sponsor} {ev.hasVendor && ev.selectedVendorIdx >= 0 && <span className="text-[#BED993] font-black uppercase ml-2">• Vendor Atribuído</span>}</div></td>
+                                                <tr key={ev.id} className={`hover:bg-slate-50 transition-colors group ${ev.hasVendor && ev.selectedVendorIdx >= 0 ? 'row-green-effect' : ''}`}>
+                                                    <td className="px-10 py-8 text-slate-800">
+                                                        <div className="flex items-center gap-2">
+                                                            <div className="font-black uppercase italic text-xl text-slate-800 leading-none">{ev.title}</div>
+                                                            {ev.meetingLink && <a href={ev.meetingLink} target="_blank" title="Abrir Reunião" className="text-[#397394] hover:scale-110 transition-transform ml-1"><Icon name="video" size={16} /></a>}
+                                                        </div>
+                                                        <div className="text-[9px] font-bold text-slate-400 uppercase mt-2 tracking-widest italic">
+                                                            {ev.sponsor} {ev.hasVendor && ev.selectedVendorIdx >= 0 && <span className="text-[#BED993] font-black uppercase ml-2">• Vendor Atribuído</span>}
+                                                        </div>
+                                                    </td>
                                                     <td className="px-10 py-8 text-center text-xs font-bold text-slate-500">{ev.date ? formatLocalDate(ev.date) : '--'}</td>
-                                                    <td className="px-10 py-8 text-center text-left"><span className="px-4 py-1.5 bg-blue-50 text-blue-700 text-[9px] font-black uppercase rounded-full">{ev.status}</span></td>
+                                                    <td className="px-10 py-8 text-center"><span className="px-4 py-1.5 bg-blue-50 text-blue-700 text-[9px] font-black uppercase rounded-full">{ev.status}</span></td>
                                                     <td className="px-10 py-8 text-right flex items-center justify-end gap-1">
-                                                        <button onClick={() => openAgendaModal(ev)} className="p-3 hover:text-blue-600 transition-all text-left"><Icon name="pencil" size={18} /></button>
+                                                        <button onClick={() => openAgendaModal(ev)} className="p-3 hover:text-blue-600 transition-all"><Icon name="pencil" size={18} /></button>
                                                         <button onClick={() => promptDelete(ev.id, 'agenda')} className="p-3 hover:text-red-500 transition-all text-slate-700"><Icon name="trash-2" size={18} /></button>
                                                     </td>
                                                 </tr>
@@ -545,34 +753,388 @@
                                 </div>
                             </section>
                         )}
+
+                        {activeTab === 'planejamento' && (
+                            <section className="animate-in fade-in duration-500">
+                                <div className="flex flex-wrap items-center justify-between gap-3 mb-10 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm sticky top-[85px] z-40">
+                                    <div className="flex items-center gap-4">
+                                        <div className="bg-slate-900 p-2.5 rounded-xl">
+                                            <Icon name="trending-up" size={24} className="text-white" />
+                                        </div>
+                                        <h2 className="text-xl font-black tracking-tight text-slate-900 uppercase">The Comms Journey</h2>
+                                    </div>
+                                    <button onClick={() => { if(isReguaEditorOpen) { setIsReguaEditorOpen(false); setEditingReguaId(null); } else setIsReguaEditorOpen(true); }}
+                                            className={`${isReguaEditorOpen ? 'bg-slate-100 text-slate-500' : 'bg-slate-900 text-white'} px-6 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-all active:scale-95`}>
+                                        {isReguaEditorOpen ? 'Fechar Editor' : <><Icon name="plus" size={18}/> Novo Planejamento</>}
+                                    </button>
+                                </div>
+
+                                {!isReguaEditorOpen && (
+                                    <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm flex flex-wrap items-end gap-6 mb-12">
+                                        <div className="flex-1 min-w-[200px] space-y-1.5">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Público / Segmento</label>
+                                            <div className="relative">
+                                                <select value={filterPublicoRegua} onChange={e => setFilterPublicoRegua(e.target.value)}
+                                                        className="w-full bg-slate-50 border-none text-sm font-bold rounded-xl px-4 py-3 outline-none appearance-none">
+                                                    {publicosUnicos.map(p => <option key={p} value={p}>{p}</option>)}
+                                                </select>
+                                                <Icon name="chevron-down" className="absolute right-3 top-3.5 text-slate-300 pointer-events-none" size={16}/>
+                                            </div>
+                                        </div>
+                                        <div className="w-48 space-y-1.5">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Mês de Início</label>
+                                            <div className="relative">
+                                                <select value={filterMesRegua} onChange={e => setFilterMesRegua(e.target.value)}
+                                                        className="w-full bg-slate-50 border-none text-sm font-bold rounded-xl px-4 py-3 outline-none appearance-none">
+                                                    <option value="Todos">Todos os Meses</option>
+                                                    {reguaUtils.MESES.map((mes, idx) => <option key={idx} value={idx}>{mes}</option>)}
+                                                </select>
+                                                <Icon name="chevron-down" className="absolute right-3 top-3.5 text-slate-300 pointer-events-none" size={16}/>
+                                            </div>
+                                        </div>
+                                        <div className="w-32 space-y-1.5">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Ano</label>
+                                            <div className="relative">
+                                                <select value={filterAnoRegua} onChange={e => setFilterAnoRegua(e.target.value)}
+                                                        className="w-full bg-slate-50 border-none text-sm font-bold rounded-xl px-4 py-3 outline-none appearance-none">
+                                                    {anosUnicos.map(ano => <option key={ano} value={ano}>{ano}</option>)}
+                                                </select>
+                                                <Icon name="chevron-down" className="absolute right-3 top-3.5 text-slate-300 pointer-events-none" size={16}/>
+                                            </div>
+                                        </div>
+                                        <div className="bg-indigo-50 text-indigo-600 px-4 py-3 rounded-xl text-xs font-black uppercase">
+                                            {filteredReguas.length} Resultados
+                                        </div>
+                                    </div>
+                                )}
+
+                                {isReguaEditorOpen && (
+                                    <div className="bg-white rounded-[2.5rem] border border-slate-100 p-10 shadow-2xl animate-in fade-in duration-300 mb-12">
+                                        <h2 className="text-2xl font-black mb-10 flex items-center gap-2 text-slate-900 tracking-tight">
+                                            <Icon name="settings" className="text-indigo-500" size={24} /> {editingReguaId ? 'Editar Planejamento' : 'Novo Fluxo Estratégico'}
+                                        </h2>
+                                        
+                                        <form onSubmit={handleSaveRegua} className="space-y-10">
+                                            <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+                                                <div className="space-y-2">
+                                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Nome da Campanha</label>
+                                                    <input required value={reguaFormData.nome} onChange={e => setReguaFormData({...reguaFormData, nome: e.target.value})} 
+                                                           className="w-full bg-slate-50 border-slate-100 rounded-xl p-3.5 outline-none focus:ring-2 focus:ring-indigo-500/10 transition-all" placeholder="Ex: Onboarding Q1" />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Público</label>
+                                                    <input required value={reguaFormData.publico} onChange={e => setReguaFormData({...reguaFormData, publico: e.target.value})} 
+                                                           className="w-full bg-slate-50 border-slate-100 rounded-xl p-3.5 outline-none" placeholder="Ex: Segmento A" />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Data Inicial</label>
+                                                    <input type="date" value={reguaFormData.dataInicio} onChange={e => setReguaFormData({...reguaFormData, dataInicio: e.target.value})} 
+                                                           className="w-full bg-slate-50 border-slate-100 rounded-xl p-3.5 outline-none" />
+                                                </div>
+                                                <div className="space-y-2 flex flex-col justify-end">
+                                                    <div className="flex items-center justify-between bg-slate-50 p-3.5 rounded-xl border border-slate-100">
+                                                        <span className="text-[10px] font-black text-slate-400 uppercase">Incluir NPS?</span>
+                                                        <button type="button" onClick={() => setReguaFormData({...reguaFormData, incluirNPS: !reguaFormData.incluirNPS})}
+                                                                className={`w-12 h-6 rounded-full transition-all relative ${reguaFormData.incluirNPS ? 'bg-indigo-600 shadow-lg shadow-indigo-100' : 'bg-slate-300'}`}>
+                                                            <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${reguaFormData.incluirNPS ? 'left-7' : 'left-1'}`}></div>
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {reguaFormData.incluirNPS && (
+                                                <div className="bg-slate-50 rounded-[2.5rem] p-10 border border-slate-100 animate-in zoom-in-95 duration-200 shadow-inner">
+                                                    <div className="flex items-center justify-between mb-8">
+                                                        <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest flex items-center gap-2">
+                                                            <Icon name="smile" size={18} className="text-green-500"/> Definir NPS do Planejamento
+                                                        </h3>
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-[10px] font-black text-slate-400 uppercase">Status:</span>
+                                                            <span className={`px-4 py-1 rounded-full text-[10px] font-black uppercase ${reguaUtils.getNPSCategory(reguaFormData.valorNPS).bg} ${reguaUtils.getNPSCategory(reguaFormData.valorNPS).text}`}>
+                                                                {reguaUtils.getNPSCategory(reguaFormData.valorNPS).label}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    <div className="flex flex-wrap md:flex-nowrap justify-between gap-2">
+                                                        {[...Array(11).keys()].map(num => {
+                                                            const cat = reguaUtils.getNPSCategory(num);
+                                                            return (
+                                                                <button key={num} type="button" onClick={() => setReguaFormData({...reguaFormData, valorNPS: num})}
+                                                                    className={`flex-1 min-w-[45px] flex flex-col items-center gap-2 p-3 rounded-2xl transition-all border-2 ${
+                                                                        reguaFormData.valorNPS === num 
+                                                                        ? `${cat.color} text-white border-transparent scale-110 shadow-xl z-10` 
+                                                                        : `bg-white ${cat.text} border-slate-100 hover:border-slate-300`
+                                                                    }`}>
+                                                                    <div className={reguaFormData.valorNPS === num ? 'text-white' : cat.text}>
+                                                                        <Icon name={cat.iconName} size={20} forceKey={reguaFormData.valorNPS === num ? 'y'+num : 'n'+num} />
+                                                                    </div>
+                                                                    <span className="text-xs font-black">{num}</span>
+                                                                </button>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                    
+                                                    <div className="grid grid-cols-3 mt-6 pt-6 border-t border-slate-200/50">
+                                                        <div className="flex flex-col items-start gap-1">
+                                                            <div className="w-full h-1.5 bg-red-500 rounded-full mb-1"></div>
+                                                            <span className="text-[9px] font-black text-red-500 uppercase tracking-widest">Detratores (0-6)</span>
+                                                        </div>
+                                                        <div className="flex flex-col items-center gap-1">
+                                                            <div className="w-2/3 h-1.5 bg-teal-500 rounded-full mb-1"></div>
+                                                            <span className="text-[9px] font-black text-teal-600 uppercase tracking-widest">Neutros (7-8)</span>
+                                                        </div>
+                                                        <div className="flex flex-col items-end gap-1">
+                                                            <div className="w-2/3 h-1.5 bg-green-500 rounded-full mb-1"></div>
+                                                            <span className="text-[9px] font-black text-green-600 uppercase tracking-widest">Promotores (9-10)</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            <div className="space-y-6">
+                                                <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                                                    <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                                        <Icon name="clock" size={16} /> Linha do Tempo de Disparos
+                                                    </h3>
+                                                    <button type="button" onClick={() => setReguaFormData({...reguaFormData, passos: [...reguaFormData.passos, { titulo: '', canal: 'Email', delayDias: 1, briefing: '', concluido: false }]})}
+                                                            className="text-indigo-600 text-[10px] font-black flex items-center gap-1 hover:underline">
+                                                        <Icon name="plus" size={14}/> ADICIONAR COMUNICADO
+                                                    </button>
+                                                </div>
+
+                                                <div className="grid gap-6">
+                                                    {reguaFormData.passos.map((p, i) => (
+                                                        <div key={i} className="bg-white border border-slate-100 p-8 rounded-[2rem] flex flex-col md:flex-row gap-8 items-start shadow-sm hover:border-indigo-100 transition-all">
+                                                            <div className="w-10 h-10 rounded-2xl bg-slate-900 text-white flex items-center justify-center font-black shrink-0 shadow-lg">{i+1}</div>
+                                                            <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-6">
+                                                                <div className="space-y-1.5">
+                                                                    <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Assunto / Chamada</label>
+                                                                    <input value={p.titulo} onChange={e => {const n = [...reguaFormData.passos]; n[i].titulo = e.target.value; setReguaFormData({...reguaFormData, passos: n});}} 
+                                                                           className="w-full bg-slate-50 border-slate-100 rounded-xl p-3 text-sm focus:bg-white transition-colors" placeholder="Ex: Boas-vindas" />
+                                                                </div>
+                                                                <div className="space-y-1.5">
+                                                                    <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Canal</label>
+                                                                    <select value={p.canal} onChange={e => {const n = [...reguaFormData.passos]; n[i].canal = e.target.value; setReguaFormData({...reguaFormData, passos: n});}}
+                                                                            className="w-full bg-slate-50 border-slate-100 rounded-xl p-3 text-sm">
+                                                                        <option>Email</option>
+                                                                        <option>WhatsApp</option>
+                                                                        <option>Push</option>
+                                                                        <option>Slack</option>
+                                                                    </select>
+                                                                </div>
+                                                                <div className="space-y-1.5">
+                                                                    <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Aguardar (Dias)</label>
+                                                                    <input type="number" min="0" value={p.delayDias} onChange={e => {const n = [...reguaFormData.passos]; n[i].delayDias = e.target.value; setReguaFormData({...reguaFormData, passos: n});}}
+                                                                           className="w-full bg-slate-50 border-slate-100 rounded-xl p-3 text-sm" />
+                                                                </div>
+                                                                <div className="md:col-span-3 space-y-1.5">
+                                                                    <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Briefing / Conteúdo</label>
+                                                                    <textarea value={p.briefing} onChange={e => {const n = [...reguaFormData.passos]; n[i].briefing = e.target.value; setReguaFormData({...reguaFormData, passos: n});}}
+                                                                              className="w-full bg-slate-50 border-slate-100 rounded-xl p-4 text-xs h-24 resize-none outline-none focus:bg-white transition-colors" placeholder="Descreva o objetivo desta comunicação..." />
+                                                                </div>
+                                                            </div>
+                                                            <button type="button" onClick={() => setReguaFormData({...reguaFormData, passos: reguaFormData.passos.filter((_, idx) => idx !== i)})}
+                                                                    className="p-2 text-slate-200 hover:text-rose-500 transition-colors pt-2"><Icon name="trash-2" size={20}/></button>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+
+                                            <div className="flex justify-end gap-4 pt-10 border-t border-slate-100">
+                                                <button type="button" onClick={() => { setIsReguaEditorOpen(false); setEditingReguaId(null); setReguaFormData(initialReguaForm); }} className="px-8 py-3 rounded-xl font-bold text-slate-400">Cancelar</button>
+                                                <button type="submit" className="bg-slate-900 text-white px-10 py-4 rounded-[1.5rem] font-black text-sm uppercase tracking-widest hover:bg-indigo-600 shadow-2xl transition-all">
+                                                    {editingReguaId ? 'Confirmar Alterações' : 'Publicar no Roadmap'}
+                                                </button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                )}
+
+                                <div className="space-y-12 mb-16">
+                                    {filteredReguas.map(regua => {
+                                        const { steps, lastDate, progress } = calculateTimeline(regua);
+                                        const nps = regua.incluirNPS ? reguaUtils.getNPSCategory(regua.valorNPS) : null;
+                                        
+                                        return (
+                                            <div key={regua.id} className="bg-white rounded-[3.5rem] border border-slate-100 overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-700 group">
+                                                <div className="px-10 py-10 border-b border-slate-50 flex flex-wrap items-center justify-between gap-8 bg-slate-50/20">
+                                                    <div className="flex items-center gap-8">
+                                                        <div className={`w-20 h-20 rounded-[2rem] flex items-center justify-center text-white shadow-2xl transform group-hover:scale-110 transition-transform ${regua.objetivo === 'Engajamento' ? 'bg-indigo-600 shadow-indigo-200' : 'bg-emerald-600 shadow-emerald-200'}`}>
+                                                            <Icon name={regua.objetivo === 'Engajamento' ? 'users' : 'target'} size={36} />
+                                                        </div>
+                                                        <div className="space-y-1.5">
+                                                            <div className="flex items-center gap-4">
+                                                                <h3 className="text-2xl font-black text-slate-900 tracking-tight">{regua.nome}</h3>
+                                                                {nps && (
+                                                                    <div className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-[11px] font-black uppercase ${nps.bg} ${nps.text} border-2 border-current shadow-sm`}>
+                                                                        <Icon name={nps.iconName} size={16}/> <span>NPS {regua.valorNPS}</span>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                            <div className="flex items-center gap-6 text-sm">
+                                                                <span className="font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                                                    <Icon name="users" size={16} className="text-indigo-400"/> {regua.publico}
+                                                                </span>
+                                                                <div className="flex items-center gap-3 bg-white px-4 py-1.5 rounded-full border border-slate-100 text-[11px] font-black text-slate-700 shadow-sm">
+                                                                    <Icon name="calendar" size={14} className="text-slate-300"/> 
+                                                                    {reguaUtils.formatDate(new Date(regua.dataInicio + 'T12:00:00'))} 
+                                                                    <Icon name="arrow-right" size={14} className="mx-1 text-slate-200"/> 
+                                                                    <span className="text-indigo-600">{lastDate}</span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="flex items-center gap-12">
+                                                        <div className="flex flex-col items-end gap-2">
+                                                            <div className="text-[11px] font-black text-slate-300 uppercase tracking-tighter">Status da Jornada</div>
+                                                            <div className="w-52 h-3 bg-white rounded-full border border-slate-100 overflow-hidden shadow-inner p-0.5">
+                                                                <div className="h-full bg-indigo-500 rounded-full transition-all duration-1000 ease-out shadow-lg" style={{ width: `${progress}%` }}></div>
+                                                            </div>
+                                                            <div className="text-[11px] font-black text-indigo-500 uppercase tracking-widest">{progress}% CONCLUÍDO</div>
+                                                        </div>
+                                                        <div className="flex items-center gap-3">
+                                                            <button onClick={() => handleEditRegua(regua)} className="p-3.5 text-slate-400 hover:text-white hover:bg-slate-900 rounded-[1.2rem] transition-all"><Icon name="edit-3" size={22}/></button>
+                                                            <button onClick={() => promptDelete(regua.id, 'reguas_planejamento')} className="p-3.5 text-slate-400 hover:text-white hover:bg-rose-500 rounded-[1.2rem] transition-all"><Icon name="trash-2" size={22}/></button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div className="p-12 overflow-x-auto custom-scroll">
+                                                    <div className="flex items-start gap-12 min-w-max">
+                                                        {steps.map((passo, idx) => (
+                                                            <React.Fragment key={idx}>
+                                                                <div className="w-80 flex-none relative">
+                                                                    <div className="mb-4 h-8 flex items-center gap-2">
+                                                                        {passo.status === 'Atrasado' && (
+                                                                            <div className="bg-rose-50 text-rose-500 text-[10px] font-black px-3 py-1.5 rounded-xl border-2 border-rose-100 animate-bounce flex items-center gap-1.5">
+                                                                                <Icon name="alert-triangle" size={12}/> EM ATRASO
+                                                                            </div>
+                                                                        )}
+                                                                        {passo.status === 'Hoje' && (
+                                                                            <div className="bg-indigo-50 text-indigo-600 text-[10px] font-black px-3 py-1.5 rounded-xl border-2 border-indigo-100 uppercase flex items-center gap-1.5 shadow-sm">
+                                                                                <Icon name="clock" size={12}/> HOJE
+                                                                            </div>
+                                                                        )}
+                                                                        {passo.status === 'Enviado' && (
+                                                                            <div className="bg-emerald-50 text-emerald-600 text-[10px] font-black px-3 py-1.5 rounded-xl border-2 border-emerald-100 uppercase flex items-center gap-1.5">
+                                                                                <Icon name="check" size={12}/> ENVIADO
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+
+                                                                    <div className={`p-8 rounded-[3rem] border-2 transition-all relative ${
+                                                                        passo.concluido ? 'border-emerald-100 bg-emerald-50/10 grayscale-[0.5]' : 
+                                                                        passo.status === 'Atrasado' ? 'border-rose-100 bg-white shadow-xl shadow-rose-50/50' : 'border-slate-50 bg-[#F8FAFC]/50 hover:bg-white hover:shadow-2xl'
+                                                                    }`}>
+                                                                        <div className="flex items-center justify-between mb-6">
+                                                                            <div className={`p-3 rounded-2xl shadow-sm ${
+                                                                                passo.canal === 'Email' ? 'bg-indigo-100 text-indigo-600' :
+                                                                                passo.canal === 'WhatsApp' ? 'bg-emerald-100 text-emerald-600' : 
+                                                                                passo.canal === 'Slack' ? 'bg-purple-100 text-purple-600' : 'bg-amber-100 text-amber-600'
+                                                                            }`}>
+                                                                                {passo.canal === 'Email' ? <Icon name="mail" size={22} /> : 
+                                                                                passo.canal === 'WhatsApp' ? <Icon name="message-square" size={22} /> : 
+                                                                                passo.canal === 'Slack' ? <Icon name="hash" size={22} /> : <Icon name="bell" size={22} />}
+                                                                            </div>
+                                                                            <button onClick={() => toggleStepRegua(regua.id, regua.passos, idx)}
+                                                                                className={`w-10 h-10 rounded-full border-2 flex items-center justify-center transition-all ${
+                                                                                    passo.concluido ? 'bg-emerald-500 border-emerald-500 text-white shadow-xl shadow-emerald-200' : 'bg-white border-slate-200 text-slate-200 hover:border-indigo-500 hover:text-indigo-500'
+                                                                                }`}>
+                                                                                <Icon name="check" size={18} forceKey={passo.concluido ? 'y'+idx : 'n'+idx} />
+                                                                            </button>
+                                                                        </div>
+                                                                        
+                                                                        <h4 className={`font-black text-base mb-3 leading-tight h-12 line-clamp-2 ${passo.concluido ? 'text-slate-400 line-through' : 'text-slate-900'}`}>{passo.titulo}</h4>
+                                                                        <p className="text-xs text-slate-400 leading-relaxed mb-8 line-clamp-2 h-8 italic">"{passo.briefing || 'Nenhum briefing cadastrado.'}"</p>
+                                                                        
+                                                                        <div className="flex items-center justify-between pt-6 border-t border-slate-50">
+                                                                            <div>
+                                                                                <span className="text-[10px] font-black text-slate-300 uppercase block mb-1 tracking-tighter">Data Prevista</span>
+                                                                                <span className="text-sm font-black text-slate-900">{passo.dateStr}</span>
+                                                                            </div>
+                                                                            <div className="bg-slate-900 text-[11px] font-black text-white px-3 py-1 rounded-full shadow-lg">
+                                                                                T + {passo.delayDias}D
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                                {idx < steps.length - 1 && (
+                                                                    <div className="self-center pt-10 text-slate-100">
+                                                                        <Icon name="chevron-right" size={32} />
+                                                                    </div>
+                                                                )}
+                                                            </React.Fragment>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-4 gap-8 pt-16 border-t border-slate-100">
+                                    <div className="bg-white p-8 rounded-[3rem] border border-slate-100 shadow-sm transition-all hover:shadow-xl group">
+                                        <div className="text-5xl font-black text-rose-500 group-hover:scale-110 transition-transform origin-left">
+                                            {reguas.reduce((acc, r) => acc + calculateTimeline(r).steps.filter(p => p.status === 'Atrasado').length, 0)}
+                                        </div>
+                                        <div className="text-[11px] font-black text-slate-400 uppercase tracking-widest mt-3">Ações Pendentes (Atrasadas)</div>
+                                    </div>
+                                    <div className="bg-white p-8 rounded-[3rem] border border-slate-100 shadow-sm transition-all hover:shadow-xl group">
+                                        <div className="text-5xl font-black text-indigo-600 group-hover:scale-110 transition-transform origin-left">
+                                            {reguas.reduce((acc, r) => acc + calculateTimeline(r).steps.filter(p => p.status === 'Hoje').length, 0)}
+                                        </div>
+                                        <div className="text-[11px] font-black text-slate-400 uppercase tracking-widest mt-3">Interações para o dia de hoje</div>
+                                    </div>
+                                    <div className="bg-white p-8 rounded-[3rem] border border-slate-100 shadow-sm transition-all hover:shadow-xl group">
+                                        <div className="text-5xl font-black text-emerald-500 group-hover:scale-110 transition-transform origin-left">
+                                            {reguas.reduce((acc, r) => acc + calculateTimeline(r).steps.filter(p => p.concluido).length, 0)}
+                                        </div>
+                                        <div className="text-[11px] font-black text-slate-400 uppercase tracking-widest mt-3">Total de envios realizados</div>
+                                    </div>
+                                    <div className="bg-slate-900 p-8 rounded-[3rem] shadow-2xl shadow-slate-200 transition-all hover:scale-[1.02]">
+                                        <div className="text-5xl font-black text-white">{reguas.length}</div>
+                                        <div className="text-[11px] font-black text-slate-400 uppercase tracking-widest mt-3">Réguas Estratégicas Ativas</div>
+                                    </div>
+                                </div>
+
+                                <div className="mt-8 bg-indigo-50/50 p-8 rounded-[2.5rem] border border-indigo-100 flex items-start gap-6 text-xs text-indigo-800 italic shadow-sm">
+                                    <Icon name="info" size={24} className="text-indigo-500 mt-1 shrink-0" />
+                                    <p className="leading-relaxed">
+                                        <strong>The Comms Journey:</strong> Esta é sua central de inteligência para orquestrar jornadas de comunicação. Planeje disparos multicanais, acompanhe o progresso em tempo real e utilize os indicadores de NPS para medir o impacto de cada estratégia.
+                                    </p>
+                                </div>
+                            </section>
+                        )}
                     </main>
 
                     {/* MODAL COMUNICADOS INTERNOS */}
                     {isModalCommOpen && (
-                        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[150] flex items-center justify-center p-2 sm:p-4 text-left">
-                            <div className="bg-white w-full max-w-4xl rounded-[3rem] p-12 shadow-2xl modal-animate relative max-h-[95vh] overflow-y-auto custom-scroll">
+                        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[150] flex items-center justify-center p-2 sm:p-4">
+                            <div className="bg-white w-full max-w-4xl rounded-[2rem] sm:rounded-[3rem] p-6 sm:p-12 shadow-2xl modal-animate relative max-h-[95vh] overflow-y-auto custom-scroll">
                                 <button type="button" onClick={() => setIsModalCommOpen(false)} className="btn-close-modal"><Icon name="x" size={24} /></button>
-                                <h3 className="text-3xl font-black italic uppercase leading-none tracking-tighter mb-10 text-slate-800 uppercase">registro de comunicação</h3>
-                                <form onSubmit={handleSaveComm} className="grid grid-cols-1 md:grid-cols-2 gap-10 text-left">
-                                    <div className="space-y-8 text-left">
+                                <h3 className="text-3xl font-black italic uppercase leading-none tracking-tighter mb-10 text-slate-800">registro de comunicação</h3>
+                                <form onSubmit={handleSaveComm} className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                                    <div className="space-y-8">
                                         <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold">Título Post</label><input name="title" defaultValue={editingComm?.title} required className="w-full bg-slate-50 border-none rounded-2xl p-5 font-bold text-lg outline-none shadow-sm" /></div>
                                         <div>
-                                            <div className="flex items-center justify-between gap-3 mb-3 text-left">
+                                            <div className="flex items-center justify-between gap-3 mb-3">
                                                 <label className="text-[10px] font-black uppercase text-slate-400 block font-bold">Analistas</label>
-                                                <button type="button" onClick={() => {const a = prompt("Nome do Novo Analista:"); if(a) setAllAnalysts(prev => [...prev, a])}} className="bg-yellow-400 p-2 rounded-lg text-black hover:scale-110 transition-transform shadow-lg flex items-center justify-center text-left">
+                                                <button type="button" onClick={() => {const a = prompt("Nome do Novo Analista:"); if(a) setAllAnalysts(prev => [...prev, a])}} className="bg-yellow-400 p-2 rounded-lg text-black hover:scale-110 transition-transform shadow-lg flex items-center justify-center">
                                                     <Icon name="plus" size={14} className="font-bold" />
                                                 </button>
                                             </div>
-                                            <div className="flex flex-wrap gap-2 text-left">
+                                            <div className="flex flex-wrap gap-2">
                                                 {allAnalysts.map(a => (
-                                                    <div key={a} onClick={() => toggleAnalyst(a)} className={`checkbox-flag ${selectedAnalysts.includes(a) ? 'active' : ''} text-left`}>
-                                                        <Icon name={selectedAnalysts.includes(a) ? "check-circle-2" : "circle"} size={14} className="text-left" forceKey={selectedAnalysts.includes(a) ? 'y' : 'n'} />
+                                                    <div key={a} onClick={() => toggleAnalyst(a)} className={`checkbox-flag ${selectedAnalysts.includes(a) ? 'active' : ''}`}>
+                                                        <Icon name={selectedAnalysts.includes(a) ? "check-circle-2" : "circle"} size={14} forceKey={selectedAnalysts.includes(a) ? 'y' : 'n'} />
                                                         {a}
                                                     </div>
                                                 ))}
                                             </div>
                                         </div>
-                                        <div className="space-y-4 text-left">
+                                        <div className="space-y-4">
                                             <label className="text-[10px] font-black uppercase text-slate-400 block font-bold">Canal de Envio (Padrão)</label>
                                             <div className="p-4 rounded-xl border-2 border-[#4A154B] bg-[#4A154B] text-white shadow-lg flex items-center justify-center gap-3">
                                                 <Icon name="slack" size={18} />
@@ -584,15 +1146,15 @@
                                             <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold">Hora</label><input name="postTime" type="time" defaultValue={editingComm?.postTime} required className="w-full bg-slate-50 border-none rounded-xl p-4 font-bold outline-none shadow-sm" /></div>
                                         </div>
                                     </div>
-                                    <div className="space-y-8 text-left">
-                                        <div className="bg-[#f8fafc] p-10 rounded-[3rem] border border-slate-100 space-y-8 shadow-inner text-center">
-                                            <div className="text-[10px] font-black uppercase text-[#397394] tracking-widest italic flex items-center justify-center gap-2 text-center text-left">Impacto Interno</div>
-                                            <div className="grid grid-cols-3 gap-4 text-left text-left">
-                                                <div><label className="text-[8px] uppercase text-slate-400 block italic text-center">Reach</label><input name="views" type="number" defaultValue={editingComm?.views || 0} className="w-full bg-white border border-slate-100 rounded-xl p-4 font-black text-center outline-none shadow-sm text-left" /></div>
-                                                <div><label className="text-[8px] uppercase text-slate-400 block italic text-center">Reações</label><input name="reactions" type="number" defaultValue={editingComm?.reactions || 0} className="w-full bg-white border border-slate-100 rounded-xl p-4 font-black text-center outline-none shadow-sm text-left" /></div>
-                                                <div><label className="text-[8px] uppercase text-slate-400 block italic text-center">Comments</label><input name="comments" type="number" defaultValue={editingComm?.comments || 0} className="w-full bg-white border border-slate-100 rounded-xl p-4 font-black text-center outline-none shadow-sm text-left" /></div>
+                                    <div className="space-y-8">
+                                        <div className="bg-[#f8fafc] p-6 sm:p-10 rounded-[2rem] sm:rounded-[3rem] border border-slate-100 space-y-8 shadow-inner">
+                                            <div className="text-[10px] font-black uppercase text-[#397394] tracking-widest italic flex items-center justify-center gap-2">Impacto Interno</div>
+                                            <div className="grid grid-cols-3 gap-4">
+                                                <div><label className="text-[8px] uppercase text-slate-400 block italic text-center">Reach</label><input name="views" type="number" defaultValue={editingComm?.views || 0} className="w-full bg-white border border-slate-100 rounded-xl p-4 font-black text-center outline-none shadow-sm" /></div>
+                                                <div><label className="text-[8px] uppercase text-slate-400 block italic text-center">Reações</label><input name="reactions" type="number" defaultValue={editingComm?.reactions || 0} className="w-full bg-white border border-slate-100 rounded-xl p-4 font-black text-center outline-none shadow-sm" /></div>
+                                                <div><label className="text-[8px] uppercase text-slate-400 block italic text-center">Comments</label><input name="comments" type="number" defaultValue={editingComm?.comments || 0} className="w-full bg-white border border-slate-100 rounded-xl p-4 font-black text-center outline-none shadow-sm" /></div>
                                             </div>
-                                            <div className="mt-6 text-left text-left"><label className="text-[10px] font-black uppercase text-slate-400 block mb-2 italic text-left">Base Canal</label><input name="population" type="number" defaultValue={editingComm?.population} placeholder="Preencher" className="w-full bg-white border-none rounded-2xl p-4 font-black text-center outline-none shadow-sm text-left" /></div>
+                                            <div className="mt-6"><label className="text-[10px] font-black uppercase text-slate-400 block mb-2 italic text-center">Base Canal</label><input name="population" type="number" defaultValue={editingComm?.population} placeholder="Preencher" className="w-full bg-white border-none rounded-2xl p-4 font-black text-center outline-none shadow-sm" /></div>
                                         </div>
                                         <div className="grid grid-cols-2 gap-4">
                                             <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold">Editoria</label><select name="editoria" defaultValue={editingComm?.editoria || EDITORIAS_LIST[0]} className="w-full bg-slate-50 border-none rounded-xl p-4 font-black shadow-sm">{EDITORIAS_LIST.map(e => <option key={e}>{e}</option>)}</select></div>
@@ -608,36 +1170,36 @@
                     {/* MODAL EXTERNOS */}
                     {isModalExternalOpen && (
                         <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[150] flex items-center justify-center p-4">
-                            <div className="bg-white w-full max-w-4xl rounded-[3rem] p-12 shadow-2xl modal-animate relative max-h-[90vh] overflow-y-auto custom-scroll text-left">
-                                <button type="button" onClick={() => setIsModalExternalOpen(false)} className="btn-close-modal text-left"><Icon name="x" size={24} /></button>
-                                <h3 className="text-3xl font-black italic uppercase tracking-tighter mb-4 text-slate-800 text-left">REGISTRO DE COMUNICAÇÃO EXTERNA</h3>
-                                <p className="text-[10px] font-black uppercase text-[#397394] mb-10 tracking-[0.2em] italic text-left">Product: IDCloud Outbound Flow</p>
-                                <form onSubmit={handleSaveExternal} className="grid grid-cols-1 md:grid-cols-2 gap-12 text-left">
-                                    <div className="space-y-8 text-left text-left">
-                                        <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold text-left">Campanha (IDCloud)</label><input name="title" defaultValue={editingExternal?.title} required className="w-full bg-slate-50 border-none rounded-xl p-5 font-bold outline-none shadow-sm text-left" placeholder="Nome da comunicação" /></div>
+                            <div className="bg-white w-full max-w-4xl rounded-[2rem] sm:rounded-[3rem] p-6 sm:p-12 shadow-2xl modal-animate relative max-h-[90vh] overflow-y-auto custom-scroll">
+                                <button type="button" onClick={() => setIsModalExternalOpen(false)} className="btn-close-modal"><Icon name="x" size={24} /></button>
+                                <h3 className="text-3xl font-black italic uppercase tracking-tighter mb-4 text-slate-800">REGISTRO DE COMUNICAÇÃO EXTERNA</h3>
+                                <p className="text-[10px] font-black uppercase text-[#397394] mb-10 tracking-[0.2em] italic">Product: IDCloud Outbound Flow</p>
+                                <form onSubmit={handleSaveExternal} className="grid grid-cols-1 md:grid-cols-2 gap-12">
+                                    <div className="space-y-8">
+                                        <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold">Campanha (IDCloud)</label><input name="title" defaultValue={editingExternal?.title} required className="w-full bg-slate-50 border-none rounded-xl p-5 font-bold outline-none shadow-sm" placeholder="Nome da comunicação" /></div>
                                         <div>
-                                            <div className="flex items-center justify-between gap-3 mb-3 text-left"><label className="text-[10px] font-black uppercase text-slate-400 block font-bold text-left text-left">Analista Responsável</label><button type="button" onClick={() => {const a = prompt("Nome do Novo Analista:"); if(a) setAllExtAnalysts([...allExtAnalysts, a])}} className="text-[#397394] hover:scale-110 transition-transform text-left"><Icon name="plus-circle" size={18}/></button></div>
-                                            <select name="analyst" defaultValue={editingExternal?.analyst || allExtAnalysts[0]} className="w-full bg-slate-50 border-none rounded-xl p-5 font-black outline-none shadow-sm text-left text-left">{allExtAnalysts.map(a => <option key={a} value={a}>{a}</option>)}</select>
+                                            <div className="flex items-center justify-between gap-3 mb-3"><label className="text-[10px] font-black uppercase text-slate-400 block font-bold">Analista Responsável</label><button type="button" onClick={() => {const a = prompt("Nome do Novo Analista:"); if(a) setAllExtAnalysts([...allExtAnalysts, a])}} className="text-[#397394] hover:scale-110 transition-transform"><Icon name="plus-circle" size={18}/></button></div>
+                                            <select name="analyst" defaultValue={editingExternal?.analyst || allExtAnalysts[0]} className="w-full bg-slate-50 border-none rounded-xl p-5 font-black outline-none shadow-sm">{allExtAnalysts.map(a => <option key={a} value={a}>{a}</option>)}</select>
                                         </div>
-                                        <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block italic font-bold text-left text-left">Objetivo (Camada PMM)</label><input name="objective" defaultValue={editingExternal?.objective} required className="w-full bg-slate-50 border-none rounded-xl p-5 font-bold outline-none shadow-sm text-left" placeholder="Propósito da mensagem" /></div>
-                                        <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold text-left text-left">Link da Comunicação</label><div className="relative text-left"><input name="commLink" defaultValue={editingExternal?.commLink} className="w-full bg-slate-50 border-none rounded-xl p-5 pl-12 font-bold outline-none shadow-sm text-left text-left" placeholder="URL do conteúdo" /><Icon name="link" size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 text-left" /></div></div>
-                                        <div><div className="flex items-center gap-2 mb-3 text-left"><label className="text-[10px] font-black uppercase text-slate-400 block font-bold text-left">Público (Países)</label></div><div className="flex flex-wrap gap-2 text-left">{Object.keys(COUNTRIES_MAP).map(c => (<div key={c} onClick={() => setSelectedCountries(prev => prev.includes(c) ? prev.filter(x => x !== c) : [...prev, c])} className={`checkbox-flag ${selectedCountries.includes(c) ? 'active' : ''} text-left`}><RoundFlag country={c} /></div>))}</div></div>
+                                        <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block italic font-bold">Objetivo (Camada PMM)</label><input name="objective" defaultValue={editingExternal?.objective} required className="w-full bg-slate-50 border-none rounded-xl p-5 font-bold outline-none shadow-sm" placeholder="Propósito da mensagem" /></div>
+                                        <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold">Link da Comunicação</label><div className="relative"><input name="commLink" defaultValue={editingExternal?.commLink} className="w-full bg-slate-50 border-none rounded-xl p-5 pl-12 font-bold outline-none shadow-sm" placeholder="URL do conteúdo" /><Icon name="link" size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" /></div></div>
+                                        <div><div className="flex items-center gap-2 mb-3"><label className="text-[10px] font-black uppercase text-slate-400 block font-bold">Público (Países)</label></div><div className="flex flex-wrap gap-2">{Object.keys(COUNTRIES_MAP).map(c => (<div key={c} onClick={() => setSelectedCountries(prev => prev.includes(c) ? prev.filter(x => x !== c) : [...prev, c])} className={`checkbox-flag ${selectedCountries.includes(c) ? 'active' : ''}`}><RoundFlag country={c} /></div>))}</div></div>
                                     </div>
-                                    <div className="space-y-8 text-left text-left text-left">
-                                        <div className="grid grid-cols-2 gap-4 text-left">
-                                            <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold text-left text-left">Data Envio</label><input name="date" type="date" defaultValue={editingExternal?.date} required className="w-full bg-slate-50 border-none rounded-xl p-4 font-bold outline-none shadow-sm text-left text-left" /></div>
-                                            <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold text-left text-left">Hora Envio</label><input name="postTime" type="time" defaultValue={editingExternal?.postTime} required className="w-full bg-slate-50 border-none rounded-xl p-4 font-bold outline-none shadow-sm text-left text-left" /></div>
+                                    <div className="space-y-8">
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold">Data Envio</label><input name="date" type="date" defaultValue={editingExternal?.date} required className="w-full bg-slate-50 border-none rounded-xl p-4 font-bold outline-none shadow-sm" /></div>
+                                            <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold">Hora Envio</label><input name="postTime" type="time" defaultValue={editingExternal?.postTime} required className="w-full bg-slate-50 border-none rounded-xl p-4 font-bold outline-none shadow-sm" /></div>
                                         </div>
-                                        <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold text-left text-left">Status</label><select name="status" defaultValue={editingExternal?.status || 'Aguardando Envio'} className="w-full bg-slate-50 border-none rounded-xl p-4 font-black outline-none shadow-sm text-left text-left text-left">{EXTERNAL_STATUS_OPTIONS.map(s => <option key={s}>{s}</option>)}</select></div>
-                                        <div className="bg-[#f8fafc] p-10 rounded-[3rem] border border-slate-100 space-y-6 shadow-inner text-center">
-                                            <div className="text-[10px] font-black uppercase text-slate-400 tracking-widest italic flex items-center justify-center gap-2 text-left text-left">Performance Outbound</div>
-                                            <div className="grid grid-cols-2 gap-6 text-left text-left text-left">
-                                                <div><label className="text-[8px] font-black uppercase text-slate-400 mb-2 block text-center text-left text-left">Total Enviados</label><input name="sentCount" type="number" value={sentCount} onChange={(e) => setSentCount(Number(e.target.value))} className="w-full bg-white border-none rounded-xl p-4 font-black text-center text-xl outline-none shadow-sm text-center text-left text-left" /></div>
-                                                <div><label className="text-[8px] font-black uppercase text-slate-400 mb-2 block text-center text-left text-left">Total Aberturas</label><input name="openedCount" type="number" value={openedCount} onChange={(e) => setOpenedCount(Number(e.target.value))} className="w-full bg-white border-none rounded-xl p-4 font-black text-center text-xl outline-none shadow-sm text-center text-left text-left" /></div>
+                                        <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold">Status</label><select name="status" defaultValue={editingExternal?.status || 'Aguardando Envio'} className="w-full bg-slate-50 border-none rounded-xl p-4 font-black outline-none shadow-sm">{EXTERNAL_STATUS_OPTIONS.map(s => <option key={s}>{s}</option>)}</select></div>
+                                        <div className="bg-[#f8fafc] p-6 sm:p-10 rounded-[2rem] sm:rounded-[3rem] border border-slate-100 space-y-6 shadow-inner text-center">
+                                            <div className="text-[10px] font-black uppercase text-slate-400 tracking-widest italic flex items-center justify-center gap-2">Performance Outbound</div>
+                                            <div className="grid grid-cols-2 gap-6">
+                                                <div><label className="text-[8px] font-black uppercase text-slate-400 mb-2 block text-center">Total Enviados</label><input name="sentCount" type="number" value={sentCount} onChange={(e) => setSentCount(Number(e.target.value))} className="w-full bg-white border-none rounded-xl p-4 font-black text-center text-xl outline-none shadow-sm" /></div>
+                                                <div><label className="text-[8px] font-black uppercase text-slate-400 mb-2 block text-center">Total Aberturas</label><input name="openedCount" type="number" value={openedCount} onChange={(e) => setOpenedCount(Number(e.target.value))} className="w-full bg-white border-none rounded-xl p-4 font-black text-center text-xl outline-none shadow-sm" /></div>
                                             </div>
-                                            <div className="pt-4 border-t border-slate-200 text-center text-left text-left"><div className="text-[8px] font-black uppercase text-slate-400 mb-2 block text-left">Open Rate Calculado</div><div className="text-4xl font-black text-slate-900 text-left">{autoOpenRate}%</div></div>
+                                            <div className="pt-4 border-t border-slate-200"><div className="text-[8px] font-black uppercase text-slate-400 mb-2 block">Open Rate Calculado</div><div className="text-4xl font-black text-slate-900">{autoOpenRate}%</div></div>
                                         </div>
-                                        <button type="submit" className="w-full py-8 bg-black text-white rounded-[2.5rem] font-black uppercase text-xs tracking-[0.4em] active:scale-[0.98] shadow-2xl italic text-center text-left text-left text-left">REGISTRAR OUTBOUND</button>
+                                        <button type="submit" className="w-full py-8 bg-black text-white rounded-[2.5rem] font-black uppercase text-xs tracking-[0.4em] active:scale-[0.98] shadow-2xl italic text-center">REGISTRAR OUTBOUND</button>
                                     </div>
                                 </form>
                             </div>
@@ -647,13 +1209,13 @@
                     {/* MODAL EXCLUSÃO */}
                     {isDeleteModalOpen && (
                         <div className="fixed inset-0 bg-slate-900/90 backdrop-blur-sm z-[300] flex items-center justify-center p-4">
-                            <div className="bg-white w-full max-w-md rounded-[2.5rem] p-10 shadow-2xl modal-animate text-center text-left">
-                                <div className="w-20 h-20 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-6 text-center text-left text-left"><Icon name="trash-2" size={40} className="text-center" /></div>
-                                <h3 className="text-2xl font-black uppercase italic tracking-tighter text-slate-900 mb-2 leading-none text-center">Tem certeza?</h3>
-                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-10 italic text-center text-left">Esta ação é irreversível.</p>
-                                <div className="grid grid-cols-2 gap-4 mt-10 text-center">
-                                    <button onClick={() => setIsDeleteModalOpen(false)} className="py-4 bg-slate-100 text-slate-400 rounded-2xl font-black uppercase text-[10px] tracking-widest italic text-center text-left">Cancelar</button>
-                                    <button onClick={executeDelete} className="py-4 bg-red-500 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-red-600 shadow-lg shadow-red-500/20 italic text-center text-left">Excluir</button>
+                            <div className="bg-white w-full max-w-md rounded-[2.5rem] p-10 shadow-2xl modal-animate text-center">
+                                <div className="w-20 h-20 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-6"><Icon name="trash-2" size={40} /></div>
+                                <h3 className="text-2xl font-black uppercase italic tracking-tighter text-slate-900 mb-2 leading-none">Tem certeza?</h3>
+                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-10 italic">Esta ação é irreversível.</p>
+                                <div className="grid grid-cols-2 gap-4 mt-10">
+                                    <button onClick={() => setIsDeleteModalOpen(false)} className="py-4 bg-slate-100 text-slate-400 rounded-2xl font-black uppercase text-[10px] tracking-widest italic">Cancelar</button>
+                                    <button onClick={executeDelete} className="py-4 bg-red-500 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-red-600 shadow-lg shadow-red-500/20 italic">Excluir</button>
                                 </div>
                             </div>
                         </div>
@@ -661,47 +1223,64 @@
 
                     {/* MODAL PLANEJAMENTO */}
                     {isModalAgendaOpen && (
-                        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[150] flex items-center justify-center p-4 text-left">
-                            <div className="bg-white w-full max-w-4xl rounded-[3rem] p-12 shadow-2xl modal-animate relative max-h-[90vh] overflow-y-auto custom-scroll text-left">
-                                <button type="button" onClick={() => setIsModalAgendaOpen(false)} className="btn-close-modal text-left text-left"><Icon name="x" size={24} /></button>
-                                <h3 className="text-3xl font-black italic uppercase leading-none tracking-tighter mb-10 text-slate-800 text-left text-left">PLANEJAMENTO DE ATIVIDADE</h3>
-                                <form onSubmit={handleSaveAgenda} className="grid grid-cols-1 md:grid-cols-2 gap-10 text-left text-left">
-                                    <div className="space-y-8 text-left text-left text-left text-left">
-                                        <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold text-left text-left">Atividade</label><input name="atividade" defaultValue={editingAgenda?.title} required className="w-full bg-slate-50 border-none rounded-2xl p-5 font-bold outline-none shadow-sm text-left text-left text-left" /></div>
-                                        <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold text-left text-left">Sponsor Responsável</label><input name="sponsor" defaultValue={editingAgenda?.sponsor} required className="w-full bg-slate-50 border-none rounded-2xl p-5 font-bold outline-none shadow-sm text-left text-left text-left" /></div>
-                                        <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold text-left text-left text-left text-left">Descrição / Briefing</label><textarea name="description" defaultValue={editingAgenda?.description} rows="4" className="w-full bg-slate-50 border-none rounded-2xl p-5 font-bold outline-none shadow-sm resize-none text-left text-left text-left text-left"></textarea></div>
-                                        <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold text-left text-left">Link da Reunião</label><div className="relative text-left text-left text-left text-left"><input name="meetingLink" defaultValue={editingAgenda?.meetingLink} className="w-full bg-slate-50 border-none rounded-xl p-5 pl-12 font-bold outline-none shadow-sm text-left text-left text-left text-left" placeholder="URL da videoconferência" /><Icon name="video" size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 text-left text-left text-left" /></div></div>
-                                        <div className="grid grid-cols-2 gap-4 text-left text-left">
-                                            <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold text-left text-left text-left">Data Prevista</label><input name="date" type="date" defaultValue={editingAgenda?.date} required className="w-full bg-slate-50 border-none rounded-xl p-4 font-bold outline-none shadow-sm text-left text-left text-left" /></div>
-                                            <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold text-left text-left text-left">Status</label><select name="status" defaultValue={editingAgenda?.status || 'Planejado'} className="w-full bg-slate-50 border-none rounded-xl p-4 font-black outline-none shadow-sm text-left text-left text-left text-left"><option>Planejado</option><option>Em Progresso</option><option>Concluído</option><option>Cancelado</option></select></div>
+                        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[150] flex items-center justify-center p-4">
+                            <div className="bg-white w-full max-w-4xl rounded-[2rem] sm:rounded-[3rem] p-6 sm:p-12 shadow-2xl modal-animate relative max-h-[90vh] overflow-y-auto custom-scroll">
+                                <button type="button" onClick={() => setIsModalAgendaOpen(false)} className="btn-close-modal"><Icon name="x" size={24} /></button>
+                                <h3 className="text-3xl font-black italic uppercase leading-none tracking-tighter mb-10 text-slate-800">PLANEJAMENTO DE ATIVIDADE</h3>
+                                <form onSubmit={handleSaveAgenda} className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                                    <div className="space-y-8">
+                                        <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold">Atividade</label><input name="atividade" defaultValue={editingAgenda?.title} required className="w-full bg-slate-50 border-none rounded-2xl p-5 font-bold outline-none shadow-sm" /></div>
+                                        <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold">Sponsor Responsável</label><input name="sponsor" defaultValue={editingAgenda?.sponsor} required className="w-full bg-slate-50 border-none rounded-2xl p-5 font-bold outline-none shadow-sm" /></div>
+                                        <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold">Descrição / Briefing</label><textarea name="description" defaultValue={editingAgenda?.description} rows="4" className="w-full bg-slate-50 border-none rounded-2xl p-5 font-bold outline-none shadow-sm resize-none"></textarea></div>
+                                        <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold">Link da Reunião</label><div className="relative"><input name="meetingLink" defaultValue={editingAgenda?.meetingLink} className="w-full bg-slate-50 border-none rounded-xl p-5 pl-12 font-bold outline-none shadow-sm" placeholder="URL da videoconferência" /><Icon name="video" size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" /></div></div>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold">Data Prevista</label><input name="date" type="date" defaultValue={editingAgenda?.date} required className="w-full bg-slate-50 border-none rounded-xl p-4 font-bold outline-none shadow-sm" /></div>
+                                            <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold">Status</label><select name="status" defaultValue={editingAgenda?.status || 'Planejado'} className="w-full bg-slate-50 border-none rounded-xl p-4 font-black outline-none shadow-sm"><option>Planejado</option><option>Em Progresso</option><option>Concluído</option><option>Cancelado</option></select></div>
                                         </div>
                                     </div>
-                                    <div className="space-y-8 text-left text-left text-left text-left text-left">
-                                        <div className="bg-[#f8fafc] p-8 rounded-[3rem] border border-slate-100 shadow-inner text-left text-left text-left text-left">
-                                            <div className="mb-6 text-left text-left text-left text-left text-left text-left"><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block text-left text-left text-left">Budget Alocado (R$)</label><input type="number" value={localBudget} onChange={(e) => setLocalBudget(Number(e.target.value))} className="w-full bg-white border-none rounded-xl p-4 font-black text-xl outline-none shadow-sm text-left text-left text-left text-left" /></div>
-                                            <div className="space-y-4 text-left text-left text-left text-left text-left">
-                                                <div className="flex items-center justify-between text-left text-left text-left text-left text-left"><label className="text-[10px] font-black uppercase text-slate-400 text-left text-left text-left">Fornecedores</label><button type="button" onClick={() => setVendorToggle(!vendorToggle)} className={`w-12 h-6 rounded-full transition-all relative ${vendorToggle ? 'bg-green-500' : 'bg-slate-300'} text-left text-left text-left text-left text-left`}><div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${vendorToggle ? 'right-1' : 'left-1'} text-left text-left text-left text-left text-left`}></div></button></div>
-                                                {vendorToggle && localVendors.map((v, i) => (
-                                                    <div key={i} className={`flex flex-col gap-1 mb-4 text-left p-4 rounded-2xl transition-all border ${selectedVendorIdx === i ? 'bg-[#BED993]/20 border-[#BED993] shadow-sm' : 'border-transparent'} text-left text-left text-left text-left`}>
-                                                        <div className="flex gap-2 items-center text-left text-left text-left text-left text-left text-left">
-                                                            <input value={v.name} onChange={(e) => {const n=[...localVendors]; n[i].name=e.target.value; setLocalVendors(n)}} placeholder={`Fornecedor ${i+1}`} className="flex-1 bg-white p-3 rounded-lg text-[10px] font-bold outline-none border border-slate-100 text-left text-left text-left text-left text-left" />
-                                                            <input type="number" value={v.value} onChange={(e) => {const n=[...localVendors]; n[i].value=Number(e.target.value); setLocalVendors(n)}} className="w-24 bg-white p-3 rounded-lg text-[10px] font-bold outline-none border border-slate-100 text-left text-left text-left text-left text-left" />
-                                                            <button type="button" onClick={() => setSelectedVendorIdx(i)} className={`p-2 rounded-lg transition-all ${selectedVendorIdx === i ? 'bg-[#BED993] text-black shadow-inner' : 'bg-slate-200 text-slate-400 hover:bg-slate-300'} text-left text-left text-left text-left`}><Icon name="check" size={14}/></button>
-                                                        </div>
-                                                        <div className="pl-1 text-left text-left text-left text-left text-left text-left">{renderBudgetLogic(v.value)}</div>
+                                    <div className="space-y-8">
+                                        <div className="bg-[#f8fafc] p-6 sm:p-8 rounded-[2rem] sm:rounded-[3rem] border border-slate-100 shadow-inner">
+                                            <div className="mb-6"><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block">Budget Alocado (R$)</label><input type="number" value={localBudget} onChange={(e) => setLocalBudget(Number(e.target.value))} className="w-full bg-white border-none rounded-xl p-4 font-black text-xl outline-none shadow-sm" /></div>
+                                            <div className="space-y-4">
+                                                <div className="flex items-center justify-between"><label className="text-[10px] font-black uppercase text-slate-400">Fornecedores</label><button type="button" onClick={() => setVendorToggle(!vendorToggle)} className={`w-12 h-6 rounded-full transition-all relative ${vendorToggle ? 'bg-green-500' : 'bg-slate-300'}`}><div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${vendorToggle ? 'right-1' : 'left-1'}`}></div></button></div>
+                                                {vendorToggle && (
+                                                    <div className="space-y-3 mt-4">
+                                                        {localVendors.map((v, i) => (
+                                                            <div key={i} className={`flex flex-col gap-1 p-4 rounded-2xl transition-all border ${selectedVendorIdx === i ? 'bg-[#BED993]/20 border-[#BED993] shadow-sm' : 'border-slate-100 bg-white'}`}>
+                                                                <div className="flex gap-2 items-center">
+                                                                    <input value={v.name} onChange={(e) => {const n=[...localVendors]; n[i].name=e.target.value; setLocalVendors(n)}} placeholder={`Fornecedor ${i+1}`} className="flex-1 bg-slate-50 p-3 rounded-lg text-[10px] font-bold outline-none border border-slate-100" />
+                                                                    <input type="number" value={v.value} onChange={(e) => {const n=[...localVendors]; n[i].value=Number(e.target.value); setLocalVendors(n)}} className="w-20 sm:w-24 bg-slate-50 p-3 rounded-lg text-[10px] font-bold outline-none border border-slate-100" />
+                                                                    <button type="button" onClick={() => setSelectedVendorIdx(i)} className={`p-2 rounded-lg transition-all ${selectedVendorIdx === i ? 'bg-[#BED993] text-black shadow-inner' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}><Icon name="check" size={14} forceKey={`check-${selectedVendorIdx === i}`}/></button>
+                                                                    {localVendors.length > 1 && (
+                                                                        <button type="button" onClick={() => {
+                                                                            const n = localVendors.filter((_, idx) => idx !== i);
+                                                                            setLocalVendors(n);
+                                                                            if(selectedVendorIdx === i) setSelectedVendorIdx(null);
+                                                                            else if(selectedVendorIdx > i) setSelectedVendorIdx(selectedVendorIdx - 1);
+                                                                        }} className="p-2 text-rose-400 hover:text-rose-600 transition-colors">
+                                                                            <Icon name="trash-2" size={16}/>
+                                                                        </button>
+                                                                    )}
+                                                                </div>
+                                                                <div className="pl-1 mt-1">{renderBudgetLogic(v.value)}</div>
+                                                            </div>
+                                                        ))}
+                                                        <button type="button" onClick={() => setLocalVendors([...localVendors, { name: '', value: 0 }])} className="text-[#397394] text-[10px] font-black flex items-center gap-1 hover:underline mt-2">
+                                                            <Icon name="plus" size={14}/> ADICIONAR FORNECEDOR
+                                                        </button>
                                                     </div>
-                                                ))}
+                                                )}
                                             </div>
                                         </div>
-                                        <button type="submit" className="w-full py-6 bg-black text-white rounded-[2rem] font-black uppercase text-xs tracking-[0.4em] active:scale-[0.98] shadow-2xl italic text-center text-left text-left text-left text-left">SALVAR PLANEJAMENTO</button>
+                                        <button type="submit" className="w-full py-6 bg-black text-white rounded-[2rem] font-black uppercase text-xs tracking-[0.4em] active:scale-[0.98] shadow-2xl italic text-center">SALVAR PLANEJAMENTO</button>
                                     </div>
                                 </form>
                             </div>
                         </div>
                     )}
 
-                    <footer className="fixed bottom-0 w-full bg-white/95 backdrop-blur-md border-t border-slate-100 px-6 sm:px-10 py-5 flex flex-col sm:flex-row justify-between items-center text-[8px] sm:text-[9px] text-slate-300 font-black uppercase tracking-[0.4em] z-40 shadow-inner gap-2 text-left text-left text-left text-left text-left">
-                        <div className="flex items-center gap-3 text-slate-400 text-left text-left text-left text-left text-left text-left text-left text-left"><div className={`w-2.5 h-2.5 rounded-full ${user ? 'bg-green-500 shadow-[0_0_12px_rgba(34,197,94,0.3)]' : 'bg-slate-300 animate-pulse'} text-left text-left text-left text-left text-left text-left`}></div><span>© 2026 Unico Ops Hub. Ambiente Gold Ativo.</span></div>
+                    <footer className="fixed bottom-0 w-full bg-white/95 backdrop-blur-md border-t border-slate-100 px-6 sm:px-10 py-5 flex flex-col sm:flex-row justify-between items-center text-[8px] sm:text-[9px] text-slate-300 font-black uppercase tracking-[0.4em] z-40 shadow-inner gap-2">
+                        <div className="flex items-center gap-3 text-slate-400"><div className={`w-2.5 h-2.5 rounded-full ${user ? 'bg-green-500 shadow-[0_0_12px_rgba(34,197,94,0.3)]' : 'bg-slate-300 animate-pulse'}`}></div><span>© 2026 Unico Ops Hub. Ambiente Gold Ativo.</span></div>
                     </footer>
                 </div>
             );
