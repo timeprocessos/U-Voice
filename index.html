@@ -279,11 +279,15 @@
             const [editingReguaId, setEditingReguaId] = useState(null);
             const [targetDelete, setTargetDelete] = useState(null);
 
-            // Estados locais para cálculos instantâneos do formulário de Comunicado
+            // Estados locais para cálculos instantâneos do formulário de Comunicado (Interno)
             const [commReach, setCommReach] = useState(0);
             const [commReactions, setCommReactions] = useState(0);
             const [commComments, setCommComments] = useState(0);
             const [commPopulation, setCommPopulation] = useState(0);
+
+            // Estados locais para cálculos instantâneos do formulário de Comunicado (Externo)
+            const [monitorClicks, setMonitorClicks] = useState(false);
+            const [clickCount, setClickCount] = useState(0);
 
             const [allAnalysts, setAllAnalysts] = useState(ANALYSTS_LIST);
             const [allExtAnalysts, setAllExtAnalysts] = useState(ANALYSTS_LIST);
@@ -325,7 +329,8 @@
 
             const [sentCount, setSentCount] = useState(0);
             const [openedCount, setOpenedCount] = useState(0);
-            const autoOpenRate = useMemo(() => (!sentCount || sentCount === 0) ? 0 : ((openedCount / sentCount) * 100).toFixed(1), [sentCount, openedCount]);
+            const autoOpenRate = useMemo(() => (!sentCount || sentCount === 0) ? "0.00" : ((openedCount / sentCount) * 100).toFixed(2), [sentCount, openedCount]);
+            const autoCtrRate = useMemo(() => (!sentCount || sentCount === 0) ? "0.00" : ((clickCount / sentCount) * 100).toFixed(2), [sentCount, clickCount]);
 
             // Inicialização de Autenticação segura
             useEffect(() => {
@@ -405,11 +410,16 @@
                 setCommPopulation(Number(c?.population) || 0);
                 setIsModalCommOpen(true); 
             };
+
             const openExternalModal = (e = null) => { 
                 setEditingExternal(e); setSelectedCountries(e?.countries || []); 
-                setSentCount(e?.sentCount || 0); setOpenedCount(e?.openedCount || 0); 
+                setSentCount(e?.sentCount || 0); 
+                setOpenedCount(e?.openedCount || 0); 
+                setMonitorClicks(e?.monitorClicks || false);
+                setClickCount(Number(e?.clickCount) || 0);
                 setIsModalExternalOpen(true); 
             };
+
             const openAgendaModal = (ev = null) => {
                 if (ev) {
                     setEditingAgenda(ev); 
@@ -492,7 +502,23 @@
             const handleSaveExternal = async (e) => {
                 e.preventDefault();
                 const fd = new FormData(e.target);
-                const data = { title: fd.get('title'), analyst: fd.get('analyst'), objective: fd.get('objective'), commLink: fd.get('commLink'), countries: selectedCountries, date: fd.get('date'), postTime: fd.get('postTime'), status: fd.get('status'), sentCount: Number(fd.get('sentCount') || 0), openedCount: Number(fd.get('openedCount') || 0), openRate: autoOpenRate, updatedAt: new Date().toISOString() };
+                const data = { 
+                    title: fd.get('title'), 
+                    analyst: fd.get('analyst'), 
+                    objective: fd.get('objective'), 
+                    commLink: fd.get('commLink'), 
+                    countries: selectedCountries, 
+                    date: fd.get('date'), 
+                    postTime: fd.get('postTime'), 
+                    status: fd.get('status'), 
+                    sentCount: Number(fd.get('sentCount') || 0), 
+                    openedCount: Number(fd.get('openedCount') || 0), 
+                    openRate: autoOpenRate, 
+                    monitorClicks: monitorClicks,
+                    clickCount: monitorClicks ? Number(fd.get('clickCount') || 0) : 0,
+                    ctrRate: monitorClicks ? autoCtrRate : "0.00",
+                    updatedAt: new Date().toISOString() 
+                };
                 setIsModalExternalOpen(false);
                 if (editingExternal) await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'external', editingExternal.id), data);
                 else await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'external'), data);
@@ -649,6 +675,21 @@
                 return { totalPosts: sent.length, interactions: totalInteractions, totalComments, avgScore, avgTA, monthlyPosts, monthlyEngagement };
             }, [comms, filterYear]);
 
+            const statsExterno = useMemo(() => {
+                const ext = externalComms.filter(e => e.status === 'Enviado' && new Date(e.date).getFullYear().toString() === filterYear);
+                
+                const totalSent = ext.reduce((acc, e) => acc + (Number(e.sentCount) || 0), 0);
+                const totalOpened = ext.reduce((acc, e) => acc + (Number(e.openedCount) || 0), 0);
+                const avgOpenRate = totalSent > 0 ? ((totalOpened / totalSent) * 100).toFixed(2) : "0.00";
+
+                const monitoredCamps = ext.filter(e => e.monitorClicks);
+                const monitoredSent = monitoredCamps.reduce((acc, e) => acc + (Number(e.sentCount) || 0), 0);
+                const totalClicks = monitoredCamps.reduce((acc, e) => acc + (Number(e.clickCount) || 0), 0);
+                const avgCTR = monitoredSent > 0 ? ((totalClicks / monitoredSent) * 100).toFixed(2) : "0.00";
+
+                return { totalSent, totalOpened, avgOpenRate, avgCTR };
+            }, [externalComms, filterYear]);
+
             return (
                 <div className="min-h-screen pb-32 text-left">
                     {message && <div className="message-box" onClick={() => setMessage("")}>{message}</div>}
@@ -800,16 +841,49 @@
 
                         {activeTab === 'impacto' && (
                             <section className="animate-in fade-in duration-500 space-y-12">
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
-                                    <div className="p-8 bg-white rounded-[2rem] border border-slate-100 shadow-sm"><div className="text-5xl font-black text-slate-900 tracking-tighter leading-none">{statsImpacto.totalPosts}</div><div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic">Total Posts</div></div>
-                                    <div className="p-8 bg-slate-900 rounded-[2rem] shadow-2xl relative overflow-hidden group hover:scale-[1.02] transition-all text-white"><div className="p-2.5 bg-white/10 rounded-xl w-fit mb-4 text-white"><Icon name="trending-up" size={20} /></div><div className="text-5xl font-black tracking-tighter leading-none">{statsImpacto.interactions}</div><div className="text-[9px] font-black uppercase text-slate-500 tracking-widest mt-4 italic">Interações</div></div>
-                                    <div className="p-8 bg-white rounded-[2rem] border border-slate-100 shadow-sm text-slate-900"><div className="text-5xl font-black text-slate-900 tracking-tighter leading-none">{statsImpacto.totalComments}</div><div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic">Comments</div></div>
-                                    <div className="p-8 bg-[#f8fafc] rounded-[2rem] border border-slate-100 shadow-sm text-slate-900"><div className="text-5xl font-black text-indigo-600 tracking-tighter leading-none">{statsImpacto.avgScore}%</div><div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic">TER Médio</div></div>
-                                    <div className="p-8 bg-[#f8fafc] rounded-[2rem] border border-slate-100 shadow-sm text-slate-900"><div className="text-5xl font-black text-emerald-600 tracking-tighter leading-none">{statsImpacto.avgTA}%</div><div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic">TA Médio</div></div>
+                                <div>
+                                    <h3 className="text-sm sm:text-base font-black text-slate-800 uppercase tracking-widest mb-6 flex items-center gap-2">
+                                        📊 Performance Interna (Slack)
+                                    </h3>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
+                                        <div className="p-8 bg-white rounded-[2rem] border border-slate-100 shadow-sm"><div className="text-5xl font-black text-slate-900 tracking-tighter leading-none">{statsImpacto.totalPosts}</div><div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic">Total Posts</div></div>
+                                        <div className="p-8 bg-slate-900 rounded-[2rem] shadow-2xl relative overflow-hidden group hover:scale-[1.02] transition-all text-white"><div className="p-2.5 bg-white/10 rounded-xl w-fit mb-4 text-white"><Icon name="trending-up" size={20} /></div><div className="text-5xl font-black tracking-tighter leading-none">{statsImpacto.interactions}</div><div className="text-[9px] font-black uppercase text-slate-500 tracking-widest mt-4 italic">Interações</div></div>
+                                        <div className="p-8 bg-white rounded-[2rem] border border-slate-100 shadow-sm text-slate-900"><div className="text-5xl font-black text-slate-900 tracking-tighter leading-none">{statsImpacto.totalComments}</div><div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic">Comments</div></div>
+                                        <div className="p-8 bg-[#f8fafc] rounded-[2rem] border border-slate-100 shadow-sm text-slate-900"><div className="text-5xl font-black text-indigo-600 tracking-tighter leading-none">{statsImpacto.avgScore}%</div><div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic">TER Médio</div></div>
+                                        <div className="p-8 bg-[#f8fafc] rounded-[2rem] border border-slate-100 shadow-sm text-slate-900"><div className="text-5xl font-black text-emerald-600 tracking-tighter leading-none">{statsImpacto.avgTA}%</div><div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic">TA Médio</div></div>
+                                    </div>
+                                    <div className="grid grid-cols-1 gap-8 mt-8">
+                                        <LineAreaChart title="Evolução de Comunicados (Volume Mensal)" data={statsImpacto.monthlyPosts} color="#397394" />
+                                        <LineAreaChart title="Taxa de Engajamento Mensal (Curva Orgânica)" data={statsImpacto.monthlyEngagement} color="#F77D8D" valueSuffix="%" />
+                                    </div>
                                 </div>
-                                <div className="grid grid-cols-1 gap-8">
-                                    <LineAreaChart title="Evolução de Comunicados (Volume Mensal)" data={statsImpacto.monthlyPosts} color="#397394" />
-                                    <LineAreaChart title="Taxa de Engajamento Mensal (Curva Orgânica)" data={statsImpacto.monthlyEngagement} color="#F77D8D" valueSuffix="%" />
+
+                                <div className="flex items-center justify-center py-4">
+                                    <div className="w-full border-t-2 border-dashed border-slate-200"></div>
+                                </div>
+
+                                <div>
+                                    <h3 className="text-sm sm:text-base font-black text-slate-800 uppercase tracking-widest mb-6 flex items-center gap-2">
+                                        ✉️ Performance Externa (Outbound & NPS)
+                                    </h3>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                                        <div className="p-8 bg-white rounded-[2rem] border border-slate-100 shadow-sm">
+                                            <div className="text-5xl font-black text-slate-900 tracking-tighter leading-none">{statsExterno.totalSent}</div>
+                                            <div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic">Total Enviados</div>
+                                        </div>
+                                        <div className="p-8 bg-white rounded-[2rem] border border-slate-100 shadow-sm">
+                                            <div className="text-5xl font-black text-slate-900 tracking-tighter leading-none">{statsExterno.totalOpened}</div>
+                                            <div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic">Total Aberturas</div>
+                                        </div>
+                                        <div className="p-8 bg-[#f8fafc] rounded-[2rem] border border-slate-100 shadow-sm text-slate-900">
+                                            <div className="text-5xl font-black text-indigo-600 tracking-tighter leading-none">{statsExterno.avgOpenRate}%</div>
+                                            <div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic">Open Rate Médio</div>
+                                        </div>
+                                        <div className="p-8 bg-[#f8fafc] rounded-[2rem] border border-slate-100 shadow-sm text-slate-900">
+                                            <div className="text-5xl font-black text-emerald-600 tracking-tighter leading-none">{statsExterno.avgCTR}%</div>
+                                            <div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic">Taxa de Clique (CTR)</div>
+                                        </div>
+                                    </div>
                                 </div>
                             </section>
                         )}
@@ -1323,7 +1397,22 @@
                                             <select name="analyst" defaultValue={editingExternal?.analyst || allExtAnalysts[0]} className="w-full bg-slate-50 border-none rounded-xl p-5 font-black outline-none shadow-sm">{allExtAnalysts.map(a => <option key={a} value={a}>{a}</option>)}</select>
                                         </div>
                                         <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block italic font-bold">Objetivo (Camada PMM)</label><input name="objective" defaultValue={editingExternal?.objective} required className="w-full bg-slate-50 border-none rounded-xl p-5 font-bold outline-none shadow-sm" placeholder="Propósito da mensagem" /></div>
-                                        <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold">Link da Comunicação</label><div className="relative"><input name="commLink" defaultValue={editingExternal?.commLink} className="w-full bg-slate-50 border-none rounded-xl p-5 pl-12 font-bold outline-none shadow-sm" placeholder="URL do conteúdo" /><Icon name="link" size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" /></div></div>
+                                        
+                                        <div>
+                                            <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold">Link da Comunicação</label>
+                                            <div className="relative">
+                                                <input name="commLink" defaultValue={editingExternal?.commLink} className="w-full bg-slate-50 border-none rounded-xl p-5 pl-12 font-bold outline-none shadow-sm" placeholder="URL do conteúdo" />
+                                                <Icon name="link" size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" />
+                                            </div>
+                                            <div className="flex items-center justify-between bg-slate-50 p-3.5 rounded-xl border border-slate-100 mt-4">
+                                                <span className="text-[10px] font-black text-slate-400 uppercase">Monitorar Cliques/NPS?</span>
+                                                <button type="button" onClick={() => setMonitorClicks(!monitorClicks)}
+                                                        className={`w-12 h-6 rounded-full transition-all relative ${monitorClicks ? 'bg-indigo-600 shadow-lg shadow-indigo-100' : 'bg-slate-300'}`}>
+                                                    <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${monitorClicks ? 'left-7' : 'left-1'}`}></div>
+                                                </button>
+                                            </div>
+                                        </div>
+
                                         <div><div className="flex items-center gap-2 mb-3"><label className="text-[10px] font-black uppercase text-slate-400 block font-bold">Público (Países)</label></div><div className="flex flex-wrap gap-2">{Object.keys(COUNTRIES_MAP).map(c => (<div key={c} onClick={() => setSelectedCountries(prev => prev.includes(c) ? prev.filter(x => x !== c) : [...prev, c])} className={`checkbox-flag ${selectedCountries.includes(c) ? 'active' : ''}`}><RoundFlag country={c} /></div>))}</div></div>
                                     </div>
                                     <div className="space-y-8">
@@ -1332,14 +1421,30 @@
                                             <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold">Hora Envio</label><input name="postTime" type="time" defaultValue={editingExternal?.postTime} required className="w-full bg-slate-50 border-none rounded-xl p-4 font-bold outline-none shadow-sm" /></div>
                                         </div>
                                         <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold">Status</label><select name="status" defaultValue={editingExternal?.status || 'Aguardando Envio'} className="w-full bg-slate-50 border-none rounded-xl p-4 font-black outline-none shadow-sm">{EXTERNAL_STATUS_OPTIONS.map(s => <option key={s}>{s}</option>)}</select></div>
+                                        
                                         <div className="bg-[#f8fafc] p-6 sm:p-10 rounded-[2rem] sm:rounded-[3rem] border border-slate-100 space-y-6 shadow-inner text-center">
                                             <div className="text-[10px] font-black uppercase text-slate-400 tracking-widest italic flex items-center justify-center gap-2">Performance Outbound</div>
-                                            <div className="grid grid-cols-2 gap-6">
-                                                <div><label className="text-[8px] font-black uppercase text-slate-400 mb-2 block text-center">Total Enviados</label><input name="sentCount" type="number" value={sentCount} onChange={(e) => setSentCount(Number(e.target.value))} className="w-full bg-white border-none rounded-xl p-4 font-black text-center text-xl outline-none shadow-sm" /></div>
-                                                <div><label className="text-[8px] font-black uppercase text-slate-400 mb-2 block text-center">Total Aberturas</label><input name="openedCount" type="number" value={openedCount} onChange={(e) => setOpenedCount(Number(e.target.value))} className="w-full bg-white border-none rounded-xl p-4 font-black text-center text-xl outline-none shadow-sm" /></div>
+                                            <div className={`grid ${monitorClicks ? 'grid-cols-3' : 'grid-cols-2'} gap-4`}>
+                                                <div><label className="text-[8px] font-black uppercase text-slate-400 mb-2 block text-center">Total Enviados</label><input name="sentCount" type="number" value={sentCount} onChange={(e) => setSentCount(Number(e.target.value))} className="w-full bg-white border-none rounded-xl p-4 font-black text-center text-lg sm:text-xl outline-none shadow-sm" /></div>
+                                                <div><label className="text-[8px] font-black uppercase text-slate-400 mb-2 block text-center">Total Aberturas</label><input name="openedCount" type="number" value={openedCount} onChange={(e) => setOpenedCount(Number(e.target.value))} className="w-full bg-white border-none rounded-xl p-4 font-black text-center text-lg sm:text-xl outline-none shadow-sm" /></div>
+                                                {monitorClicks && (
+                                                    <div><label className="text-[8px] font-black uppercase text-slate-400 mb-2 block text-center">Total Cliques</label><input name="clickCount" type="number" value={clickCount} onChange={(e) => setClickCount(Number(e.target.value))} className="w-full bg-white border-none rounded-xl p-4 font-black text-center text-lg sm:text-xl outline-none shadow-sm" /></div>
+                                                )}
                                             </div>
-                                            <div className="pt-4 border-t border-slate-200"><div className="text-[8px] font-black uppercase text-slate-400 mb-2 block">Open Rate Calculado</div><div className="text-4xl font-black text-slate-900">{autoOpenRate}%</div></div>
+                                            <div className={`grid ${monitorClicks ? 'grid-cols-2' : 'grid-cols-1'} gap-4 pt-4 border-t border-slate-200`}>
+                                                <div className="text-center">
+                                                    <div className="text-[8px] font-black uppercase text-slate-400 mb-2 block">Open Rate Calculado</div>
+                                                    <div className="text-3xl sm:text-4xl font-black text-slate-900">{autoOpenRate}%</div>
+                                                </div>
+                                                {monitorClicks && (
+                                                    <div className="text-center border-l border-slate-200">
+                                                        <div className="text-[8px] font-black uppercase text-slate-400 mb-2 block">CTR Calculado</div>
+                                                        <div className="text-3xl sm:text-4xl font-black text-indigo-600">{autoCtrRate}%</div>
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
+
                                         <button type="submit" className="w-full py-8 bg-black text-white rounded-[2.5rem] font-black uppercase text-xs tracking-[0.4em] active:scale-[0.98] shadow-2xl italic text-center">REGISTRAR OUTBOUND</button>
                                     </div>
                                 </form>
