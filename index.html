@@ -279,6 +279,11 @@
             const [editingReguaId, setEditingReguaId] = useState(null);
             const [targetDelete, setTargetDelete] = useState(null);
 
+            const [commReach, setCommReach] = useState(0);
+            const [commReactions, setCommReactions] = useState(0);
+            const [commComments, setCommComments] = useState(0);
+            const [commPopulation, setCommPopulation] = useState(0);
+
             const [allAnalysts, setAllAnalysts] = useState(ANALYSTS_LIST);
             const [allExtAnalysts, setAllExtAnalysts] = useState(ANALYSTS_LIST);
             const [channelsList, setChannelsList] = useState(CHANNELS_LIST);
@@ -390,7 +395,16 @@
                 setTargetDelete(null);
             };
 
-            const openCommModal = (c = null) => { setEditingComm(c); setSelectedAnalysts(c?.analysts || []); setSelectedFormats(c?.formats || []); setIsModalCommOpen(true); };
+            const openCommModal = (c = null) => { 
+                setEditingComm(c); 
+                setSelectedAnalysts(c?.analysts || []); 
+                setSelectedFormats(c?.formats || []); 
+                setCommReach(Number(c?.views) || 0);
+                setCommReactions(Number(c?.reactions) || 0);
+                setCommComments(Number(c?.comments) || 0);
+                setCommPopulation(Number(c?.population) || 0);
+                setIsModalCommOpen(true); 
+            };
             const openExternalModal = (e = null) => { 
                 setEditingExternal(e); setSelectedCountries(e?.countries || []); 
                 setSentCount(e?.sentCount || 0); setOpenedCount(e?.openedCount || 0); 
@@ -452,7 +466,24 @@
             const handleSaveComm = async (e) => {
                 e.preventDefault();
                 const fd = new FormData(e.target);
-                const data = { title: fd.get('title'), channelName: fd.get('channelName'), date: fd.get('date'), postTime: fd.get('postTime'), editoria: fd.get('editoria'), analysts: selectedAnalysts, formats: selectedFormats, deliveryChannel: 'slack', status: fd.get('status'), population: Number(fd.get('population')) || 0, views: Number(fd.get('views') || 0), reactions: Number(fd.get('reactions') || 0), comments: Number(fd.get('comments') || 0), updatedAt: new Date().toISOString() };
+                const data = { 
+                    title: fd.get('title'), 
+                    commLink: fd.get('commLink'),
+                    channelName: fd.get('channelName'), 
+                    date: fd.get('date'), 
+                    postTime: fd.get('postTime'), 
+                    editoria: fd.get('editoria'), 
+                    analysts: selectedAnalysts, 
+                    formats: selectedFormats, 
+                    deliveryChannel: 'slack', 
+                    status: fd.get('status'), 
+                    population: Number(fd.get('population')) || 0, 
+                    views: Number(fd.get('views')) || 0, 
+                    reactions: Number(fd.get('reactions')) || 0, 
+                    comments: Number(fd.get('comments')) || 0, 
+                    notas: fd.get('notas') || '',
+                    updatedAt: new Date().toISOString() 
+                };
                 setIsModalCommOpen(false);
                 if (editingComm) await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'comms', editingComm.id), data);
                 else await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'comms'), data);
@@ -596,24 +627,24 @@
             const statsImpacto = useMemo(() => {
                 const sent = comms.filter(c => c.status === 'Enviado' && new Date(c.date).getFullYear().toString() === filterYear);
                 const totalPosts = sent.length;
-                const scoreSum = sent.reduce((acc, c) => {
-                    const pop = Number(c.population) || 0; if (pop === 0) return acc;
-                    return acc + (((Number(c.reactions || 0) * 1) + (Number(c.comments || 0) * 2)) / pop) * 100;
-                }, 0);
-                const avgScore = sent.length > 0 ? (scoreSum / sent.length).toFixed(1) : "0.0";
+                
+                const totalReach = sent.reduce((acc, c) => acc + (Number(c.views) || 0), 0);
+                const totalInteractions = sent.reduce((acc, c) => acc + (Number(c.reactions) || 0) + (Number(c.comments) || 0), 0);
+                const totalComments = sent.reduce((acc, c) => acc + (Number(c.comments) || 0), 0);
+                
+                const avgScore = totalReach > 0 ? ((totalInteractions / totalReach) * 100).toFixed(2) : "0.00";
+                
                 const monthlyPosts = {}; const monthlyEngagement = {};
                 MESES_ABREV.forEach((mes, idx) => {
                     const mPosts = sent.filter(c => new Date(c.date).getMonth() === idx);
                     monthlyPosts[mes] = mPosts.length;
                     if (mPosts.length > 0) {
-                        const mSum = mPosts.reduce((acc, c) => {
-                            const p = Number(c.population) || 0;
-                            return acc + (p === 0 ? 0 : (((Number(c.reactions) * 1) + (Number(c.comments) * 2)) / p) * 100);
-                        }, 0);
-                        monthlyEngagement[mes] = (mSum / mPosts.length).toFixed(1);
+                        const mReach = mPosts.reduce((acc, c) => acc + (Number(c.views) || 0), 0);
+                        const mInt = mPosts.reduce((acc, c) => acc + (Number(c.reactions) || 0) + (Number(c.comments) || 0), 0);
+                        monthlyEngagement[mes] = mReach > 0 ? ((mInt / mReach) * 100).toFixed(2) : 0;
                     } else monthlyEngagement[mes] = 0;
                 });
-                return { totalPosts: sent.length, interactions: sent.reduce((acc, c) => acc + (Number(c.reactions) || 0) + (Number(c.comments) || 0), 0), totalComments: sent.reduce((acc, c) => acc + (Number(c.comments) || 0), 0), avgScore, monthlyPosts, monthlyEngagement };
+                return { totalPosts: sent.length, interactions: totalInteractions, totalComments, avgScore, monthlyPosts, monthlyEngagement };
             }, [comms, filterYear]);
 
             return (
@@ -653,7 +684,7 @@
                                 <div className="bg-white rounded-[2rem] sm:rounded-[3rem] border border-slate-100 overflow-hidden shadow-sm overflow-x-auto">
                                     <table className="w-full text-left min-w-[900px]">
                                         <thead className="bg-slate-50 border-b text-slate-400 text-[10px] font-black uppercase tracking-widest italic">
-                                            <tr><th className="px-10 py-6">Item / Editoria</th><th className="px-10 py-6 text-center">Data / Status</th><th className="px-10 py-6 text-center">Analistas / Canal</th><th className="px-10 py-6 text-right">Impact Score</th><th className="px-10 py-6 w-32"></th></tr>
+                                            <tr><th className="px-10 py-6">Item / Editoria</th><th className="px-10 py-6 text-center">Data / Status</th><th className="px-10 py-6 text-center">Analistas / Canal</th><th className="px-10 py-6 text-right">TER / TA</th><th className="px-10 py-6 w-32"></th></tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-50 text-slate-800">
                                             {filteredInternalComms.map(c => {
@@ -664,7 +695,10 @@
                                                             <div className="flex items-center gap-4">
                                                                 <ChannelIndicator />
                                                                 <div>
-                                                                    <div className="font-black uppercase italic text-lg text-slate-900 leading-none">{c.title}</div>
+                                                                    <div className="flex items-center gap-2 font-black uppercase italic text-lg text-slate-900 leading-none">
+                                                                        {c.title}
+                                                                        {c.commLink && <a href={c.commLink} target="_blank" className="text-slate-300 hover:text-blue-500"><Icon name="link" size={14} /></a>}
+                                                                    </div>
                                                                     <div className="text-[9px] font-black text-[#397394] mt-1 bg-blue-50 px-2 py-0.5 rounded uppercase italic w-fit">{c.editoria}</div>
                                                                 </div>
                                                             </div>
@@ -677,8 +711,22 @@
                                                             </div>
                                                         </td>
                                                         <td className="px-10 py-8 text-center text-[10px] font-bold"><div>{c.analysts?.join(', ')}</div><span className="text-slate-400 italic">{c.channelName}</span></td>
-                                                        <td className="px-10 py-8 text-right font-black text-2xl tracking-tighter text-slate-900">
-                                                            {(() => { const pop = Number(c.population) || 0; if (pop === 0) return "0.0"; return ((((Number(c.reactions || 0) * 1) + (Number(c.comments || 0) * 2)) / pop) * 100).toFixed(1); })()}%
+                                                        <td className="px-10 py-8 text-right">
+                                                            <div className="font-black text-2xl tracking-tighter text-indigo-600">
+                                                                {(() => { 
+                                                                    const reach = Number(c.views) || 0; 
+                                                                    if (reach === 0) return "0.00"; 
+                                                                    return (((Number(c.reactions || 0) + Number(c.comments || 0)) / reach) * 100).toFixed(2); 
+                                                                })()}%
+                                                            </div>
+                                                            <div className="text-[8px] font-bold text-slate-400 mt-1 uppercase tracking-widest">
+                                                                TA: {(() => { 
+                                                                    const reach = Number(c.views) || 0; 
+                                                                    const pop = Number(c.population) || 0;
+                                                                    if (pop === 0) return "0.00"; 
+                                                                    return ((reach / pop) * 100).toFixed(2); 
+                                                                })()}%
+                                                            </div>
                                                         </td>
                                                         <td className="px-10 py-8 text-right flex items-center justify-end gap-1">
                                                             <button onClick={() => openCommModal(c)} className="p-3 text-slate-400 hover:text-blue-600 transition-colors"><Icon name="pencil" size={18} /></button>
@@ -754,7 +802,7 @@
                                     <div className="p-10 bg-white rounded-[2rem] sm:rounded-[3rem] border border-slate-100 shadow-sm"><div className="text-6xl font-black text-slate-900 tracking-tighter leading-none">{statsImpacto.totalPosts}</div><div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic">Total Posts</div></div>
                                     <div className="p-10 bg-slate-900 rounded-[2rem] sm:rounded-[3rem] shadow-2xl relative overflow-hidden group hover:scale-[1.02] transition-all text-white"><div className="p-3 bg-white/10 rounded-xl w-fit mb-6 text-white"><Icon name="trending-up" size={26} /></div><div className="text-6xl font-black tracking-tighter leading-none">{statsImpacto.interactions}</div><div className="text-[9px] font-black uppercase text-slate-500 tracking-widest mt-4 italic">Interações</div></div>
                                     <div className="p-10 bg-white rounded-[2rem] sm:rounded-[3rem] border border-slate-100 shadow-sm text-slate-900"><div className="text-6xl font-black text-slate-900 tracking-tighter leading-none">{statsImpacto.totalComments}</div><div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic">Comments</div></div>
-                                    <div className="p-10 bg-[#f8fafc] rounded-[2rem] sm:rounded-[3rem] border border-slate-100 shadow-sm text-slate-900"><div className="text-6xl font-black text-slate-900 tracking-tighter leading-none">{statsImpacto.avgScore}%</div><div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic">Score Engaja</div></div>
+                                    <div className="p-10 bg-[#f8fafc] rounded-[2rem] sm:rounded-[3rem] border border-slate-100 shadow-sm text-slate-900"><div className="text-6xl font-black text-slate-900 tracking-tighter leading-none">{statsImpacto.avgScore}%</div><div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-4 italic">TER Médio</div></div>
                                 </div>
                                 <div className="grid grid-cols-1 gap-8">
                                     <LineAreaChart title="Evolução de Comunicados (Volume Mensal)" data={statsImpacto.monthlyPosts} color="#397394" />
@@ -1175,6 +1223,7 @@
                                 <form onSubmit={handleSaveComm} className="grid grid-cols-1 md:grid-cols-2 gap-10">
                                     <div className="space-y-8">
                                         <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold">Título Post</label><input name="title" defaultValue={editingComm?.title} required className="w-full bg-slate-50 border-none rounded-2xl p-5 font-bold text-lg outline-none shadow-sm" /></div>
+                                        <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold">Link da Comunicação</label><div className="relative"><input name="commLink" defaultValue={editingComm?.commLink} className="w-full bg-slate-50 border-none rounded-xl p-5 pl-12 font-bold outline-none shadow-sm" placeholder="URL da postagem" /><Icon name="link" size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" /></div></div>
                                         <div>
                                             <div className="flex items-center justify-between gap-3 mb-3">
                                                 <label className="text-[10px] font-black uppercase text-slate-400 block font-bold">Analistas</label>
@@ -1204,14 +1253,32 @@
                                         </div>
                                     </div>
                                     <div className="space-y-8">
-                                        <div className="bg-[#f8fafc] p-6 sm:p-10 rounded-[2rem] sm:rounded-[3rem] border border-slate-100 space-y-8 shadow-inner">
+                                        <div className="bg-[#f8fafc] p-6 sm:p-10 rounded-[2rem] sm:rounded-[3rem] border border-slate-100 space-y-6 shadow-inner">
                                             <div className="text-[10px] font-black uppercase text-[#397394] tracking-widest italic flex items-center justify-center gap-2">Impacto Interno</div>
+                                            
                                             <div className="grid grid-cols-3 gap-4">
-                                                <div><label className="text-[8px] uppercase text-slate-400 block italic text-center">Reach</label><input name="views" type="number" defaultValue={editingComm?.views || 0} className="w-full bg-white border border-slate-100 rounded-xl p-4 font-black text-center outline-none shadow-sm" /></div>
-                                                <div><label className="text-[8px] uppercase text-slate-400 block italic text-center">Reações</label><input name="reactions" type="number" defaultValue={editingComm?.reactions || 0} className="w-full bg-white border border-slate-100 rounded-xl p-4 font-black text-center outline-none shadow-sm" /></div>
-                                                <div><label className="text-[8px] uppercase text-slate-400 block italic text-center">Comments</label><input name="comments" type="number" defaultValue={editingComm?.comments || 0} className="w-full bg-white border border-slate-100 rounded-xl p-4 font-black text-center outline-none shadow-sm" /></div>
+                                                <div><label className="text-[8px] uppercase text-slate-400 block italic text-center">Reach</label><input name="views" type="number" value={commReach} onChange={(e) => setCommReach(Number(e.target.value))} className="w-full bg-white border border-slate-100 rounded-xl p-4 font-black text-center outline-none shadow-sm" /></div>
+                                                <div><label className="text-[8px] uppercase text-slate-400 block italic text-center">Reações</label><input name="reactions" type="number" value={commReactions} onChange={(e) => setCommReactions(Number(e.target.value))} className="w-full bg-white border border-slate-100 rounded-xl p-4 font-black text-center outline-none shadow-sm" /></div>
+                                                <div><label className="text-[8px] uppercase text-slate-400 block italic text-center">Comments</label><input name="comments" type="number" value={commComments} onChange={(e) => setCommComments(Number(e.target.value))} className="w-full bg-white border border-slate-100 rounded-xl p-4 font-black text-center outline-none shadow-sm" /></div>
                                             </div>
-                                            <div className="mt-6"><label className="text-[10px] font-black uppercase text-slate-400 block mb-2 italic text-center">Base Canal</label><input name="population" type="number" defaultValue={editingComm?.population} placeholder="Preencher" className="w-full bg-white border-none rounded-2xl p-4 font-black text-center outline-none shadow-sm" /></div>
+                                            
+                                            <div><label className="text-[10px] font-black uppercase text-slate-400 block mb-2 italic text-center">Base Canal</label><input name="population" type="number" value={commPopulation} onChange={(e) => setCommPopulation(Number(e.target.value))} placeholder="Preencher" className="w-full bg-white border-none rounded-2xl p-4 font-black text-center outline-none shadow-sm" /></div>
+                                            
+                                            <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-200/50">
+                                                <div className="text-center">
+                                                    <span className="text-[8px] font-black uppercase text-slate-400 block mb-1">Taxa de Engaj. (TER)</span>
+                                                    <span className="text-2xl font-black text-indigo-600">{commReach > 0 ? (((commReactions + commComments) / commReach) * 100).toFixed(2) : "0.00"}%</span>
+                                                </div>
+                                                <div className="text-center border-l border-slate-200/50">
+                                                    <span className="text-[8px] font-black uppercase text-slate-400 block mb-1">Taxa de Alcance (TA)</span>
+                                                    <span className="text-2xl font-black text-emerald-600">{commPopulation > 0 ? ((commReach / commPopulation) * 100).toFixed(2) : "0.00"}%</span>
+                                                </div>
+                                            </div>
+
+                                            <div>
+                                                <label className="text-[10px] font-black uppercase text-slate-400 block mb-2 italic text-center">Notas de Performance / Comentários</label>
+                                                <textarea name="notas" defaultValue={editingComm?.notas} rows="2" className="w-full bg-white border-none rounded-2xl p-4 text-xs font-bold outline-none shadow-sm resize-none text-center" placeholder="Insira análises e observações aqui..."></textarea>
+                                            </div>
                                         </div>
                                         <div className="grid grid-cols-2 gap-4">
                                             <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold">Editoria</label><select name="editoria" defaultValue={editingComm?.editoria || EDITORIAS_LIST[0]} className="w-full bg-slate-50 border-none rounded-xl p-4 font-black shadow-sm">{EDITORIAS_LIST.map(e => <option key={e}>{e}</option>)}</select></div>
