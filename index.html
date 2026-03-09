@@ -1520,8 +1520,8 @@
                                                             <div className="text-[9px] sm:text-[11px] font-black text-indigo-500 uppercase tracking-widest">{progress}% CONCL.</div>
                                                         </div>
                                                         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-                                                            <button onClick={() => handleEditRegua(regua)} className="p-2 sm:p-3.5 text-slate-400 hover:text-white hover:bg-slate-900 rounded-[0.8rem] sm:rounded-[1.2rem] transition-all bg-slate-50 sm:bg-transparent"><Icon name="edit-3" size={18} className="sm:w-[22px] sm:h-[22px]"/></button>
-                                                            <button onClick={() => promptDelete(regua.id, 'reguas_planejamento')} className="p-2 sm:p-3.5 text-slate-400 hover:text-white hover:bg-rose-500 rounded-[0.8rem] sm:rounded-[1.2rem] transition-all bg-slate-50 sm:bg-transparent"><Icon name="trash-2" size={18} className="sm:w-[22px] sm:h-[22px]"/></button>
+                                                            <button onClick={(e) => { e.stopPropagation(); handleEditRegua(regua); }} className="p-2 sm:p-3.5 text-slate-400 hover:text-white hover:bg-slate-900 rounded-[0.8rem] sm:rounded-[1.2rem] transition-all bg-slate-50 sm:bg-transparent"><Icon name="edit-3" size={18} className="sm:w-[22px] sm:h-[22px]"/></button>
+                                                            <button onClick={(e) => { e.stopPropagation(); promptDelete(regua.id, 'reguas_planejamento'); }} className="p-2 sm:p-3.5 text-slate-400 hover:text-white hover:bg-rose-500 rounded-[0.8rem] sm:rounded-[1.2rem] transition-all bg-slate-50 sm:bg-transparent"><Icon name="trash-2" size={18} className="sm:w-[22px] sm:h-[22px]"/></button>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -1563,7 +1563,7 @@
                                                                                 passo.canal === 'WhatsApp' ? <Icon name="message-square" size={18} className="sm:w-[22px] sm:h-[22px]" /> : 
                                                                                 passo.canal === 'Slack' ? <Icon name="hash" size={18} className="sm:w-[22px] sm:h-[22px]" /> : <Icon name="bell" size={18} className="sm:w-[22px] sm:h-[22px]" />}
                                                                             </div>
-                                                                            <button onClick={() => toggleStepRegua(regua.id, regua.passos, idx)}
+                                                                            <button onClick={(e) => { e.stopPropagation(); toggleStepRegua(regua.id, regua.passos, idx); }}
                                                                                 className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full border-2 flex items-center justify-center transition-all ${
                                                                                     passo.concluido ? 'bg-emerald-500 border-emerald-500 text-white shadow-lg shadow-emerald-200' : 'bg-white border-slate-200 text-slate-200 hover:border-indigo-500 hover:text-indigo-500'
                                                                                 }`}>
@@ -1742,10 +1742,10 @@
                             <div className="bg-white w-full max-w-4xl rounded-[1.5rem] sm:rounded-[3rem] p-5 sm:p-12 shadow-2xl modal-animate relative max-h-[95vh] overflow-y-auto custom-scroll">
                                 <button type="button" onClick={() => setIsModalExternalOpen(false)} className="btn-close-modal"><Icon name="x" size={20} className="sm:w-[24px] sm:h-[24px]"/></button>
                                 <h3 className="text-2xl sm:text-3xl font-black italic uppercase tracking-tighter mb-2 sm:mb-4 text-slate-800 pr-10">REGISTRO DE COMUNICAÇÃO EXTERNA</h3>
-                                <p className="text-[9px] sm:text-[10px] font-black uppercase text-[#397394] mb-6 sm:mb-10 tracking-[0.2em] italic">Product: IDCloud Outbound Flow</p>
+                                <p className="text-[9px] sm:text-[10px] font-black uppercase text-[#397394] mb-6 sm:mb-10 tracking-[0.2em] italic">Product: Outbound Flow</p>
                                 <form onSubmit={handleSaveExternal} className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-12">
                                     <div className="space-y-6 sm:space-y-8">
-                                        <div><label className="text-[9px] sm:text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold">Campanha (IDCloud)</label><input name="title" defaultValue={editingExternal?.title} required className="w-full bg-slate-50 border-none rounded-xl p-4 sm:p-5 font-bold outline-none shadow-sm text-sm" placeholder="Nome da comunicação" /></div>
+                                        <div><label className="text-[9px] sm:text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold">Campanha</label><input name="title" defaultValue={editingExternal?.title} required className="w-full bg-slate-50 border-none rounded-xl p-4 sm:p-5 font-bold outline-none shadow-sm text-sm" placeholder="Nome da comunicação" /></div>
                                         <div>
                                             <div className="flex items-center justify-between gap-3 mb-2 sm:mb-3"><label className="text-[9px] sm:text-[10px] font-black uppercase text-slate-400 block font-bold">Analista Responsável</label><button type="button" onClick={() => {const a = prompt("Nome do Novo Analista:"); if(a) setAllExtAnalysts([...allExtAnalysts, a])}} className="text-[#397394] hover:scale-110 transition-transform"><Icon name="plus-circle" size={16} className="sm:w-[18px] sm:h-[18px]"/></button></div>
                                             <select name="analyst" defaultValue={editingExternal?.analyst || allExtAnalysts[0]} className="w-full bg-slate-50 border-none rounded-xl p-4 sm:p-5 font-black outline-none shadow-sm text-sm">{allExtAnalysts.map(a => <option key={a} value={a}>{a}</option>)}</select>
