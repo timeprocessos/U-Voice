@@ -722,29 +722,37 @@
 
             const handleSaveRegua = async (e) => {
                 e.preventDefault();
-                const data = { ...reguaFormData, updatedAt: new Date().toISOString() };
-                setIsReguaEditorOpen(false);
-                if (editingReguaId) await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'reguas_planejamento', editingReguaId), data);
-                else {
-                    data.createdAt = new Date().toISOString();
-                    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'reguas_planejamento'), data);
+                const submitBtn = e.nativeEvent?.submitter;
+                if(submitBtn) submitBtn.disabled = true; // Previne múltiplos envios (duplicação)
+
+                try {
+                    const data = { ...reguaFormData, updatedAt: new Date().toISOString() };
+                    setIsReguaEditorOpen(false);
+                    if (editingReguaId) {
+                        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'reguas_planejamento', editingReguaId), data);
+                    } else {
+                        data.createdAt = new Date().toISOString();
+                        await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'reguas_planejamento'), data);
+                    }
+                    setEditingReguaId(null);
+                    setReguaFormData(JSON.parse(JSON.stringify(initialReguaForm))); // Limpa a memória forçadamente com deep copy
+                } catch (err) {
+                    console.error(err);
+                } finally {
+                    if(submitBtn) submitBtn.disabled = false;
                 }
-                setEditingReguaId(null);
-                // Forçar uma cópia profunda para garantir que o formulário limpa totalmente
-                setReguaFormData(JSON.parse(JSON.stringify(initialReguaForm)));
             };
 
             const handleEditRegua = (regua) => {
                 setEditingReguaId(regua.id);
-                // Cópia profunda para não alterar acidentalmente o estado dos cards lidos do banco
-                setReguaFormData(JSON.parse(JSON.stringify(regua)));
+                setReguaFormData(JSON.parse(JSON.stringify(regua))); // Deep copy para não referenciar o estado original do banco
                 setIsReguaEditorOpen(true);
                 window.scrollTo({ top: 0, behavior: 'smooth' });
             };
 
             const toggleStepRegua = async (reguaId, reguaSteps, stepIdx) => {
                 try {
-                    // Cópia profunda segura via .map() para que o React perceba a alteração instantaneamente
+                    // Atualização imutável usando map. Evita mutação direta e permite que a tela (Check) atualize
                     const newSteps = reguaSteps.map((step, index) => 
                         index === stepIdx ? { ...step, concluido: !step.concluido } : step
                     );
@@ -1301,7 +1309,7 @@
                                             setReguaFormData(JSON.parse(JSON.stringify(initialReguaForm)));
                                         } else { 
                                             setEditingReguaId(null);
-                                            setReguaFormData(JSON.parse(JSON.stringify(initialReguaForm))); // Limpa a memória para vir totalmente zerado
+                                            setReguaFormData(JSON.parse(JSON.stringify(initialReguaForm))); // Zera forçadamente os campos
                                             setIsReguaEditorOpen(true); 
                                         } 
                                     }}
@@ -1449,7 +1457,7 @@
                                                         <div key={i} className="bg-white border border-slate-100 p-5 sm:p-8 rounded-[1.5rem] sm:rounded-[2rem] flex flex-col gap-4 sm:gap-6 items-start shadow-sm hover:border-indigo-100 transition-all relative">
                                                             
                                                             <div className="flex items-center justify-between w-full">
-                                                                <div className="w-8 h-8 sm:w-10 h-10 rounded-xl sm:rounded-2xl bg-slate-900 text-white flex items-center justify-center font-black shadow-lg text-sm sm:text-base">{i+1}</div>
+                                                                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-slate-900 text-white flex items-center justify-center font-black shadow-lg text-sm sm:text-base">{i+1}</div>
                                                                 <button type="button" onClick={() => setReguaFormData({...reguaFormData, passos: reguaFormData.passos.filter((_, idx) => idx !== i)})}
                                                                         className="p-2 text-slate-300 hover:text-rose-500 transition-colors bg-slate-50 hover:bg-rose-50 rounded-full sm:bg-transparent sm:hover:bg-transparent sm:p-0"><Icon name="trash-2" size={18} className="sm:w-[20px] sm:h-[20px]"/></button>
                                                             </div>
@@ -1457,12 +1465,18 @@
                                                             <div className="w-full grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
                                                                 <div className="space-y-1.5 sm:col-span-2 lg:col-span-1">
                                                                     <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Assunto / Chamada</label>
-                                                                    <input value={p.titulo} onChange={e => {const n = [...reguaFormData.passos]; n[i].titulo = e.target.value; setReguaFormData({...reguaFormData, passos: n});}} 
+                                                                    <input value={p.titulo} onChange={e => {
+                                                                               const newPassos = reguaFormData.passos.map((step, idx) => idx === i ? { ...step, titulo: e.target.value } : step);
+                                                                               setReguaFormData({...reguaFormData, passos: newPassos});
+                                                                           }} 
                                                                            className="w-full bg-slate-50 border-slate-100 rounded-xl p-3 text-xs sm:text-sm focus:bg-white transition-colors" placeholder="Ex: Boas-vindas" />
                                                                 </div>
                                                                 <div className="space-y-1.5">
                                                                     <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Canal</label>
-                                                                    <select value={p.canal} onChange={e => {const n = [...reguaFormData.passos]; n[i].canal = e.target.value; setReguaFormData({...reguaFormData, passos: n});}}
+                                                                    <select value={p.canal} onChange={e => {
+                                                                               const newPassos = reguaFormData.passos.map((step, idx) => idx === i ? { ...step, canal: e.target.value } : step);
+                                                                               setReguaFormData({...reguaFormData, passos: newPassos});
+                                                                           }}
                                                                             className="w-full bg-slate-50 border-slate-100 rounded-xl p-3 text-xs sm:text-sm">
                                                                         <option>Email</option>
                                                                         <option>WhatsApp</option>
@@ -1472,12 +1486,18 @@
                                                                 </div>
                                                                 <div className="space-y-1.5">
                                                                     <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Aguardar (Dias)</label>
-                                                                    <input type="number" min="0" value={p.delayDias} onChange={e => {const n = [...reguaFormData.passos]; n[i].delayDias = e.target.value; setReguaFormData({...reguaFormData, passos: n});}}
+                                                                    <input type="number" min="0" value={p.delayDias} onChange={e => {
+                                                                               const newPassos = reguaFormData.passos.map((step, idx) => idx === i ? { ...step, delayDias: e.target.value } : step);
+                                                                               setReguaFormData({...reguaFormData, passos: newPassos});
+                                                                           }}
                                                                            className="w-full bg-slate-50 border-slate-100 rounded-xl p-3 text-xs sm:text-sm" />
                                                                 </div>
                                                                 <div className="sm:col-span-3 space-y-1.5">
                                                                     <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Briefing / Conteúdo</label>
-                                                                    <textarea value={p.briefing} onChange={e => {const n = [...reguaFormData.passos]; n[i].briefing = e.target.value; setReguaFormData({...reguaFormData, passos: n});}}
+                                                                    <textarea value={p.briefing} onChange={e => {
+                                                                               const newPassos = reguaFormData.passos.map((step, idx) => idx === i ? { ...step, briefing: e.target.value } : step);
+                                                                               setReguaFormData({...reguaFormData, passos: newPassos});
+                                                                           }}
                                                                               className="w-full bg-slate-50 border-slate-100 rounded-xl p-3 sm:p-4 text-xs h-20 sm:h-24 resize-none outline-none focus:bg-white transition-colors" placeholder="Descreva o objetivo desta comunicação..." />
                                                                 </div>
                                                             </div>
@@ -1540,8 +1560,8 @@
                                                             <div className="text-[9px] sm:text-[11px] font-black text-indigo-500 uppercase tracking-widest">{progress}% CONCL.</div>
                                                         </div>
                                                         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-                                                            <button onClick={(e) => { e.stopPropagation(); handleEditRegua(regua); }} className="p-2 sm:p-3.5 text-slate-400 hover:text-white hover:bg-slate-900 rounded-[0.8rem] sm:rounded-[1.2rem] transition-all bg-slate-50 sm:bg-transparent"><Icon name="edit-3" size={18} className="sm:w-[22px] sm:h-[22px]"/></button>
-                                                            <button onClick={(e) => { e.stopPropagation(); promptDelete(regua.id, 'reguas_planejamento'); }} className="p-2 sm:p-3.5 text-slate-400 hover:text-white hover:bg-rose-500 rounded-[0.8rem] sm:rounded-[1.2rem] transition-all bg-slate-50 sm:bg-transparent"><Icon name="trash-2" size={18} className="sm:w-[22px] sm:h-[22px]"/></button>
+                                                            <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleEditRegua(regua); }} className="p-2 sm:p-3.5 text-slate-400 hover:text-white hover:bg-slate-900 rounded-[0.8rem] sm:rounded-[1.2rem] transition-all bg-slate-50 sm:bg-transparent relative z-20"><Icon name="edit-3" size={18} className="sm:w-[22px] sm:h-[22px]"/></button>
+                                                            <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); promptDelete(regua.id, 'reguas_planejamento'); }} className="p-2 sm:p-3.5 text-slate-400 hover:text-white hover:bg-rose-500 rounded-[0.8rem] sm:rounded-[1.2rem] transition-all bg-slate-50 sm:bg-transparent relative z-20"><Icon name="trash-2" size={18} className="sm:w-[22px] sm:h-[22px]"/></button>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -1583,8 +1603,8 @@
                                                                                 passo.canal === 'WhatsApp' ? <Icon name="message-square" size={18} className="sm:w-[22px] sm:h-[22px]" /> : 
                                                                                 passo.canal === 'Slack' ? <Icon name="hash" size={18} className="sm:w-[22px] sm:h-[22px]" /> : <Icon name="bell" size={18} className="sm:w-[22px] sm:h-[22px]" />}
                                                                             </div>
-                                                                            <button onClick={(e) => { e.stopPropagation(); toggleStepRegua(regua.id, regua.passos, idx); }}
-                                                                                className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full border-2 flex items-center justify-center transition-all ${
+                                                                            <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleStepRegua(regua.id, regua.passos, idx); }}
+                                                                                className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full border-2 flex items-center justify-center transition-all relative z-20 cursor-pointer ${
                                                                                     passo.concluido ? 'bg-emerald-500 border-emerald-500 text-white shadow-lg shadow-emerald-200' : 'bg-white border-slate-200 text-slate-200 hover:border-indigo-500 hover:text-indigo-500'
                                                                                 }`}>
                                                                                 <Icon name="check" size={16} className="sm:w-[18px] sm:h-[18px]" forceKey={passo.concluido ? 'y'+idx : 'n'+idx} />
