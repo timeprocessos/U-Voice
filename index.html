@@ -459,13 +459,13 @@
 
             // Inicialização de Autenticação segura e Persistência
             useEffect(() => {
-                const unsubscribe = onAuthStateChanged(auth, (u) => { 
+                const unsubscribe = onAuthStateChanged(auth, async (u) => { 
                     setUser(u); 
                     if (u) {
                         setMessage("Sistemas Ativos"); 
                         setIsAuthModalOpen(false); 
                     } else {
-                        // Se não tem usuário logado (ex: o usuário clicou em Sair)
+                        // Se não tem utilizador logado (ex: o utilizador clicou em Sair)
                         setIsAuthModalOpen(true); 
                     }
                 });
@@ -488,19 +488,21 @@
                 setAuthError('');
                 const provider = new GoogleAuthProvider();
                 try {
+                    let result;
                     if (user && user.isAnonymous) {
                         try {
-                            await linkWithPopup(user, provider);
+                            result = await linkWithPopup(user, provider);
                         } catch (err) {
                             if (err.code === 'auth/credential-already-in-use') {
-                                await signInWithPopup(auth, provider);
+                                result = await signInWithPopup(auth, provider);
                             } else {
                                 throw err;
                             }
                         }
                     } else {
-                        await signInWithPopup(auth, provider);
+                        result = await signInWithPopup(auth, provider);
                     }
+
                     setIsAuthModalOpen(false);
                 } catch (error) {
                     console.error(error);
@@ -512,13 +514,14 @@
             const handleEmailAuth = async (e) => {
                 e.preventDefault();
                 setAuthError('');
+
                 try {
                     if (isLoginMode) {
                         try {
                             await signInWithEmailAndPassword(auth, authEmail, authPassword);
                         } catch (err) {
                             if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
-                                setAuthError('Usuário não encontrado ou senha inválida.');
+                                setAuthError('Utilizador não encontrado ou palavra-passe inválida.');
                             } else {
                                 setAuthError(err.message);
                             }
@@ -1042,7 +1045,10 @@
                             {/* Controle Mobile */}
                             <div className="md:hidden flex items-center gap-3">
                                 {user && !user.isAnonymous ? (
-                                    <button onClick={() => signOut(auth)} className="text-[10px] font-black text-rose-500 uppercase">Sair</button>
+                                    <>
+                                        <span className="text-[10px] font-bold text-slate-400 lowercase truncate max-w-[120px]" title={user.email}>{user.email}</span>
+                                        <button onClick={() => signOut(auth)} className="text-[10px] font-black text-rose-500 uppercase">Sair</button>
+                                    </>
                                 ) : (
                                     <button onClick={() => setIsAuthModalOpen(true)} className="text-[10px] font-black text-indigo-600 uppercase">Login</button>
                                 )}
@@ -1062,7 +1068,7 @@
                             <div className="hidden md:flex items-center gap-4 border-l pl-6 border-slate-200 shrink-0">
                                 {user && !user.isAnonymous ? (
                                     <div className="flex items-center gap-4">
-                                        {user.displayName && <span className="text-[10px] font-black uppercase text-slate-400 truncate max-w-[120px]">{user.displayName}</span>}
+                                        <span className="text-[10px] font-bold text-slate-500 lowercase truncate max-w-[180px]" title={user.email}>{user.email}</span>
                                         <button onClick={() => signOut(auth)} className="text-[10px] font-black text-rose-500 uppercase hover:underline">Sair</button>
                                     </div>
                                 ) : (
