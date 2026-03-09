@@ -507,7 +507,7 @@
                     setMessage("Removido com sucesso!"); 
                 } catch (e) { 
                     console.error("Erro ao excluir:", e);
-                    setMessage("Erro ao excluir!"); 
+                    setMessage("Erro de permissão no Banco de Dados!"); 
                 }
                 setIsDeleteModalOpen(false); 
                 setTargetDelete(null);
@@ -727,6 +727,8 @@
 
                 try {
                     const data = { ...reguaFormData, updatedAt: new Date().toISOString() };
+                    delete data.id; // Remove o ID do payload para evitar corromper a referência do banco
+                    
                     setIsReguaEditorOpen(false);
                     if (editingReguaId) {
                         await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'reguas_planejamento', editingReguaId), data);
@@ -735,9 +737,11 @@
                         await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'reguas_planejamento'), data);
                     }
                     setEditingReguaId(null);
-                    setReguaFormData(JSON.parse(JSON.stringify(initialReguaForm))); // Limpa a memória forçadamente com deep copy
+                    setReguaFormData(JSON.parse(JSON.stringify(initialReguaForm))); // Limpa a memória forçadamente
+                    setMessage("Planejamento salvo!");
                 } catch (err) {
                     console.error(err);
+                    setMessage("Erro de permissão no Banco de Dados!");
                 } finally {
                     if(submitBtn) submitBtn.disabled = false;
                 }
@@ -759,7 +763,7 @@
                     await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'reguas_planejamento', reguaId), { passos: newSteps, updatedAt: new Date().toISOString() });
                 } catch (error) {
                     console.error("Erro ao atualizar status:", error);
-                    setMessage("Erro ao atualizar!");
+                    setMessage("Erro de permissão no Banco de Dados!");
                 }
             };
 
