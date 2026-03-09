@@ -504,9 +504,10 @@
                 if (!targetDelete) return;
                 try { 
                     await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', targetDelete.collection, targetDelete.id)); 
-                    setMessage("Removido!"); 
+                    setMessage("Removido com sucesso!"); 
                 } catch (e) { 
-                    setMessage("Erro!"); 
+                    console.error("Erro ao excluir:", e);
+                    setMessage("Erro ao excluir!"); 
                 }
                 setIsDeleteModalOpen(false); 
                 setTargetDelete(null);
@@ -729,20 +730,29 @@
                     await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'reguas_planejamento'), data);
                 }
                 setEditingReguaId(null);
-                setReguaFormData(initialReguaForm);
+                // Forçar uma cópia profunda para garantir que o formulário limpa totalmente
+                setReguaFormData(JSON.parse(JSON.stringify(initialReguaForm)));
             };
 
             const handleEditRegua = (regua) => {
                 setEditingReguaId(regua.id);
-                setReguaFormData({ ...regua });
+                // Cópia profunda para não alterar acidentalmente o estado dos cards lidos do banco
+                setReguaFormData(JSON.parse(JSON.stringify(regua)));
                 setIsReguaEditorOpen(true);
                 window.scrollTo({ top: 0, behavior: 'smooth' });
             };
 
             const toggleStepRegua = async (reguaId, reguaSteps, stepIdx) => {
-                const newSteps = [...reguaSteps];
-                newSteps[stepIdx].concluido = !newSteps[stepIdx].concluido;
-                await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'reguas_planejamento', reguaId), { passos: newSteps, updatedAt: new Date().toISOString() });
+                try {
+                    // Cópia profunda segura via .map() para que o React perceba a alteração instantaneamente
+                    const newSteps = reguaSteps.map((step, index) => 
+                        index === stepIdx ? { ...step, concluido: !step.concluido } : step
+                    );
+                    await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'reguas_planejamento', reguaId), { passos: newSteps, updatedAt: new Date().toISOString() });
+                } catch (error) {
+                    console.error("Erro ao atualizar status:", error);
+                    setMessage("Erro ao atualizar!");
+                }
             };
 
             const calculateTimeline = (regua) => {
@@ -1284,7 +1294,17 @@
                                         </div>
                                         <h2 className="text-lg sm:text-xl font-black tracking-tight text-slate-900 uppercase">The Comms Journey</h2>
                                     </div>
-                                    <button onClick={() => { if(isReguaEditorOpen) { setIsReguaEditorOpen(false); setEditingReguaId(null); } else setIsReguaEditorOpen(true); }}
+                                    <button onClick={() => { 
+                                        if(isReguaEditorOpen) { 
+                                            setIsReguaEditorOpen(false); 
+                                            setEditingReguaId(null); 
+                                            setReguaFormData(JSON.parse(JSON.stringify(initialReguaForm)));
+                                        } else { 
+                                            setEditingReguaId(null);
+                                            setReguaFormData(JSON.parse(JSON.stringify(initialReguaForm))); // Limpa a memória para vir totalmente zerado
+                                            setIsReguaEditorOpen(true); 
+                                        } 
+                                    }}
                                             className={`${isReguaEditorOpen ? 'bg-slate-100 text-slate-500' : 'bg-slate-900 text-white'} w-full sm:w-auto px-6 py-3 sm:py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all active:scale-95 text-xs sm:text-sm`}>
                                         {isReguaEditorOpen ? 'Fechar Editor' : <><Icon name="plus" size={16}/> Novo Planejamento</>}
                                     </button>
@@ -1467,7 +1487,7 @@
                                             </div>
 
                                             <div className="flex flex-col sm:flex-row justify-end gap-3 sm:gap-4 pt-6 sm:pt-10 border-t border-slate-100">
-                                                <button type="button" onClick={() => { setIsReguaEditorOpen(false); setEditingReguaId(null); setReguaFormData(initialReguaForm); }} className="w-full sm:w-auto px-8 py-4 sm:py-3 rounded-[1rem] sm:rounded-xl font-bold text-slate-400 bg-slate-50 sm:bg-transparent">Cancelar</button>
+                                                <button type="button" onClick={() => { setIsReguaEditorOpen(false); setEditingReguaId(null); setReguaFormData(JSON.parse(JSON.stringify(initialReguaForm))); }} className="w-full sm:w-auto px-8 py-4 sm:py-3 rounded-[1rem] sm:rounded-xl font-bold text-slate-400 bg-slate-50 sm:bg-transparent">Cancelar</button>
                                                 <button type="submit" className="w-full sm:w-auto bg-slate-900 text-white px-10 py-4 sm:py-4 rounded-[1rem] sm:rounded-[1.5rem] font-black text-xs sm:text-sm uppercase tracking-widest hover:bg-indigo-600 shadow-2xl sm:shadow-xl transition-all">
                                                     {editingReguaId ? 'Confirmar Alterações' : 'Publicar no Roadmap'}
                                                 </button>
