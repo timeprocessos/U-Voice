@@ -390,6 +390,7 @@
             const [externalComms, setExternalComms] = useState([]);
             const [reguas, setReguas] = useState([]);
             const [message, setMessage] = useState("");
+            const fileInputRef = useRef(null); // Ref para o input de arquivo oculto
             
             const [isModalCommOpen, setIsModalCommOpen] = useState(false);
             const [isModalExternalOpen, setIsModalExternalOpen] = useState(false);
@@ -671,6 +672,70 @@
                 } else {
                     setSelectedVendorIndices([...selectedVendorIndices, idx]);
                 }
+            };
+
+            // Lógica de Importação CSV
+            const handleImportCSV = (event) => {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = async (e) => {
+                    const text = e.target.result;
+                    const lines = text.split('\n');
+                    if (lines.length < 2) {
+                        setMessage("Arquivo CSV inválido ou vazio.");
+                        return;
+                    }
+
+                    const headers = lines[0].split(',').map(h => h.trim());
+                    let importedCount = 0;
+
+                    for (let i = 1; i < lines.length; i++) {
+                        const line = lines[i].trim();
+                        if (!line) continue;
+
+                        // Tratamento simples para vírgulas dentro de campos entre aspas (opcional, dependendo do CSV gerado pelo Excel)
+                        // Para um CSV simples separado por vírgula:
+                        const values = line.split(','); 
+                        
+                        let data = {};
+                        headers.forEach((header, index) => {
+                            data[header] = values[index] ? values[index].trim() : '';
+                        });
+
+                        // Limpeza e tipagem dos dados importados
+                        const formattedData = {
+                            title: data.title || 'Sem Título',
+                            commLink: data.commLink || '',
+                            channelName: data.channelName || '',
+                            date: data.date || '',
+                            postTime: data.postTime || '',
+                            editoria: data.editoria || 'Originais Unico',
+                            analysts: data.analysts ? data.analysts.split(',').map(a => a.trim()) : [],
+                            formats: data.formats ? data.formats.split(',').map(f => f.trim()) : [],
+                            deliveryChannel: 'slack',
+                            status: data.status || 'Aguardando Envio',
+                            population: Number(data.population) || 0,
+                            views: Number(data.views) || 0,
+                            reactions: Number(data.reactions) || 0,
+                            comments: Number(data.comments) || 0,
+                            notas: data.notas || '',
+                            updatedAt: new Date().toISOString()
+                        };
+
+                        try {
+                            await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'comms'), formattedData);
+                            importedCount++;
+                        } catch (err) {
+                            console.error("Erro ao importar linha", i, err);
+                        }
+                    }
+
+                    setMessage(`${importedCount} comunicados importados!`);
+                    if (fileInputRef.current) fileInputRef.current.value = ""; // Limpa o input
+                };
+                reader.readAsText(file);
             };
 
             const handleSaveComm = async (e) => {
@@ -1105,7 +1170,21 @@
                                         </select>
                                         <select value={filterMonth} onChange={(e) => setFilterMonth(e.target.value)} className="impact-filter flex-1 sm:flex-none"><option value="Todos">Mês: Todos</option>{MESES_MAP.map(m => <option key={m.val} value={m.val}>{m.label}</option>)}</select>
                                     </div>
-                                    <button onClick={() => openCommModal()} className="w-full sm:w-auto sm:ml-auto bg-[#397394] text-white px-6 sm:px-8 py-3 sm:py-4 rounded-2xl text-[10px] font-black uppercase flex items-center justify-center gap-2 shadow-xl hover:bg-[#2d5c78] transition-all"><Icon name="plus" size={14} /> Novo Comunicado</button>
+                                    
+                                    <div className="flex w-full sm:w-auto sm:ml-auto gap-2">
+                                        {/* Input oculto para carregar arquivo */}
+                                        <input 
+                                            type="file" 
+                                            accept=".csv" 
+                                            ref={fileInputRef} 
+                                            style={{ display: 'none' }} 
+                                            onChange={handleImportCSV} 
+                                        />
+                                        <button onClick={() => fileInputRef.current.click()} className="flex-1 sm:flex-none bg-slate-100 text-slate-600 px-4 sm:px-6 py-3 sm:py-4 rounded-2xl text-[10px] font-black uppercase flex items-center justify-center gap-2 shadow-sm hover:bg-slate-200 transition-all" title="Importar CSV">
+                                            <Icon name="upload" size={14} /> Importar
+                                        </button>
+                                        <button onClick={() => openCommModal()} className="flex-1 sm:flex-none bg-[#397394] text-white px-6 sm:px-8 py-3 sm:py-4 rounded-2xl text-[10px] font-black uppercase flex items-center justify-center gap-2 shadow-xl hover:bg-[#2d5c78] transition-all"><Icon name="plus" size={14} /> Novo</button>
+                                    </div>
                                 </div>
                                 <div className="bg-white rounded-[1.5rem] sm:rounded-[3rem] border border-slate-100 overflow-hidden shadow-sm overflow-x-auto custom-scroll">
                                     <table className="w-full text-left min-w-[800px]">
