@@ -84,7 +84,7 @@
             signInAnonymously, 
             signInWithCustomToken 
         } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, doc, onSnapshot, deleteDoc, addDoc, updateDoc, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, doc, onSnapshot, deleteDoc, addDoc, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // Configuração segura para o ambiente Canvas e seu projeto
         const firebaseConfig = typeof __firebase_config !== 'undefined' 
@@ -187,7 +187,6 @@
             return `${parts[2]}/${parts[1]}/${parts[0]}`;
         }
         
-        // Utilitários de Formatação de Moeda
         const parseCurrency = (str) => {
             if (!str) return 0;
             const digits = str.replace(/\D/g, '');
@@ -374,7 +373,7 @@
             const [externalComms, setExternalComms] = useState([]);
             const [reguas, setReguas] = useState([]);
             const [message, setMessage] = useState("");
-            const fileInputRef = useRef(null); 
+            const fileInputRef = useRef(null);
             
             const [isModalCommOpen, setIsModalCommOpen] = useState(false);
             const [isModalExternalOpen, setIsModalExternalOpen] = useState(false);
@@ -388,13 +387,11 @@
             const [editingReguaId, setEditingReguaId] = useState(null);
             const [targetDelete, setTargetDelete] = useState(null);
 
-            // Estados locais para cálculos instantâneos do formulário de Comunicado (Interno)
+            // Estados locais para cálculos instantâneos
             const [commReach, setCommReach] = useState(0);
             const [commReactions, setCommReactions] = useState(0);
             const [commComments, setCommComments] = useState(0);
             const [commPopulation, setCommPopulation] = useState(0);
-
-            // Estados locais para cálculos instantâneos do formulário de Comunicado (Externo)
             const [monitorClicks, setMonitorClicks] = useState(false);
             const [clickCount, setClickCount] = useState(0);
 
@@ -428,13 +425,14 @@
             const [includeAgendaNPS, setIncludeAgendaNPS] = useState(false);
             const [agendaNPSValue, setAgendaNPSValue] = useState(5);
 
-            // Cópia Isolada por Função Fábrica - Garante memória limpa
-            const defaultReguaForm = () => ({
+            // FUNÇÃO ANTI-DUPLICAÇÃO E LIMPEZA DA RÉGUA DE COMUNICAÇÃO
+            const getInitialReguaForm = () => ({
                 nome: '', objetivo: 'Engajamento', publico: 'Público Geral',
                 dataInicio: reguaUtils.getRawDate(new Date()), incluirNPS: false, valorNPS: 5,
                 passos: [{ titulo: '', canal: 'Email', delayDias: 0, briefing: '', concluido: false }]
             });
-            const [reguaFormData, setReguaFormData] = useState(defaultReguaForm());
+            const [reguaFormData, setReguaFormData] = useState(getInitialReguaForm());
+            const [isSaving, setIsSaving] = useState(false);
             
             const [filterPublicoRegua, setFilterPublicoRegua] = useState('Todos');
             const [filterMesRegua, setFilterMesRegua] = useState('Todos');
@@ -495,22 +493,20 @@
                 return () => { unsubC(); unsubA(); unsubE(); unsubR(); };
             }, [user]);
 
-            // Handlers de Exclusão Genérico
+            // Handlers de Exclusão Global
             const promptDelete = (id, col) => { 
-                if (!id) return;
                 setTargetDelete({ id, collection: col }); 
                 setIsDeleteModalOpen(true); 
             };
 
             const executeDelete = async () => {
-                if (!targetDelete || !targetDelete.id) return;
+                if (!targetDelete) return;
                 try { 
-                    const docRef = doc(db, 'artifacts', appId, 'public', 'data', targetDelete.collection, targetDelete.id);
-                    await deleteDoc(docRef); 
+                    await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', targetDelete.collection, targetDelete.id)); 
                     setMessage("Removido com sucesso!"); 
                 } catch (e) { 
                     console.error("Erro ao excluir:", e);
-                    setMessage(`Falha ao excluir: ${e.message || "Sem permissão"}`); 
+                    setMessage("Erro de permissão no Banco de Dados!"); 
                 }
                 setIsDeleteModalOpen(false); 
                 setTargetDelete(null);
@@ -609,7 +605,6 @@
                     for (let i = 1; i < lines.length; i++) {
                         const line = lines[i].trim();
                         if (!line) continue;
-
                         const values = line.split(','); 
                         
                         let data = {};
@@ -643,7 +638,6 @@
                             console.error("Erro ao importar linha", i, err);
                         }
                     }
-
                     setMessage(`${importedCount} comunicados importados!`);
                     if (fileInputRef.current) fileInputRef.current.value = ""; 
                 };
@@ -654,22 +648,12 @@
                 e.preventDefault();
                 const fd = new FormData(e.target);
                 const data = { 
-                    title: fd.get('title'), 
-                    commLink: fd.get('commLink'),
-                    channelName: fd.get('channelName'), 
-                    date: fd.get('date'), 
-                    postTime: fd.get('postTime'), 
-                    editoria: fd.get('editoria'), 
-                    analysts: selectedAnalysts, 
-                    formats: selectedFormats, 
-                    deliveryChannel: 'slack', 
-                    status: fd.get('status'), 
-                    population: Number(fd.get('population')) || 0, 
-                    views: Number(fd.get('views')) || 0, 
-                    reactions: Number(fd.get('reactions')) || 0, 
-                    comments: Number(fd.get('comments')) || 0, 
-                    notas: fd.get('notas') || '',
-                    updatedAt: new Date().toISOString() 
+                    title: fd.get('title'), commLink: fd.get('commLink'), channelName: fd.get('channelName'), 
+                    date: fd.get('date'), postTime: fd.get('postTime'), editoria: fd.get('editoria'), 
+                    analysts: selectedAnalysts, formats: selectedFormats, deliveryChannel: 'slack', 
+                    status: fd.get('status'), population: Number(fd.get('population')) || 0, 
+                    views: Number(fd.get('views')) || 0, reactions: Number(fd.get('reactions')) || 0, 
+                    comments: Number(fd.get('comments')) || 0, notas: fd.get('notas') || '', updatedAt: new Date().toISOString() 
                 };
                 setIsModalCommOpen(false);
                 if (editingComm) await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'comms', editingComm.id), data);
@@ -680,21 +664,12 @@
                 e.preventDefault();
                 const fd = new FormData(e.target);
                 const data = { 
-                    title: fd.get('title'), 
-                    analyst: fd.get('analyst'), 
-                    objective: fd.get('objective'), 
-                    commLink: fd.get('commLink'), 
-                    countries: selectedCountries, 
-                    date: fd.get('date'), 
-                    postTime: fd.get('postTime'), 
-                    status: fd.get('status'), 
-                    sentCount: Number(fd.get('sentCount') || 0), 
-                    openedCount: Number(fd.get('openedCount') || 0), 
-                    openRate: autoOpenRate, 
-                    monitorClicks: monitorClicks,
-                    clickCount: monitorClicks ? Number(fd.get('clickCount') || 0) : 0,
-                    ctrRate: monitorClicks ? autoCtrRate : "0.00",
-                    updatedAt: new Date().toISOString() 
+                    title: fd.get('title'), analyst: fd.get('analyst'), objective: fd.get('objective'), 
+                    commLink: fd.get('commLink'), countries: selectedCountries, date: fd.get('date'), 
+                    postTime: fd.get('postTime'), status: fd.get('status'), sentCount: Number(fd.get('sentCount') || 0), 
+                    openedCount: Number(fd.get('openedCount') || 0), openRate: autoOpenRate, 
+                    monitorClicks: monitorClicks, clickCount: monitorClicks ? Number(fd.get('clickCount') || 0) : 0,
+                    ctrRate: monitorClicks ? autoCtrRate : "0.00", updatedAt: new Date().toISOString() 
                 };
                 setIsModalExternalOpen(false);
                 if (editingExternal) await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'external', editingExternal.id), data);
@@ -707,82 +682,119 @@
                 const data = { 
                     title: fd.get('atividade'), date: fd.get('date'), sponsor: fd.get('sponsor'), 
                     description: fd.get('description'), meetingLink: fd.get('meetingLink'), status: fd.get('status'), 
-                    budget: localBudget, hasVendor: vendorToggle, 
-                    selectedVendorIndices: selectedVendorIndices, 
-                    vendors: localVendors, 
-                    includeNPS: includeAgendaNPS, npsValue: agendaNPSValue,
-                    updatedAt: new Date().toISOString() 
+                    budget: localBudget, hasVendor: vendorToggle, selectedVendorIndices: selectedVendorIndices, 
+                    vendors: localVendors, includeNPS: includeAgendaNPS, npsValue: agendaNPSValue, updatedAt: new Date().toISOString() 
                 };
                 setIsModalAgendaOpen(false);
                 if (editingAgenda) await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'agenda', editingAgenda.id), data);
                 else await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'agenda'), data);
             };
 
-            // ====== NOVAS FUNÇÕES DO PLANEJAMENTO (RÉGUAS) ======
-            
+            // =========================================================================
+            // CORE FUNCIONALIDADES - PÁGINA "PLANEJAMENTO" - REESCRITO E PROTEGIDO
+            // =========================================================================
+
+            // SANITIZAÇÃO DE SEGURANÇA: Firebase SDK quebra se enviarmos objetos instanciados na tela
+            // Esta função limpa tudo garantindo que apenas Strings, Numbers e Booleans puros sejam gravados.
+            const sanitizeStepsForDB = (steps) => {
+                if (!Array.isArray(steps)) return [];
+                return steps.map(s => ({
+                    titulo: s.titulo || '',
+                    canal: s.canal || 'Email',
+                    delayDias: Number(s.delayDias) || 0,
+                    briefing: s.briefing || '',
+                    concluido: !!s.concluido
+                }));
+            };
+
             const handleSaveRegua = async (e) => {
                 e.preventDefault();
-                const submitBtn = e.nativeEvent?.submitter;
-                if(submitBtn) submitBtn.disabled = true;
+                if (isSaving) return; 
+                setIsSaving(true);
 
                 try {
-                    const dataToSave = { ...reguaFormData, updatedAt: new Date().toISOString() };
-                    delete dataToSave.id;
-
+                    const cleanData = { 
+                        nome: reguaFormData.nome,
+                        objetivo: reguaFormData.objetivo,
+                        publico: reguaFormData.publico,
+                        dataInicio: reguaFormData.dataInicio,
+                        incluirNPS: reguaFormData.incluirNPS,
+                        valorNPS: reguaFormData.valorNPS,
+                        passos: sanitizeStepsForDB(reguaFormData.passos),
+                        updatedAt: new Date().toISOString() 
+                    };
+                    
                     setIsReguaEditorOpen(false);
-
                     if (editingReguaId) {
-                        const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'reguas_planejamento', editingReguaId);
-                        await setDoc(docRef, dataToSave, { merge: true });
+                        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'reguas_planejamento', editingReguaId), cleanData);
                     } else {
-                        dataToSave.createdAt = new Date().toISOString();
-                        await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'reguas_planejamento'), dataToSave);
+                        cleanData.createdAt = new Date().toISOString();
+                        await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'reguas_planejamento'), cleanData);
                     }
                     
                     setEditingReguaId(null);
-                    setReguaFormData(defaultReguaForm());
+                    setReguaFormData(getInitialReguaForm());
+                    setMessage("Planejamento salvo com sucesso!");
                 } catch (err) {
-                    console.error("Erro ao salvar régua:", err);
-                    setMessage(`Erro: ${err.message}`);
-                    setIsReguaEditorOpen(true);
+                    console.error(err);
+                    setMessage("Erro ao salvar! Verifique as permissões de banco.");
                 } finally {
-                    if(submitBtn) submitBtn.disabled = false;
+                    setIsSaving(false);
                 }
             };
 
-            const handleEditRegua = (e, regua) => {
-                e.preventDefault(); 
-                e.stopPropagation();
+            const handleEditRegua = (regua) => {
                 setEditingReguaId(regua.id);
-                setReguaFormData(JSON.parse(JSON.stringify(regua)));
+                // Garantimos a recuperação com valores defaults corretos
+                setReguaFormData({
+                    nome: regua.nome || '',
+                    objetivo: regua.objetivo || 'Engajamento',
+                    publico: regua.publico || '',
+                    dataInicio: regua.dataInicio || reguaUtils.getRawDate(new Date()),
+                    incluirNPS: !!regua.incluirNPS,
+                    valorNPS: regua.valorNPS || 5,
+                    passos: sanitizeStepsForDB(regua.passos) // Limpa os cálculos visuais da tela!
+                });
                 setIsReguaEditorOpen(true);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
             };
 
-            const toggleStepRegua = async (e, reguaId, reguaSteps, stepIdx) => {
-                e.preventDefault(); 
-                e.stopPropagation();
-                if (!reguaId) return;
-                
+            const toggleStepRegua = async (reguaId, reguaSteps, stepIdx) => {
+                if (isSaving) return;
+                setIsSaving(true);
                 try {
-                    const newSteps = reguaSteps.map((step, index) => 
-                        index === stepIdx ? { ...step, concluido: !step.concluido } : step
-                    );
-                    const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'reguas_planejamento', reguaId);
-                    await setDoc(docRef, { passos: newSteps, updatedAt: new Date().toISOString() }, { merge: true });
+                    // Deep clone and clean
+                    const cleanSteps = sanitizeStepsForDB(reguaSteps);
+                    
+                    // Toggle a etapa exata
+                    if (cleanSteps[stepIdx]) {
+                        cleanSteps[stepIdx].concluido = !cleanSteps[stepIdx].concluido;
+                    }
+                    
+                    await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'reguas_planejamento', reguaId), { 
+                        passos: cleanSteps, 
+                        updatedAt: new Date().toISOString() 
+                    });
                 } catch (error) {
-                    console.error("Erro no check:", error);
-                    setMessage(`Erro: ${error.message}`);
+                    console.error("Erro ao atualizar status do card:", error);
+                    setMessage("Erro de sincronização. Tente novamente.");
+                } finally {
+                    setIsSaving(false);
                 }
             };
 
+            // Calcula apenas visualmente para renderizar na listagem. (Isso nunca será salvo no banco!)
             const calculateTimeline = (regua) => {
                 let current = 0;
                 const today = new Date();
                 today.setHours(0,0,0,0);
 
-                const steps = regua.passos.map(p => {
+                const safePassos = Array.isArray(regua.passos) ? regua.passos : [];
+                const safeDataInicio = regua.dataInicio || reguaUtils.getRawDate(new Date());
+
+                const steps = safePassos.map(p => {
                     current += parseInt(p.delayDias || 0);
-                    const dateObj = reguaUtils.addDays(regua.dataInicio, current);
+                    const dateObj = reguaUtils.addDays(safeDataInicio, current);
                     const dateStripped = new Date(dateObj);
                     dateStripped.setHours(0,0,0,0);
 
@@ -791,14 +803,16 @@
                     else if (reguaUtils.isToday(dateObj)) status = 'Hoje';
                     else if (dateStripped < today) status = 'Atrasado';
 
-                    return { ...p, dateObj, dateStr: reguaUtils.formatDate(dateObj), status };
+                    return { ...p, dateStr: reguaUtils.formatDate(dateObj), status };
                 });
                 
-                const lastDate = steps.length > 0 ? steps[steps.length - 1].dateStr : null;
-                const progress = Math.round((steps.filter(s => s.concluido).length / steps.length) * 100) || 0;
+                const lastDate = steps.length > 0 ? steps[steps.length - 1].dateStr : '--/--/--';
+                const progress = steps.length > 0 ? Math.round((steps.filter(s => s.concluido).length / steps.length) * 100) : 0;
 
                 return { steps, lastDate, progress };
             };
+
+            // =========================================================================
 
             const renderIndividualSaving = (vendorValue) => {
                 if (!localBudget || localBudget <= 0 || !vendorValue) return null;
@@ -808,7 +822,6 @@
                 return <span className="text-[10px] font-black text-red-500 uppercase tracking-tighter">({Math.abs(saving).toFixed(1)}% acima do orçado)</span>;
             };
 
-            // Cálculo global para exibir o resumo total do Saving
             const custoTotalSelecionado = useMemo(() => {
                 return localVendors.reduce((acc, v, i) => selectedVendorIndices.includes(i) ? acc + Number(v.value) : acc, 0);
             }, [localVendors, selectedVendorIndices]);
@@ -843,7 +856,7 @@
 
             const filteredReguas = useMemo(() => {
                 return reguas.filter(r => {
-                    const date = new Date(r.dataInicio + 'T12:00:00');
+                    const date = new Date((r.dataInicio || '2026-01-01') + 'T12:00:00');
                     const mes = date.getMonth();
                     const ano = date.getFullYear().toString();
 
@@ -855,10 +868,9 @@
                 });
             }, [reguas, filterPublicoRegua, filterMesRegua, filterAnoRegua]);
 
-            const publicosUnicos = ['Todos', ...new Set(reguas.map(r => r.publico))];
+            const publicosUnicos = ['Todos', ...new Set(reguas.map(r => r.publico).filter(Boolean))];
             const anosUnicos = ['Todos', '2024', '2025', '2026'];
 
-            // Lógica de Impacto Consolidada com Filtros Globais e Média Ponderada
             const statsImpacto = useMemo(() => {
                 const sent = comms.filter(c => {
                     if (c.status !== 'Enviado' || !c.date) return false;
@@ -873,10 +885,8 @@
                 const totalInteractions = sent.reduce((acc, c) => acc + (Number(c.reactions) || 0) + (Number(c.comments) || 0), 0);
                 const totalComments = sent.reduce((acc, c) => acc + (Number(c.comments) || 0), 0);
                 
-                // Média Ponderada Global (TER)
                 const avgScore = totalReach > 0 ? ((totalInteractions / totalReach) * 100).toFixed(2) : "0.00";
                 
-                // Média Ponderada Global (TA) ignorando posts não preenchidos (zerados)
                 const validTAPosts = sent.filter(c => Number(c.population) > 0 && Number(c.views) > 0);
                 const totalValidReach = validTAPosts.reduce((acc, c) => acc + Number(c.views), 0);
                 const totalValidPopulation = validTAPosts.reduce((acc, c) => acc + Number(c.population), 0);
@@ -935,7 +945,6 @@
                     let c = 0;
 
                     let vendorsToCalc = ev.vendors || [];
-                    // Fallback para legacy documents que não tem 'vendors'
                     if (!ev.vendors && ev.vendor1 !== undefined) {
                          vendorsToCalc = [
                             { value: Number(ev.vendorValue1 || 0) },
@@ -945,7 +954,6 @@
                     }
 
                     let indices = ev.selectedVendorIndices;
-                    // Fallback para legacy documents que tem apenas 'selectedVendorIdx'
                     if (!indices && ev.selectedVendorIdx !== undefined && ev.selectedVendorIdx >= 0) {
                         indices = [ev.selectedVendorIdx];
                     } else if (!indices) {
@@ -1023,7 +1031,14 @@
                                     </div>
                                     
                                     <div className="flex w-full sm:w-auto sm:ml-auto gap-2">
-                                        <input type="file" accept=".csv" ref={fileInputRef} style={{ display: 'none' }} onChange={handleImportCSV} />
+                                        {/* Input oculto para carregar arquivo */}
+                                        <input 
+                                            type="file" 
+                                            accept=".csv" 
+                                            ref={fileInputRef} 
+                                            style={{ display: 'none' }} 
+                                            onChange={handleImportCSV} 
+                                        />
                                         <button onClick={() => fileInputRef.current.click()} className="flex-1 sm:flex-none bg-slate-100 text-slate-600 px-4 sm:px-6 py-3 sm:py-4 rounded-2xl text-[10px] font-black uppercase flex items-center justify-center gap-2 shadow-sm hover:bg-slate-200 transition-all" title="Importar CSV">
                                             <Icon name="upload" size={14} /> Importar
                                         </button>
@@ -1298,219 +1313,272 @@
                             </section>
                         )}
 
-                        {/* ========================================================================================= */}
-                        {/* ===================== ABA PLANEJAMENTO - TOTALMENTE REFORMULADA (MODAL) ================= */}
-                        {/* ========================================================================================= */}
                         {activeTab === 'planejamento' && (
                             <section className="animate-in fade-in duration-500">
-                                <div className="flex flex-col sm:flex-row flex-wrap items-start sm:items-center justify-between gap-4 mb-8 sm:mb-10 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm sticky top-[70px] sm:top-[85px] z-40">
-                                    <div className="flex items-center gap-3 sm:gap-4">
-                                        <div className="bg-slate-900 p-2 sm:p-2.5 rounded-xl">
-                                            <Icon name="trending-up" size={20} className="text-white sm:w-6 sm:h-6" />
+                                {/* NOVO CABEÇALHO E FILTROS */}
+                                <div className="flex flex-col sm:flex-row flex-wrap items-start sm:items-center justify-between gap-4 mb-8 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm sticky top-[70px] sm:top-[85px] z-40">
+                                    <div className="flex items-center gap-3">
+                                        <div className="bg-indigo-600 p-2 sm:p-2.5 rounded-xl">
+                                            <Icon name="git-merge" size={20} className="text-white sm:w-6 sm:h-6" />
                                         </div>
-                                        <h2 className="text-lg sm:text-xl font-black tracking-tight text-slate-900 uppercase">The Comms Journey</h2>
+                                        <h2 className="text-lg sm:text-xl font-black tracking-tight text-slate-900 uppercase">A Jornada de Comunicação</h2>
                                     </div>
-                                    <button onClick={() => { 
-                                                setEditingReguaId(null);
-                                                setReguaFormData(defaultReguaForm()); 
-                                                setIsReguaEditorOpen(true); 
-                                            }}
-                                            className="bg-slate-900 text-white w-full sm:w-auto px-6 py-3 sm:py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all hover:bg-indigo-600 active:scale-95 text-xs sm:text-sm shadow-md">
-                                        <Icon name="plus" size={16}/> Novo Planejamento
-                                    </button>
+                                    {!isReguaEditorOpen && (
+                                        <button onClick={() => { 
+                                            setEditingReguaId(null);
+                                            setReguaFormData(getInitialReguaForm());
+                                            setIsReguaEditorOpen(true); 
+                                        }} className="w-full sm:w-auto bg-slate-900 text-white px-6 py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all hover:bg-indigo-600 text-xs sm:text-sm shadow-md active:scale-95">
+                                            <Icon name="plus" size={16}/> NOVA RÉGUA
+                                        </button>
+                                    )}
                                 </div>
 
-                                <div className="bg-white p-5 sm:p-6 rounded-[1.5rem] sm:rounded-[2rem] border border-slate-100 shadow-sm flex flex-col sm:flex-row flex-wrap items-end gap-4 sm:gap-6 mb-8 sm:mb-12">
-                                    <div className="w-full sm:flex-1 sm:min-w-[200px] space-y-1.5">
-                                        <label className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Público / Segmento</label>
-                                        <div className="relative">
-                                            <select value={filterPublicoRegua} onChange={e => setFilterPublicoRegua(e.target.value)}
-                                                    className="w-full bg-slate-50 border-none text-xs sm:text-sm font-bold rounded-xl px-4 py-3 outline-none appearance-none">
-                                                {publicosUnicos.map(p => <option key={p} value={p}>{p}</option>)}
-                                            </select>
-                                            <Icon name="chevron-down" className="absolute right-3 top-3 text-slate-300 pointer-events-none" size={16}/>
-                                        </div>
-                                    </div>
-                                    <div className="w-full sm:w-48 space-y-1.5">
-                                        <label className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Mês de Início</label>
-                                        <div className="relative">
-                                            <select value={filterMesRegua} onChange={e => setFilterMesRegua(e.target.value)}
-                                                    className="w-full bg-slate-50 border-none text-xs sm:text-sm font-bold rounded-xl px-4 py-3 outline-none appearance-none">
-                                                <option value="Todos">Todos os Meses</option>
-                                                {reguaUtils.MESES.map((mes, idx) => <option key={idx} value={idx}>{mes}</option>)}
-                                            </select>
-                                            <Icon name="chevron-down" className="absolute right-3 top-3 text-slate-300 pointer-events-none" size={16}/>
-                                        </div>
-                                    </div>
-                                    <div className="w-full sm:w-32 space-y-1.5">
-                                        <label className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Ano</label>
-                                        <div className="relative">
-                                            <select value={filterAnoRegua} onChange={e => setFilterAnoRegua(e.target.value)}
-                                                    className="w-full bg-slate-50 border-none text-xs sm:text-sm font-bold rounded-xl px-4 py-3 outline-none appearance-none">
-                                                {anosUnicos.map(ano => <option key={ano} value={ano}>{ano}</option>)}
-                                            </select>
-                                            <Icon name="chevron-down" className="absolute right-3 top-3 text-slate-300 pointer-events-none" size={16}/>
-                                        </div>
-                                    </div>
-                                    <div className="w-full sm:w-auto bg-indigo-50 text-indigo-600 px-4 py-3 rounded-xl text-xs font-black uppercase text-center">
-                                        {filteredReguas.length} Resultados
-                                    </div>
-                                </div>
-
-                                <div className="space-y-8 sm:space-y-12 mb-16">
-                                    {filteredReguas.map(regua => {
-                                        const { steps, lastDate, progress } = calculateTimeline(regua);
-                                        const nps = regua.incluirNPS ? reguaUtils.getNPSCategory(regua.valorNPS) : null;
-                                        
-                                        return (
-                                            <div key={regua.id} className="bg-white rounded-[1.5rem] sm:rounded-[3.5rem] border border-slate-100 overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-700 group relative z-10">
-                                                <div className="px-6 sm:px-10 py-6 sm:py-10 border-b border-slate-50 flex flex-col sm:flex-row sm:items-center justify-between gap-6 sm:gap-8 bg-slate-50/20">
-                                                    <div className="flex items-start sm:items-center gap-4 sm:gap-8">
-                                                        <div className={`w-14 h-14 sm:w-20 sm:h-20 rounded-[1rem] sm:rounded-[2rem] flex items-center justify-center text-white shadow-xl sm:shadow-2xl transform sm:group-hover:scale-110 transition-transform shrink-0 ${regua.objetivo === 'Engajamento' ? 'bg-indigo-600 shadow-indigo-200' : 'bg-emerald-600 shadow-emerald-200'}`}>
-                                                            <Icon name={regua.objetivo === 'Engajamento' ? 'users' : 'target'} size={24} className="sm:w-[36px] sm:h-[36px]" />
-                                                        </div>
-                                                        <div className="space-y-2">
-                                                            <div className="flex flex-wrap items-center gap-2 sm:gap-4">
-                                                                <h3 className="text-lg sm:text-2xl font-black text-slate-900 tracking-tight leading-tight">{regua.nome}</h3>
-                                                                {nps && (
-                                                                    <div className={`flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-1 sm:py-1.5 rounded-full text-[9px] sm:text-[11px] font-black uppercase ${nps.bg} ${nps.text} border border-current shadow-sm`}>
-                                                                        <Icon name={nps.iconName} size={12} className="sm:w-[16px] sm:h-[16px]"/> <span>NPS {regua.valorNPS}</span>
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                            <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6 text-xs sm:text-sm">
-                                                                <span className="font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 text-[10px] sm:text-xs">
-                                                                    <Icon name="users" size={14} className="text-indigo-400 sm:w-[16px] sm:h-[16px]"/> {regua.publico}
-                                                                </span>
-                                                                <div className="flex items-center gap-2 sm:gap-3 bg-white px-3 sm:px-4 py-1 sm:py-1.5 rounded-full border border-slate-100 text-[9px] sm:text-[11px] font-black text-slate-700 shadow-sm w-fit">
-                                                                    <Icon name="calendar" size={12} className="text-slate-300 sm:w-[14px] sm:h-[14px]"/> 
-                                                                    {reguaUtils.formatDate(new Date(regua.dataInicio + 'T12:00:00'))} 
-                                                                    <Icon name="arrow-right" size={12} className="mx-1 text-slate-200 sm:w-[14px] sm:h-[14px]"/> 
-                                                                    <span className="text-indigo-600">{lastDate}</span>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-
-                                                    <div className="flex items-center justify-between sm:justify-end gap-6 sm:gap-12 w-full sm:w-auto mt-2 sm:mt-0 pt-4 sm:pt-0 border-t sm:border-0 border-slate-100">
-                                                        <div className="flex flex-col sm:items-end gap-1.5 sm:gap-2 flex-1 sm:flex-none">
-                                                            <div className="text-[9px] sm:text-[11px] font-black text-slate-300 uppercase tracking-tighter">Status</div>
-                                                            <div className="w-full sm:w-52 h-2 sm:h-3 bg-white rounded-full border border-slate-100 overflow-hidden shadow-inner p-[1px] sm:p-0.5">
-                                                                <div className="h-full bg-indigo-500 rounded-full transition-all duration-1000 ease-out shadow-lg" style={{ width: `${progress}%` }}></div>
-                                                            </div>
-                                                            <div className="text-[9px] sm:text-[11px] font-black text-indigo-500 uppercase tracking-widest">{progress}% CONCL.</div>
-                                                        </div>
-                                                        <div className="flex items-center gap-2 sm:gap-3 shrink-0 relative z-30">
-                                                            <button onClick={(e) => handleEditRegua(e, regua)} className="p-2 sm:p-3.5 text-slate-400 hover:text-white hover:bg-slate-900 rounded-[0.8rem] sm:rounded-[1.2rem] transition-all bg-slate-50 sm:bg-transparent"><Icon name="edit-3" size={18} className="sm:w-[22px] sm:h-[22px]"/></button>
-                                                            <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); promptDelete(regua.id, 'reguas_planejamento'); }} className="p-2 sm:p-3.5 text-slate-400 hover:text-white hover:bg-rose-500 rounded-[0.8rem] sm:rounded-[1.2rem] transition-all bg-slate-50 sm:bg-transparent"><Icon name="trash-2" size={18} className="sm:w-[22px] sm:h-[22px]"/></button>
-                                                        </div>
-                                                    </div>
+                                {!isReguaEditorOpen && (
+                                    <>
+                                        {/* BARRA DE FILTROS */}
+                                        <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-100 shadow-sm flex flex-col sm:flex-row gap-4 mb-8">
+                                            <div className="w-full sm:flex-1">
+                                                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Público / Segmento</label>
+                                                <div className="relative">
+                                                    <select value={filterPublicoRegua} onChange={e => setFilterPublicoRegua(e.target.value)} className="w-full bg-slate-50 border-none text-xs font-bold rounded-xl px-4 py-3 outline-none appearance-none cursor-pointer">
+                                                        {publicosUnicos.map(p => <option key={p} value={p}>{p}</option>)}
+                                                    </select>
+                                                    <Icon name="chevron-down" className="absolute right-3 top-3 text-slate-300 pointer-events-none" size={16}/>
                                                 </div>
+                                            </div>
+                                            <div className="w-full sm:w-48">
+                                                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Mês de Início</label>
+                                                <div className="relative">
+                                                    <select value={filterMesRegua} onChange={e => setFilterMesRegua(e.target.value)} className="w-full bg-slate-50 border-none text-xs font-bold rounded-xl px-4 py-3 outline-none appearance-none cursor-pointer">
+                                                        <option value="Todos">Todos os Meses</option>
+                                                        {reguaUtils.MESES.map((mes, idx) => <option key={idx} value={idx}>{mes}</option>)}
+                                                    </select>
+                                                    <Icon name="chevron-down" className="absolute right-3 top-3 text-slate-300 pointer-events-none" size={16}/>
+                                                </div>
+                                            </div>
+                                            <div className="w-full sm:w-32">
+                                                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Ano</label>
+                                                <div className="relative">
+                                                    <select value={filterAnoRegua} onChange={e => setFilterAnoRegua(e.target.value)} className="w-full bg-slate-50 border-none text-xs font-bold rounded-xl px-4 py-3 outline-none appearance-none cursor-pointer">
+                                                        {anosUnicos.map(ano => <option key={ano} value={ano}>{ano}</option>)}
+                                                    </select>
+                                                    <Icon name="chevron-down" className="absolute right-3 top-3 text-slate-300 pointer-events-none" size={16}/>
+                                                </div>
+                                            </div>
+                                        </div>
 
-                                                <div className="p-6 sm:p-12 overflow-x-auto custom-scroll relative z-20">
-                                                    <div className="flex items-start gap-6 sm:gap-12 min-w-max pb-4 sm:pb-0">
-                                                        {steps.map((passo, idx) => (
-                                                            <React.Fragment key={idx}>
-                                                                <div className="w-64 sm:w-80 flex-none relative">
-                                                                    <div className="mb-3 sm:mb-4 h-6 sm:h-8 flex items-center gap-2">
-                                                                        {passo.status === 'Atrasado' && (
-                                                                            <div className="bg-rose-50 text-rose-500 text-[9px] sm:text-[10px] font-black px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg sm:rounded-xl border-2 border-rose-100 animate-bounce flex items-center gap-1 sm:gap-1.5">
-                                                                                <Icon name="alert-triangle" size={10} className="sm:w-[12px] sm:h-[12px]"/> EM ATRASO
-                                                                            </div>
-                                                                        )}
-                                                                        {passo.status === 'Hoje' && (
-                                                                            <div className="bg-indigo-50 text-indigo-600 text-[9px] sm:text-[10px] font-black px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg sm:rounded-xl border-2 border-indigo-100 uppercase flex items-center gap-1 sm:gap-1.5 shadow-sm">
-                                                                                <Icon name="clock" size={10} className="sm:w-[12px] sm:h-[12px]"/> HOJE
-                                                                            </div>
-                                                                        )}
-                                                                        {passo.status === 'Enviado' && (
-                                                                            <div className="bg-emerald-50 text-emerald-600 text-[9px] sm:text-[10px] font-black px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg sm:rounded-xl border-2 border-emerald-100 uppercase flex items-center gap-1 sm:gap-1.5">
-                                                                                <Icon name="check" size={10} className="sm:w-[12px] sm:h-[12px]"/> ENVIADO
-                                                                            </div>
-                                                                        )}
-                                                                    </div>
-
-                                                                    <div className={`p-5 sm:p-8 rounded-[1.5rem] sm:rounded-[3rem] border-2 transition-all relative ${
-                                                                        passo.concluido ? 'border-emerald-100 bg-emerald-50/10 grayscale-[0.5]' : 
-                                                                        passo.status === 'Atrasado' ? 'border-rose-100 bg-white shadow-xl shadow-rose-50/50' : 'border-slate-50 bg-[#F8FAFC]/50 hover:bg-white hover:shadow-2xl'
-                                                                    }`}>
-                                                                        <div className="flex items-center justify-between mb-4 sm:mb-6">
-                                                                            <div className={`p-2.5 sm:p-3 rounded-xl sm:rounded-2xl shadow-sm ${
-                                                                                passo.canal === 'Email' ? 'bg-indigo-100 text-indigo-600' :
-                                                                                passo.canal === 'WhatsApp' ? 'bg-emerald-100 text-emerald-600' : 
-                                                                                passo.canal === 'Slack' ? 'bg-purple-100 text-purple-600' : 'bg-amber-100 text-amber-600'
-                                                                            }`}>
-                                                                                {passo.canal === 'Email' ? <Icon name="mail" size={18} className="sm:w-[22px] sm:h-[22px]" /> : 
-                                                                                passo.canal === 'WhatsApp' ? <Icon name="message-square" size={18} className="sm:w-[22px] sm:h-[22px]" /> : 
-                                                                                passo.canal === 'Slack' ? <Icon name="hash" size={18} className="sm:w-[22px] sm:h-[22px]" /> : <Icon name="bell" size={18} className="sm:w-[22px] sm:h-[22px]" />}
-                                                                            </div>
-                                                                            <button onClick={(e) => toggleStepRegua(e, regua.id, regua.passos, idx)}
-                                                                                className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full border-2 flex items-center justify-center transition-all relative z-40 cursor-pointer ${
-                                                                                    passo.concluido ? 'bg-emerald-500 border-emerald-500 text-white shadow-lg shadow-emerald-200' : 'bg-white border-slate-200 text-slate-200 hover:border-indigo-500 hover:text-indigo-500'
-                                                                                }`}>
-                                                                                <Icon name="check" size={16} className="sm:w-[18px] sm:h-[18px]" forceKey={passo.concluido ? 'y'+idx : 'n'+idx} />
-                                                                            </button>
-                                                                        </div>
-                                                                        
-                                                                        <h4 className={`font-black text-sm sm:text-base mb-2 sm:mb-3 leading-tight h-10 sm:h-12 line-clamp-2 ${passo.concluido ? 'text-slate-400 line-through' : 'text-slate-900'}`}>{passo.titulo}</h4>
-                                                                        <p className="text-[10px] sm:text-xs text-slate-400 leading-relaxed mb-4 sm:mb-8 line-clamp-2 h-7 sm:h-8 italic">"{passo.briefing || 'Nenhum briefing cadastrado.'}"</p>
-                                                                        
-                                                                        <div className="flex items-center justify-between pt-4 sm:pt-6 border-t border-slate-50">
-                                                                            <div>
-                                                                                <span className="text-[8px] sm:text-[10px] font-black text-slate-300 uppercase block mb-0.5 sm:mb-1 tracking-tighter">Data Prevista</span>
-                                                                                <span className="text-xs sm:text-sm font-black text-slate-900">{passo.dateStr}</span>
-                                                                            </div>
-                                                                            <div className="bg-slate-900 text-[9px] sm:text-[11px] font-black text-white px-2 sm:px-3 py-1 rounded-full shadow-md sm:shadow-lg">
-                                                                                T + {passo.delayDias}D
-                                                                            </div>
-                                                                        </div>
-                                                                    </div>
+                                        {/* LISTAGEM DE RÉGUAS - MODELO CARD VERTICAL NOVO */}
+                                        <div className="space-y-6 sm:space-y-8 mb-16">
+                                            {filteredReguas.map(regua => {
+                                                const { steps, progress } = calculateTimeline(regua);
+                                                const nps = regua.incluirNPS ? reguaUtils.getNPSCategory(regua.valorNPS) : null;
+                                                
+                                                return (
+                                                    <div key={regua.id} className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden flex flex-col group hover:shadow-lg transition-all">
+                                                        {/* CABEÇALHO DO CARD */}
+                                                        <div className="p-5 sm:p-6 bg-slate-50 border-b border-slate-100 flex flex-col md:flex-row justify-between gap-4">
+                                                            <div>
+                                                                <div className="flex items-center gap-3 flex-wrap">
+                                                                    <h3 className="text-xl sm:text-2xl font-black text-slate-800 uppercase tracking-tight">{regua.nome}</h3>
+                                                                    {nps && (
+                                                                        <span className={`px-2 py-1 rounded-md text-[9px] font-black uppercase ${nps.bg} ${nps.text} border border-current shadow-sm flex items-center gap-1`}>
+                                                                            <Icon name={nps.iconName} size={10}/> NPS {regua.valorNPS}
+                                                                        </span>
+                                                                    )}
                                                                 </div>
-                                                                {idx < steps.length - 1 && (
-                                                                    <div className="self-center pt-6 sm:pt-10 text-slate-200">
-                                                                        <Icon name="chevron-right" size={24} className="sm:w-[32px] sm:h-[32px]" />
+                                                                <div className="flex flex-wrap items-center gap-3 mt-2 text-xs font-bold text-slate-500 uppercase tracking-widest">
+                                                                    <span className="flex items-center gap-1 text-indigo-500"><Icon name="users" size={14}/> {regua.publico}</span>
+                                                                    <span className="text-slate-300">•</span>
+                                                                    <span className="flex items-center gap-1"><Icon name="calendar" size={14}/> {reguaUtils.formatDate(new Date((regua.dataInicio || '2026-01-01') + 'T12:00:00'))}</span>
+                                                                </div>
+                                                            </div>
+                                                            <div className="flex items-center gap-2">
+                                                                <button onClick={() => handleEditRegua(regua)} disabled={isSaving} className="p-3 bg-white text-indigo-600 rounded-xl shadow-sm hover:shadow-md hover:bg-indigo-50 border border-indigo-100 transition-all font-bold text-[10px] uppercase flex items-center gap-2 disabled:opacity-50"><Icon name="pencil" size={14}/> Editar</button>
+                                                                <button onClick={() => promptDelete(regua.id, 'reguas_planejamento')} disabled={isSaving} className="p-3 bg-white text-rose-600 rounded-xl shadow-sm hover:shadow-md hover:bg-rose-50 border border-rose-100 transition-all font-bold text-[10px] uppercase flex items-center gap-2 disabled:opacity-50"><Icon name="trash-2" size={14}/> Excluir</button>
+                                                            </div>
+                                                        </div>
+                                                        {/* BARRA DE PROGRESSO */}
+                                                        <div className="w-full bg-slate-100 h-1.5 sm:h-2">
+                                                            <div className="bg-emerald-500 h-full transition-all duration-1000 ease-out" style={{width: `${progress}%`}}></div>
+                                                        </div>
+                                                        {/* ETAPAS DA RÉGUA */}
+                                                        <div className="p-5 sm:p-8 bg-white">
+                                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                                {steps.map((step, idx) => (
+                                                                    <div key={idx} className={`flex items-start gap-4 p-4 sm:p-5 rounded-2xl border-2 transition-colors ${step.concluido ? 'border-emerald-100 bg-emerald-50/50' : 'border-slate-100 bg-slate-50/50 hover:border-indigo-100'}`}>
+                                                                        <button onClick={() => toggleStepRegua(regua.id, regua.passos, idx)} disabled={isSaving} 
+                                                                                className={`mt-1 shrink-0 w-8 h-8 rounded-full border-2 flex items-center justify-center transition-all disabled:cursor-not-allowed ${step.concluido ? 'bg-emerald-500 border-emerald-500 text-white shadow-md shadow-emerald-200' : 'bg-white border-slate-300 text-slate-300 hover:border-indigo-500 hover:text-indigo-500'}`}>
+                                                                            <Icon name="check" size={16} forceKey={`chk-${regua.id}-${idx}-${step.concluido}`}/>
+                                                                        </button>
+                                                                        <div className="flex-1">
+                                                                            <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                                                                                <span className={`text-[9px] sm:text-[10px] font-black uppercase px-2 py-0.5 rounded-md border ${step.status === 'Enviado' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : step.status === 'Atrasado' ? 'bg-rose-50 text-rose-600 border-rose-200 animate-pulse' : step.status === 'Hoje' ? 'bg-indigo-50 text-indigo-600 border-indigo-200' : 'bg-white text-slate-500 border-slate-200'}`}>{step.status}</span>
+                                                                                <span className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest">T+{step.delayDias} dias</span>
+                                                                                <span className="text-[9px] font-bold text-slate-400">({step.dateStr})</span>
+                                                                                <span className="text-[9px] font-black text-indigo-500 uppercase bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-md ml-auto flex items-center gap-1"><Icon name={step.canal === 'Email' ? 'mail' : step.canal === 'WhatsApp' ? 'message-square' : step.canal === 'Slack' ? 'hash' : 'bell'} size={10}/> {step.canal}</span>
+                                                                            </div>
+                                                                            <h4 className={`text-sm font-black mb-1 leading-tight ${step.concluido ? 'text-slate-400 line-through' : 'text-slate-800'}`}>{step.titulo || 'Sem Título'}</h4>
+                                                                            <p className="text-xs text-slate-500 italic leading-relaxed">{step.briefing || 'Sem descrição.'}</p>
+                                                                        </div>
                                                                     </div>
-                                                                )}
-                                                            </React.Fragment>
-                                                        ))}
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                            {filteredReguas.length === 0 && (
+                                                <div className="text-center p-12 bg-slate-50 rounded-3xl border-2 border-dashed border-slate-200 text-slate-400 font-bold flex flex-col items-center gap-3">
+                                                    <Icon name="inbox" size={32} className="text-slate-300" />
+                                                    Nenhuma régua de comunicação encontrada.
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* INDICADORES (MANTIDOS) */}
+                                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-8 pt-10 sm:pt-16 border-t border-slate-100">
+                                            <div className="bg-white p-5 sm:p-8 rounded-[1.5rem] sm:rounded-[3rem] border border-slate-100 shadow-sm transition-all hover:shadow-xl group col-span-1">
+                                                <div className="text-3xl sm:text-5xl font-black text-rose-500 sm:group-hover:scale-110 transition-transform origin-left">
+                                                    {reguas.reduce((acc, r) => acc + calculateTimeline(r).steps.filter(p => p.status === 'Atrasado').length, 0)}
+                                                </div>
+                                                <div className="text-[8px] sm:text-[11px] font-black text-slate-400 uppercase tracking-widest mt-2 sm:mt-3">Ações Pendentes</div>
+                                            </div>
+                                            <div className="bg-white p-5 sm:p-8 rounded-[1.5rem] sm:rounded-[3rem] border border-slate-100 shadow-sm transition-all hover:shadow-xl group col-span-1">
+                                                <div className="text-3xl sm:text-5xl font-black text-indigo-600 sm:group-hover:scale-110 transition-transform origin-left">
+                                                    {reguas.reduce((acc, r) => acc + calculateTimeline(r).steps.filter(p => p.status === 'Hoje').length, 0)}
+                                                </div>
+                                                <div className="text-[8px] sm:text-[11px] font-black text-slate-400 uppercase tracking-widest mt-2 sm:mt-3">Para Hoje</div>
+                                            </div>
+                                            <div className="bg-white p-5 sm:p-8 rounded-[1.5rem] sm:rounded-[3rem] border border-slate-100 shadow-sm transition-all hover:shadow-xl group col-span-1">
+                                                <div className="text-3xl sm:text-5xl font-black text-emerald-500 sm:group-hover:scale-110 transition-transform origin-left">
+                                                    {reguas.reduce((acc, r) => acc + calculateTimeline(r).steps.filter(p => p.concluido).length, 0)}
+                                                </div>
+                                                <div className="text-[8px] sm:text-[11px] font-black text-slate-400 uppercase tracking-widest mt-2 sm:mt-3">Concluídos</div>
+                                            </div>
+                                            <div className="bg-slate-900 p-5 sm:p-8 rounded-[1.5rem] sm:rounded-[3rem] shadow-xl sm:shadow-2xl shadow-slate-200 transition-all hover:scale-[1.02] col-span-1">
+                                                <div className="text-3xl sm:text-5xl font-black text-white">{reguas.length}</div>
+                                                <div className="text-[8px] sm:text-[11px] font-black text-slate-400 uppercase tracking-widest mt-2 sm:mt-3">Réguas Ativas</div>
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
+
+                                {/* NOVO FORMULÁRIO DE EDIÇÃO LINEAR */}
+                                {isReguaEditorOpen && (
+                                    <div className="bg-white rounded-[1.5rem] sm:rounded-[3rem] border border-slate-200 shadow-2xl p-6 sm:p-10 mb-8 animate-in fade-in duration-300">
+                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 pb-6 border-b border-slate-100 gap-4">
+                                            <h2 className="text-2xl sm:text-3xl font-black text-slate-800 uppercase tracking-tighter flex items-center gap-3">
+                                                <Icon name="settings" className="text-indigo-600" size={28} /> {editingReguaId ? 'Editar Régua' : 'Nova Régua de Comunicação'}
+                                            </h2>
+                                            <button type="button" onClick={() => { setIsReguaEditorOpen(false); setEditingReguaId(null); setReguaFormData(getInitialReguaForm()); }} className="w-full sm:w-auto bg-slate-100 text-slate-500 px-6 py-3 rounded-xl font-bold uppercase tracking-widest text-[10px] hover:bg-slate-200 transition-colors text-center">Cancelar e Fechar</button>
+                                        </div>
+                                        
+                                        <form onSubmit={handleSaveRegua} className="space-y-10">
+                                            {/* Configurações Gerais */}
+                                            <div>
+                                                <h3 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-4 flex items-center gap-2"><Icon name="info" size={14}/> Informações Básicas</h3>
+                                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 bg-slate-50 p-6 sm:p-8 rounded-[1.5rem] border border-slate-100">
+                                                    <div>
+                                                        <label className="block text-[10px] font-black uppercase text-slate-500 mb-2 ml-1">Nome da Campanha</label>
+                                                        <input required value={reguaFormData.nome} onChange={e => setReguaFormData({...reguaFormData, nome: e.target.value})} className="w-full bg-white border border-slate-200 rounded-xl p-4 outline-none focus:border-indigo-500 font-bold text-sm shadow-sm transition-colors" placeholder="Ex: Pesquisa de Clima Q3" />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-[10px] font-black uppercase text-slate-500 mb-2 ml-1">Público Alvo</label>
+                                                        <input required value={reguaFormData.publico} onChange={e => setReguaFormData({...reguaFormData, publico: e.target.value})} className="w-full bg-white border border-slate-200 rounded-xl p-4 outline-none focus:border-indigo-500 text-sm shadow-sm transition-colors" placeholder="Ex: Clientes VIP" />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-[10px] font-black uppercase text-slate-500 mb-2 ml-1">Data Início (Marco Zero)</label>
+                                                        <input type="date" required value={reguaFormData.dataInicio} onChange={e => setReguaFormData({...reguaFormData, dataInicio: e.target.value})} className="w-full bg-white border border-slate-200 rounded-xl p-4 outline-none focus:border-indigo-500 font-bold text-sm shadow-sm transition-colors" />
                                                     </div>
                                                 </div>
                                             </div>
-                                        );
-                                    })}
-                                </div>
 
-                                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-8 pt-10 sm:pt-16 border-t border-slate-100">
-                                    <div className="bg-white p-5 sm:p-8 rounded-[1.5rem] sm:rounded-[3rem] border border-slate-100 shadow-sm transition-all hover:shadow-xl group col-span-1">
-                                        <div className="text-3xl sm:text-5xl font-black text-rose-500 sm:group-hover:scale-110 transition-transform origin-left">
-                                            {reguas.reduce((acc, r) => acc + calculateTimeline(r).steps.filter(p => p.status === 'Atrasado').length, 0)}
-                                        </div>
-                                        <div className="text-[8px] sm:text-[11px] font-black text-slate-400 uppercase tracking-widest mt-2 sm:mt-3">Ações Pendentes</div>
-                                    </div>
-                                    <div className="bg-white p-5 sm:p-8 rounded-[1.5rem] sm:rounded-[3rem] border border-slate-100 shadow-sm transition-all hover:shadow-xl group col-span-1">
-                                        <div className="text-3xl sm:text-5xl font-black text-indigo-600 sm:group-hover:scale-110 transition-transform origin-left">
-                                            {reguas.reduce((acc, r) => acc + calculateTimeline(r).steps.filter(p => p.status === 'Hoje').length, 0)}
-                                        </div>
-                                        <div className="text-[8px] sm:text-[11px] font-black text-slate-400 uppercase tracking-widest mt-2 sm:mt-3">Para Hoje</div>
-                                    </div>
-                                    <div className="bg-white p-5 sm:p-8 rounded-[1.5rem] sm:rounded-[3rem] border border-slate-100 shadow-sm transition-all hover:shadow-xl group col-span-1">
-                                        <div className="text-3xl sm:text-5xl font-black text-emerald-500 sm:group-hover:scale-110 transition-transform origin-left">
-                                            {reguas.reduce((acc, r) => acc + calculateTimeline(r).steps.filter(p => p.concluido).length, 0)}
-                                        </div>
-                                        <div className="text-[8px] sm:text-[11px] font-black text-slate-400 uppercase tracking-widest mt-2 sm:mt-3">Concluídos</div>
-                                    </div>
-                                    <div className="bg-slate-900 p-5 sm:p-8 rounded-[1.5rem] sm:rounded-[3rem] shadow-xl sm:shadow-2xl shadow-slate-200 transition-all hover:scale-[1.02] col-span-1">
-                                        <div className="text-3xl sm:text-5xl font-black text-white">{reguas.length}</div>
-                                        <div className="text-[8px] sm:text-[11px] font-black text-slate-400 uppercase tracking-widest mt-2 sm:mt-3">Réguas Ativas</div>
-                                    </div>
-                                </div>
+                                            {/* Configuração NPS */}
+                                            <div>
+                                                <div className="flex items-center justify-between mb-4">
+                                                    <h3 className="text-xs font-black uppercase tracking-widest text-slate-400 flex items-center gap-2"><Icon name="smile" size={14}/> Expectativa de NPS</h3>
+                                                    <div className="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-full border border-slate-200">
+                                                        <span className="text-[10px] font-black text-slate-500 uppercase">Habilitar Metrifica?</span>
+                                                        <button type="button" onClick={() => setReguaFormData({...reguaFormData, incluirNPS: !reguaFormData.incluirNPS})} className={`w-10 h-5 rounded-full transition-all relative ${reguaFormData.incluirNPS ? 'bg-green-500' : 'bg-slate-300'}`}>
+                                                            <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all ${reguaFormData.incluirNPS ? 'left-6' : 'left-1'}`}></div>
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                                {reguaFormData.incluirNPS && (
+                                                    <div className="bg-slate-50 p-6 sm:p-8 rounded-[1.5rem] border border-green-100 shadow-inner flex flex-wrap sm:flex-nowrap justify-between gap-2">
+                                                        {[...Array(11).keys()].map(num => {
+                                                            const cat = reguaUtils.getNPSCategory(num);
+                                                            return (
+                                                                <button key={num} type="button" onClick={() => setReguaFormData({...reguaFormData, valorNPS: num})}
+                                                                    className={`flex-1 min-w-[32px] sm:min-w-[45px] flex flex-col items-center gap-2 p-3 rounded-2xl transition-all border-2 ${
+                                                                        reguaFormData.valorNPS === num ? `${cat.color} text-white border-transparent scale-110 shadow-lg z-10` : `bg-white ${cat.text} border-slate-100 hover:border-slate-300`
+                                                                    }`}>
+                                                                    <div className={reguaFormData.valorNPS === num ? 'text-white' : cat.text}><Icon name={cat.iconName} size={16}/></div>
+                                                                    <span className="text-xs font-black">{num}</span>
+                                                                </button>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                )}
+                                            </div>
 
-                                <div className="mt-8 bg-indigo-50/50 p-6 sm:p-8 rounded-[1.5rem] sm:rounded-[2.5rem] border border-indigo-100 flex flex-col sm:flex-row items-start gap-4 sm:gap-6 text-xs text-indigo-800 italic shadow-sm">
-                                    <Icon name="info" size={20} className="text-indigo-500 sm:mt-1 shrink-0 sm:w-[24px] sm:h-[24px]" />
-                                    <p className="leading-relaxed">
-                                        <strong>The Comms Journey:</strong> Esta é sua central de inteligência para orquestrar jornadas de comunicação. Planeje disparos multicanais, acompanhe o progresso em tempo real e utilize os indicadores de NPS para medir o impacto de cada estratégia.
-                                    </p>
-                                </div>
+                                            {/* Construtor de Etapas (Linear) */}
+                                            <div className="pt-6 border-t border-slate-100">
+                                                <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
+                                                    <h3 className="text-sm font-black uppercase tracking-widest text-slate-800 flex items-center gap-2"><Icon name="list" size={18}/> Passos de Comunicação</h3>
+                                                    <button type="button" onClick={() => setReguaFormData({...reguaFormData, passos: [...reguaFormData.passos, { titulo: '', canal: 'Email', delayDias: 1, briefing: '', concluido: false }]})} className="w-full sm:w-auto text-[10px] font-black uppercase text-indigo-600 bg-indigo-50 px-5 py-3 rounded-xl hover:bg-indigo-100 transition-colors flex items-center justify-center gap-2 border border-indigo-100"><Icon name="plus" size={14}/> Adicionar Nova Etapa</button>
+                                                </div>
+                                                <div className="space-y-4">
+                                                    {reguaFormData.passos.map((p, i) => (
+                                                        <div key={i} className="flex flex-col md:flex-row gap-4 bg-white p-5 rounded-[1.5rem] border-2 border-slate-100 relative shadow-sm hover:border-indigo-100 transition-all group">
+                                                            <div className="hidden md:flex shrink-0 w-8 h-8 bg-slate-900 text-white rounded-full items-center justify-center text-xs font-black shadow-md">{i+1}</div>
+                                                            <div className="flex-1 grid grid-cols-1 md:grid-cols-12 gap-4">
+                                                                <div className="md:col-span-5">
+                                                                    <label className="block text-[9px] font-black uppercase text-slate-400 mb-1 ml-1">Assunto / Título da Mensagem</label>
+                                                                    <input required value={p.titulo} onChange={e => { const newPassos = [...reguaFormData.passos]; newPassos[i].titulo = e.target.value; setReguaFormData({...reguaFormData, passos: newPassos}); }} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm font-bold outline-none focus:border-indigo-500 focus:bg-white transition-colors" placeholder="Ex: Bem-vindo!" />
+                                                                </div>
+                                                                <div className="md:col-span-3">
+                                                                    <label className="block text-[9px] font-black uppercase text-slate-400 mb-1 ml-1">Canal</label>
+                                                                    <div className="relative">
+                                                                        <select value={p.canal} onChange={e => { const newPassos = [...reguaFormData.passos]; newPassos[i].canal = e.target.value; setReguaFormData({...reguaFormData, passos: newPassos}); }} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm font-bold outline-none focus:border-indigo-500 appearance-none cursor-pointer focus:bg-white transition-colors">
+                                                                            <option>Email</option><option>WhatsApp</option><option>Push</option><option>Slack</option>
+                                                                        </select>
+                                                                        <Icon name="chevron-down" size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"/>
+                                                                    </div>
+                                                                </div>
+                                                                <div className="md:col-span-4">
+                                                                    <label className="block text-[9px] font-black uppercase text-slate-400 mb-1 ml-1">Gatilho (Dias após Início)</label>
+                                                                    <div className="relative">
+                                                                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-black text-[10px]">T+</span>
+                                                                        <input type="number" min="0" required value={p.delayDias} onChange={e => { const newPassos = [...reguaFormData.passos]; newPassos[i].delayDias = e.target.value; setReguaFormData({...reguaFormData, passos: newPassos}); }} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 pl-10 text-sm font-bold outline-none focus:border-indigo-500 focus:bg-white transition-colors" />
+                                                                    </div>
+                                                                </div>
+                                                                <div className="md:col-span-12">
+                                                                    <label className="block text-[9px] font-black uppercase text-slate-400 mb-1 ml-1">Briefing / Conteúdo</label>
+                                                                    <input value={p.briefing} onChange={e => { const newPassos = [...reguaFormData.passos]; newPassos[i].briefing = e.target.value; setReguaFormData({...reguaFormData, passos: newPassos}); }} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm outline-none focus:border-indigo-500 focus:bg-white transition-colors" placeholder="Detalhes do que será enviado..." />
+                                                                </div>
+                                                            </div>
+                                                            <button type="button" onClick={() => { const newPassos = reguaFormData.passos.filter((_, idx) => idx !== i); setReguaFormData({...reguaFormData, passos: newPassos}); }} className="w-full md:w-12 h-12 md:h-auto bg-rose-50 border border-rose-100 text-rose-500 rounded-xl flex items-center justify-center hover:bg-rose-500 hover:text-white transition-colors shrink-0 mt-4 md:mt-0" title="Remover Etapa">
+                                                                <Icon name="trash-2" size={18}/> <span className="md:hidden ml-2 font-black text-xs uppercase">Remover Etapa</span>
+                                                            </button>
+                                                        </div>
+                                                    ))}
+                                                    {reguaFormData.passos.length === 0 && (
+                                                        <div className="text-center p-8 bg-slate-50 border border-dashed border-slate-200 rounded-2xl text-slate-400 text-sm font-bold">Nenhum passo adicionado. Use o botão acima para criar o fluxo.</div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            
+                                            {/* Submit */}
+                                            <div className="pt-8 border-t border-slate-200 flex flex-col sm:flex-row justify-end gap-4">
+                                                <button type="submit" disabled={isSaving} className={`w-full sm:w-auto px-10 py-4 sm:py-5 rounded-2xl font-black uppercase tracking-widest text-[10px] sm:text-xs transition-all ${isSaving ? 'bg-slate-400 text-white cursor-not-allowed' : 'bg-black text-white hover:bg-indigo-600 shadow-xl'}`}>
+                                                    {isSaving ? 'Processando e Salvando...' : (editingReguaId ? 'Confirmar e Atualizar Régua' : 'Publicar Nova Régua')}
+                                                </button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                )}
                             </section>
                         )}
                     </main>
@@ -1695,8 +1763,8 @@
                                 <h3 className="text-xl sm:text-2xl font-black uppercase italic tracking-tighter text-slate-900 mb-2 leading-none">Tem certeza?</h3>
                                 <p className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-8 sm:mb-10 italic">Esta ação é irreversível.</p>
                                 <div className="grid grid-cols-2 gap-3 sm:gap-4 mt-8 sm:mt-10">
-                                    <button onClick={() => setIsDeleteModalOpen(false)} className="py-3 sm:py-4 bg-slate-100 text-slate-400 rounded-xl sm:rounded-2xl font-black uppercase text-[9px] sm:text-[10px] tracking-widest italic">Cancelar</button>
-                                    <button onClick={executeDelete} className="py-3 sm:py-4 bg-red-500 text-white rounded-xl sm:rounded-2xl font-black uppercase text-[9px] sm:text-[10px] tracking-widest hover:bg-red-600 shadow-lg shadow-red-500/20 italic">Excluir</button>
+                                    <button onClick={() => setIsDeleteModalOpen(false)} className="py-3 sm:py-4 bg-slate-100 text-slate-400 rounded-xl sm:rounded-2xl font-black uppercase text-[9px] sm:text-[10px] tracking-widest italic hover:bg-slate-200 transition-colors">Cancelar</button>
+                                    <button onClick={executeDelete} className="py-3 sm:py-4 bg-red-500 text-white rounded-xl sm:rounded-2xl font-black uppercase text-[9px] sm:text-[10px] tracking-widest hover:bg-red-600 shadow-lg shadow-red-500/20 italic transition-colors">Excluir</button>
                                 </div>
                             </div>
                         </div>
@@ -1864,191 +1932,6 @@
                                     </div>
 
                                     <button type="submit" className="w-full mt-2 sm:mt-4 py-5 sm:py-6 bg-black text-white rounded-[1.5rem] sm:rounded-[2rem] font-black uppercase text-[10px] sm:text-xs tracking-[0.2em] sm:tracking-[0.4em] active:scale-[0.98] shadow-2xl italic text-center">SALVAR PLANEJAMENTO</button>
-                                </form>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* ========================================================================================= */}
-                    {/* ====== MODAL PLANEJAMENTO (RÉGUAS DE COMUNICAÇÃO) ====== */}
-                    {isReguaEditorOpen && (
-                        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[150] flex items-center justify-center p-2 sm:p-4">
-                            <div className="bg-white w-full max-w-5xl rounded-[1.5rem] sm:rounded-[3rem] p-5 sm:p-12 shadow-2xl modal-animate relative max-h-[95vh] overflow-y-auto custom-scroll">
-                                <button type="button" onClick={() => { setIsReguaEditorOpen(false); setEditingReguaId(null); setReguaFormData(defaultReguaForm()); }} className="btn-close-modal"><Icon name="x" size={20} className="sm:w-[24px] sm:h-[24px]"/></button>
-                                
-                                <h3 className="text-2xl sm:text-3xl font-black italic uppercase tracking-tighter mb-8 sm:mb-10 text-slate-800 pr-10 flex items-center gap-3">
-                                    <Icon name="settings" className="text-indigo-500" size={28} /> 
-                                    {editingReguaId ? 'Editar Planejamento' : 'Novo Fluxo Estratégico'}
-                                </h3>
-                                
-                                <form onSubmit={handleSaveRegua} className="space-y-8 sm:space-y-10">
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8">
-                                        <div className="space-y-2">
-                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Nome da Campanha</label>
-                                            <input required value={reguaFormData.nome} onChange={e => setReguaFormData({...reguaFormData, nome: e.target.value})} 
-                                                   className="w-full bg-slate-50 border-none border-slate-100 rounded-xl p-3.5 outline-none focus:ring-2 focus:ring-indigo-500/10 transition-all text-sm font-bold shadow-sm" placeholder="Ex: Onboarding Q1" />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Público</label>
-                                            <input required value={reguaFormData.publico} onChange={e => setReguaFormData({...reguaFormData, publico: e.target.value})} 
-                                                   className="w-full bg-slate-50 border-none border-slate-100 rounded-xl p-3.5 outline-none text-sm font-bold shadow-sm" placeholder="Ex: Segmento A" />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Data Inicial</label>
-                                            <input type="date" value={reguaFormData.dataInicio} onChange={e => setReguaFormData({...reguaFormData, dataInicio: e.target.value})} 
-                                                   className="w-full bg-slate-50 border-none border-slate-100 rounded-xl p-3.5 outline-none text-sm font-bold shadow-sm" />
-                                        </div>
-                                        <div className="space-y-2 flex flex-col justify-end">
-                                            <div className="flex items-center justify-between bg-slate-50 p-3.5 rounded-xl border border-slate-100 shadow-sm">
-                                                <span className="text-[10px] font-black text-slate-400 uppercase">Incluir NPS?</span>
-                                                <button type="button" onClick={() => setReguaFormData({...reguaFormData, incluirNPS: !reguaFormData.incluirNPS})}
-                                                        className={`w-12 h-6 rounded-full transition-all relative ${reguaFormData.incluirNPS ? 'bg-indigo-600 shadow-lg shadow-indigo-100' : 'bg-slate-300'}`}>
-                                                    <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${reguaFormData.incluirNPS ? 'left-7' : 'left-1'}`}></div>
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {reguaFormData.incluirNPS && (
-                                        <div className="bg-slate-50 rounded-[1.5rem] sm:rounded-[2.5rem] p-6 sm:p-10 border border-slate-100 animate-in zoom-in-95 duration-200 shadow-inner">
-                                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 sm:mb-8">
-                                                <h3 className="text-xs sm:text-sm font-black text-slate-900 uppercase tracking-widest flex items-center gap-2">
-                                                    <Icon name="smile" size={16} className="text-green-500 sm:w-[18px] sm:h-[18px]"/> Definir NPS do Planejamento
-                                                </h3>
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase">Status:</span>
-                                                    <span className={`px-3 sm:px-4 py-1 sm:py-1.5 rounded-full text-[9px] sm:text-[10px] font-black uppercase ${reguaUtils.getNPSCategory(reguaFormData.valorNPS).bg} ${reguaUtils.getNPSCategory(reguaFormData.valorNPS).text}`}>
-                                                        {reguaUtils.getNPSCategory(reguaFormData.valorNPS).label}
-                                                    </span>
-                                                </div>
-                                            </div>
-                                            
-                                            <div className="flex flex-wrap sm:flex-nowrap justify-between gap-1.5 sm:gap-2">
-                                                {[...Array(11).keys()].map(num => {
-                                                    const cat = reguaUtils.getNPSCategory(num);
-                                                    return (
-                                                        <button key={num} type="button" onClick={() => setReguaFormData({...reguaFormData, valorNPS: num})}
-                                                            className={`flex-1 min-w-[28px] sm:min-w-[45px] flex flex-col items-center gap-1 sm:gap-2 p-2 sm:p-3 rounded-xl sm:rounded-2xl transition-all border-2 ${
-                                                                reguaFormData.valorNPS === num 
-                                                                ? `${cat.color} text-white border-transparent scale-110 shadow-xl z-10` 
-                                                                : `bg-white ${cat.text} border-slate-100 hover:border-slate-300 shadow-sm`
-                                                            }`}>
-                                                            <div className={reguaFormData.valorNPS === num ? 'text-white' : cat.text}>
-                                                                <Icon name={cat.iconName} size={16} className="sm:w-[20px] sm:h-[20px]" forceKey={reguaFormData.valorNPS === num ? 'y'+num : 'n'+num} />
-                                                            </div>
-                                                            <span className="text-[10px] sm:text-xs font-black">{num}</span>
-                                                        </button>
-                                                    );
-                                                })}
-                                            </div>
-                                            
-                                            <div className="grid grid-cols-3 mt-6 pt-6 border-t border-slate-200/50">
-                                                <div className="flex flex-col items-start gap-1">
-                                                    <div className="w-full h-1 sm:h-1.5 bg-red-500 rounded-full mb-1"></div>
-                                                    <span className="text-[7px] sm:text-[9px] font-black text-red-500 uppercase tracking-widest">Detratores (0-6)</span>
-                                                </div>
-                                                <div className="flex flex-col items-center gap-1">
-                                                    <div className="w-2/3 h-1 sm:h-1.5 bg-teal-500 rounded-full mb-1"></div>
-                                                    <span className="text-[7px] sm:text-[9px] font-black text-teal-600 uppercase tracking-widest">Neutros (7-8)</span>
-                                                </div>
-                                                <div className="flex flex-col items-end gap-1">
-                                                    <div className="w-2/3 h-1 sm:h-1.5 bg-green-500 rounded-full mb-1"></div>
-                                                    <span className="text-[7px] sm:text-[9px] font-black text-green-600 uppercase tracking-widest">Promotores (9-10)</span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    <div className="space-y-4 sm:space-y-6 bg-[#f8fafc] p-5 sm:p-10 rounded-[1.5rem] sm:rounded-[3rem] border border-slate-100 shadow-inner">
-                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-200 pb-4 gap-3">
-                                            <h3 className="text-[10px] sm:text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                                                <Icon name="clock" size={14} className="sm:w-[16px] sm:h-[16px]" /> Linha do Tempo de Disparos
-                                            </h3>
-                                            <button type="button" onClick={() => setReguaFormData({...reguaFormData, passos: [...reguaFormData.passos, { titulo: '', canal: 'Email', delayDias: 1, briefing: '', concluido: false }]})}
-                                                    className="bg-indigo-600 text-white text-[10px] font-black flex items-center gap-2 px-4 py-2 sm:py-2.5 rounded-xl hover:scale-105 transition-transform shadow-md w-fit">
-                                                <Icon name="plus" size={14}/> ADICIONAR COMUNICADO
-                                            </button>
-                                        </div>
-
-                                        <div className="grid gap-6">
-                                            {reguaFormData.passos.map((p, i) => (
-                                                <div key={i} className="bg-white border border-slate-100 p-5 sm:p-8 rounded-[1.5rem] sm:rounded-[2rem] flex flex-col gap-4 sm:gap-6 items-start shadow-sm hover:shadow-md hover:border-indigo-100 transition-all relative">
-                                                    
-                                                    <div className="flex items-center justify-between w-full">
-                                                        <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-slate-900 text-white flex items-center justify-center font-black shadow-lg text-sm sm:text-base">{i+1}</div>
-                                                        <button type="button" onClick={() => {
-                                                                    const newPassos = reguaFormData.passos.filter((_, idx) => idx !== i);
-                                                                    setReguaFormData({...reguaFormData, passos: newPassos});
-                                                                }}
-                                                                className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 transition-colors rounded-xl"><Icon name="trash-2" size={18} className="sm:w-[20px] sm:h-[20px]"/></button>
-                                                    </div>
-                                                    
-                                                    <div className="w-full grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
-                                                        <div className="space-y-1.5 sm:col-span-2 lg:col-span-1">
-                                                            <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Assunto / Chamada</label>
-                                                            <input value={p.titulo} onChange={e => {
-                                                                        const val = e.target.value;
-                                                                        setReguaFormData(prev => {
-                                                                            const newPassos = [...prev.passos];
-                                                                            newPassos[i] = { ...newPassos[i], titulo: val };
-                                                                            return { ...prev, passos: newPassos };
-                                                                        });
-                                                                    }} 
-                                                                    className="w-full bg-slate-50 border-none border-slate-100 rounded-xl p-3.5 text-xs sm:text-sm font-bold focus:bg-white outline-none shadow-sm transition-colors" placeholder="Ex: Boas-vindas" />
-                                                        </div>
-                                                        <div className="space-y-1.5">
-                                                            <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Canal</label>
-                                                            <select value={p.canal} onChange={e => {
-                                                                        const val = e.target.value;
-                                                                        setReguaFormData(prev => {
-                                                                            const newPassos = [...prev.passos];
-                                                                            newPassos[i] = { ...newPassos[i], canal: val };
-                                                                            return { ...prev, passos: newPassos };
-                                                                        });
-                                                                    }}
-                                                                    className="w-full bg-slate-50 border-none border-slate-100 rounded-xl p-3.5 text-xs sm:text-sm font-bold shadow-sm outline-none">
-                                                                <option>Email</option>
-                                                                <option>WhatsApp</option>
-                                                                <option>Push</option>
-                                                                <option>Slack</option>
-                                                            </select>
-                                                        </div>
-                                                        <div className="space-y-1.5">
-                                                            <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Aguardar (Dias)</label>
-                                                            <input type="number" min="0" value={p.delayDias} onChange={e => {
-                                                                        const val = e.target.value;
-                                                                        setReguaFormData(prev => {
-                                                                            const newPassos = [...prev.passos];
-                                                                            newPassos[i] = { ...newPassos[i], delayDias: val };
-                                                                            return { ...prev, passos: newPassos };
-                                                                        });
-                                                                    }}
-                                                                    className="w-full bg-slate-50 border-none border-slate-100 rounded-xl p-3.5 text-xs sm:text-sm font-bold shadow-sm outline-none text-center" />
-                                                        </div>
-                                                        <div className="sm:col-span-3 space-y-1.5">
-                                                            <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Briefing / Conteúdo</label>
-                                                            <textarea value={p.briefing} onChange={e => {
-                                                                        const val = e.target.value;
-                                                                        setReguaFormData(prev => {
-                                                                            const newPassos = [...prev.passos];
-                                                                            newPassos[i] = { ...newPassos[i], briefing: val };
-                                                                            return { ...prev, passos: newPassos };
-                                                                        });
-                                                                    }}
-                                                                    className="w-full bg-slate-50 border-none border-slate-100 rounded-xl p-3.5 sm:p-4 text-xs shadow-sm font-bold h-20 sm:h-24 resize-none outline-none focus:bg-white transition-colors" placeholder="Descreva o objetivo desta comunicação..." />
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-
-                                    <div className="flex flex-col sm:flex-row justify-end gap-3 sm:gap-4 pt-6 sm:pt-10 border-t border-slate-100">
-                                        <button type="button" onClick={() => { setIsReguaEditorOpen(false); setEditingReguaId(null); setReguaFormData(defaultReguaForm()); }} className="w-full sm:w-auto px-8 py-4 sm:py-4 rounded-[1rem] sm:rounded-2xl font-bold text-slate-400 bg-slate-50 hover:bg-slate-100 transition-all text-xs sm:text-sm uppercase tracking-widest">Cancelar</button>
-                                        <button type="submit" className="w-full sm:w-auto bg-slate-900 text-white px-10 py-4 sm:py-4 rounded-[1rem] sm:rounded-2xl font-black text-xs sm:text-sm uppercase tracking-widest hover:bg-indigo-600 shadow-2xl sm:shadow-xl transition-all">
-                                            {editingReguaId ? 'Confirmar Alterações' : 'Publicar no Roadmap'}
-                                        </button>
-                                    </div>
                                 </form>
                             </div>
                         </div>
