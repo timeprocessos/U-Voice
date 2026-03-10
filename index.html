@@ -374,7 +374,7 @@
             const [externalComms, setExternalComms] = useState([]);
             const [reguas, setReguas] = useState([]);
             const [message, setMessage] = useState("");
-            const fileInputRef = useRef(null); // Ref para o input de arquivo oculto
+            const fileInputRef = useRef(null);
             
             const [isModalCommOpen, setIsModalCommOpen] = useState(false);
             const [isModalExternalOpen, setIsModalExternalOpen] = useState(false);
@@ -428,12 +428,14 @@
             const [includeAgendaNPS, setIncludeAgendaNPS] = useState(false);
             const [agendaNPSValue, setAgendaNPSValue] = useState(5);
 
-            const initialReguaForm = {
+            // CORREÇÃO: Transformado em função para garantir que a memória seja 100% isolada e zerada a cada novo planejamento
+            const getInitialReguaForm = () => ({
                 nome: '', objetivo: 'Engajamento', publico: 'Público Geral',
                 dataInicio: reguaUtils.getRawDate(new Date()), incluirNPS: false, valorNPS: 5,
                 passos: [{ titulo: '', canal: 'Email', delayDias: 0, briefing: '', concluido: false }]
-            };
-            const [reguaFormData, setReguaFormData] = useState(initialReguaForm);
+            });
+            const [reguaFormData, setReguaFormData] = useState(getInitialReguaForm());
+            const [isSaving, setIsSaving] = useState(false); // CORREÇÃO: Bloqueia cliques múltiplos que geram duplicação
             
             const [filterPublicoRegua, setFilterPublicoRegua] = useState('Todos');
             const [filterMesRegua, setFilterMesRegua] = useState('Todos');
@@ -609,8 +611,6 @@
                         const line = lines[i].trim();
                         if (!line) continue;
 
-                        // Tratamento simples para vírgulas dentro de campos entre aspas (opcional, dependendo do CSV gerado pelo Excel)
-                        // Para um CSV simples separado por vírgula:
                         const values = line.split(','); 
                         
                         let data = {};
@@ -618,7 +618,6 @@
                             data[header] = values[index] ? values[index].trim() : '';
                         });
 
-                        // Limpeza e tipagem dos dados importados
                         const formattedData = {
                             title: data.title || 'Sem Título',
                             commLink: data.commLink || '',
@@ -647,7 +646,7 @@
                     }
 
                     setMessage(`${importedCount} comunicados importados!`);
-                    if (fileInputRef.current) fileInputRef.current.value = ""; // Limpa o input
+                    if (fileInputRef.current) fileInputRef.current.value = ""; 
                 };
                 reader.readAsText(file);
             };
@@ -722,12 +721,20 @@
 
             const handleSaveRegua = async (e) => {
                 e.preventDefault();
-                const submitBtn = e.nativeEvent?.submitter;
-                if(submitBtn) submitBtn.disabled = true; // Previne múltiplos envios (duplicação)
+                if (isSaving) return; // Trava contra duplo-clique
+                setIsSaving(true);
 
                 try {
                     const data = { ...reguaFormData, updatedAt: new Date().toISOString() };
                     delete data.id; // Remove o ID do payload para evitar corromper a referência do banco
+                    
+                    // CORREÇÃO: Limpa sujeiras locais para não quebrar o banco de dados do Firebase em produção
+                    if (Array.isArray(data.passos)) {
+                        data.passos = data.passos.map(s => {
+                            const { dateObj, dateStr, status, ...rest } = s;
+                            return rest;
+                        });
+                    }
                     
                     setIsReguaEditorOpen(false);
                     if (editingReguaId) {
@@ -737,33 +744,56 @@
                         await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'reguas_planejamento'), data);
                     }
                     setEditingReguaId(null);
-                    setReguaFormData(JSON.parse(JSON.stringify(initialReguaForm))); // Limpa a memória forçadamente
+                    setReguaFormData(getInitialReguaForm()); // Garante o reset total do formulário
                     setMessage("Planejamento salvo!");
                 } catch (err) {
                     console.error(err);
                     setMessage("Erro de permissão no Banco de Dados!");
                 } finally {
-                    if(submitBtn) submitBtn.disabled = false;
+                    setIsSaving(false);
                 }
             };
 
             const handleEditRegua = (regua) => {
                 setEditingReguaId(regua.id);
-                setReguaFormData(JSON.parse(JSON.stringify(regua))); // Deep copy para não referenciar o estado original do banco
+                const defaultForm = getInitialReguaForm();
+                const cleanRegua = JSON.parse(JSON.stringify(regua));
+                
+                // CORREÇÃO: Mescla com os padrões para proteger a tela contra dados legados/quebrados que existem na produção
+                const mergedRegua = { ...defaultForm, ...cleanRegua };
+                
+                if (Array.isArray(mergedRegua.passos)) {
+                    mergedRegua.passos = mergedRegua.passos.map(s => {
+                        const { dateObj, dateStr, status, ...rest } = s;
+                        return { ...defaultForm.passos[0], ...rest, titulo: rest.titulo || '' };
+                    });
+                }
+                
+                setReguaFormData(mergedRegua); 
                 setIsReguaEditorOpen(true);
                 window.scrollTo({ top: 0, behavior: 'smooth' });
             };
 
             const toggleStepRegua = async (reguaId, reguaSteps, stepIdx) => {
+                if (isSaving) return;
+                setIsSaving(true);
                 try {
-                    // Atualização imutável usando map. Evita mutação direta e permite que a tela (Check) atualize
-                    const newSteps = reguaSteps.map((step, index) => 
+                    // CORREÇÃO: Garante que os passos manipulados sejam íntegros antes de enviar o update
+                    const safeSteps = Array.isArray(reguaSteps) ? reguaSteps : [];
+                    const cleanSteps = safeSteps.map(s => {
+                        const { dateObj, dateStr, status, ...rest } = s;
+                        return rest;
+                    });
+                    
+                    const newSteps = cleanSteps.map((step, index) => 
                         index === stepIdx ? { ...step, concluido: !step.concluido } : step
                     );
                     await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'reguas_planejamento', reguaId), { passos: newSteps, updatedAt: new Date().toISOString() });
                 } catch (error) {
                     console.error("Erro ao atualizar status:", error);
                     setMessage("Erro de permissão no Banco de Dados!");
+                } finally {
+                    setIsSaving(false);
                 }
             };
 
@@ -772,9 +802,13 @@
                 const today = new Date();
                 today.setHours(0,0,0,0);
 
-                const steps = regua.passos.map(p => {
+                // CORREÇÃO: Previne crash silencioso do React caso 'passos' venha como undefined do Firebase legado
+                const safePassos = Array.isArray(regua.passos) ? regua.passos : [];
+                const safeDataInicio = regua.dataInicio || reguaUtils.getRawDate(new Date());
+
+                const steps = safePassos.map(p => {
                     current += parseInt(p.delayDias || 0);
-                    const dateObj = reguaUtils.addDays(regua.dataInicio, current);
+                    const dateObj = reguaUtils.addDays(safeDataInicio, current);
                     const dateStripped = new Date(dateObj);
                     dateStripped.setHours(0,0,0,0);
 
@@ -787,7 +821,7 @@
                 });
                 
                 const lastDate = steps.length > 0 ? steps[steps.length - 1].dateStr : null;
-                const progress = Math.round((steps.filter(s => s.concluido).length / steps.length) * 100) || 0;
+                const progress = steps.length > 0 ? Math.round((steps.filter(s => s.concluido).length / steps.length) * 100) : 0;
 
                 return { steps, lastDate, progress };
             };
@@ -800,7 +834,6 @@
                 return <span className="text-[10px] font-black text-red-500 uppercase tracking-tighter">({Math.abs(saving).toFixed(1)}% acima do orçado)</span>;
             };
 
-            // Cálculo global para exibir o resumo total do Saving
             const custoTotalSelecionado = useMemo(() => {
                 return localVendors.reduce((acc, v, i) => selectedVendorIndices.includes(i) ? acc + Number(v.value) : acc, 0);
             }, [localVendors, selectedVendorIndices]);
@@ -850,7 +883,6 @@
             const publicosUnicos = ['Todos', ...new Set(reguas.map(r => r.publico))];
             const anosUnicos = ['Todos', '2024', '2025', '2026'];
 
-            // Lógica de Impacto Consolidada com Filtros Globais e Média Ponderada
             const statsImpacto = useMemo(() => {
                 const sent = comms.filter(c => {
                     if (c.status !== 'Enviado' || !c.date) return false;
@@ -865,10 +897,8 @@
                 const totalInteractions = sent.reduce((acc, c) => acc + (Number(c.reactions) || 0) + (Number(c.comments) || 0), 0);
                 const totalComments = sent.reduce((acc, c) => acc + (Number(c.comments) || 0), 0);
                 
-                // Média Ponderada Global (TER)
                 const avgScore = totalReach > 0 ? ((totalInteractions / totalReach) * 100).toFixed(2) : "0.00";
                 
-                // Média Ponderada Global (TA) ignorando posts não preenchidos (zerados)
                 const validTAPosts = sent.filter(c => Number(c.population) > 0 && Number(c.views) > 0);
                 const totalValidReach = validTAPosts.reduce((acc, c) => acc + Number(c.views), 0);
                 const totalValidPopulation = validTAPosts.reduce((acc, c) => acc + Number(c.population), 0);
@@ -927,7 +957,6 @@
                     let c = 0;
 
                     let vendorsToCalc = ev.vendors || [];
-                    // Fallback para legacy documents que não tem 'vendors'
                     if (!ev.vendors && ev.vendor1 !== undefined) {
                          vendorsToCalc = [
                             { value: Number(ev.vendorValue1 || 0) },
@@ -937,7 +966,6 @@
                     }
 
                     let indices = ev.selectedVendorIndices;
-                    // Fallback para legacy documents que tem apenas 'selectedVendorIdx'
                     if (!indices && ev.selectedVendorIdx !== undefined && ev.selectedVendorIdx >= 0) {
                         indices = [ev.selectedVendorIdx];
                     } else if (!indices) {
@@ -1310,10 +1338,10 @@
                                         if(isReguaEditorOpen) { 
                                             setIsReguaEditorOpen(false); 
                                             setEditingReguaId(null); 
-                                            setReguaFormData(JSON.parse(JSON.stringify(initialReguaForm)));
+                                            setReguaFormData(getInitialReguaForm());
                                         } else { 
                                             setEditingReguaId(null);
-                                            setReguaFormData(JSON.parse(JSON.stringify(initialReguaForm))); // Zera forçadamente os campos
+                                            setReguaFormData(getInitialReguaForm()); // CORREÇÃO: Zera forçadamente chamando o construtor gerador limpo
                                             setIsReguaEditorOpen(true); 
                                         } 
                                     }}
@@ -1470,18 +1498,18 @@
                                                                 <div className="space-y-1.5 sm:col-span-2 lg:col-span-1">
                                                                     <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Assunto / Chamada</label>
                                                                     <input value={p.titulo} onChange={e => {
-                                                                               const newPassos = reguaFormData.passos.map((step, idx) => idx === i ? { ...step, titulo: e.target.value } : step);
-                                                                               setReguaFormData({...reguaFormData, passos: newPassos});
-                                                                           }} 
-                                                                           className="w-full bg-slate-50 border-slate-100 rounded-xl p-3 text-xs sm:text-sm focus:bg-white transition-colors" placeholder="Ex: Boas-vindas" />
+                                                                           const newPassos = reguaFormData.passos.map((step, idx) => idx === i ? { ...step, titulo: e.target.value } : step);
+                                                                           setReguaFormData({...reguaFormData, passos: newPassos});
+                                                                       }} 
+                                                                       className="w-full bg-slate-50 border-slate-100 rounded-xl p-3 text-xs sm:text-sm focus:bg-white transition-colors" placeholder="Ex: Boas-vindas" />
                                                                 </div>
                                                                 <div className="space-y-1.5">
                                                                     <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Canal</label>
                                                                     <select value={p.canal} onChange={e => {
-                                                                               const newPassos = reguaFormData.passos.map((step, idx) => idx === i ? { ...step, canal: e.target.value } : step);
-                                                                               setReguaFormData({...reguaFormData, passos: newPassos});
-                                                                           }}
-                                                                            className="w-full bg-slate-50 border-slate-100 rounded-xl p-3 text-xs sm:text-sm">
+                                                                           const newPassos = reguaFormData.passos.map((step, idx) => idx === i ? { ...step, canal: e.target.value } : step);
+                                                                           setReguaFormData({...reguaFormData, passos: newPassos});
+                                                                       }}
+                                                                        className="w-full bg-slate-50 border-slate-100 rounded-xl p-3 text-xs sm:text-sm">
                                                                         <option>Email</option>
                                                                         <option>WhatsApp</option>
                                                                         <option>Push</option>
@@ -1491,18 +1519,18 @@
                                                                 <div className="space-y-1.5">
                                                                     <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Aguardar (Dias)</label>
                                                                     <input type="number" min="0" value={p.delayDias} onChange={e => {
-                                                                               const newPassos = reguaFormData.passos.map((step, idx) => idx === i ? { ...step, delayDias: e.target.value } : step);
-                                                                               setReguaFormData({...reguaFormData, passos: newPassos});
-                                                                           }}
-                                                                           className="w-full bg-slate-50 border-slate-100 rounded-xl p-3 text-xs sm:text-sm" />
+                                                                           const newPassos = reguaFormData.passos.map((step, idx) => idx === i ? { ...step, delayDias: e.target.value } : step);
+                                                                           setReguaFormData({...reguaFormData, passos: newPassos});
+                                                                       }}
+                                                                       className="w-full bg-slate-50 border-slate-100 rounded-xl p-3 text-xs sm:text-sm" />
                                                                 </div>
                                                                 <div className="sm:col-span-3 space-y-1.5">
                                                                     <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Briefing / Conteúdo</label>
                                                                     <textarea value={p.briefing} onChange={e => {
-                                                                               const newPassos = reguaFormData.passos.map((step, idx) => idx === i ? { ...step, briefing: e.target.value } : step);
-                                                                               setReguaFormData({...reguaFormData, passos: newPassos});
-                                                                           }}
-                                                                              className="w-full bg-slate-50 border-slate-100 rounded-xl p-3 sm:p-4 text-xs h-20 sm:h-24 resize-none outline-none focus:bg-white transition-colors" placeholder="Descreva o objetivo desta comunicação..." />
+                                                                           const newPassos = reguaFormData.passos.map((step, idx) => idx === i ? { ...step, briefing: e.target.value } : step);
+                                                                           setReguaFormData({...reguaFormData, passos: newPassos});
+                                                                       }}
+                                                                          className="w-full bg-slate-50 border-slate-100 rounded-xl p-3 sm:p-4 text-xs h-20 sm:h-24 resize-none outline-none focus:bg-white transition-colors" placeholder="Descreva o objetivo desta comunicação..." />
                                                                 </div>
                                                             </div>
                                                         </div>
@@ -1511,9 +1539,9 @@
                                             </div>
 
                                             <div className="flex flex-col sm:flex-row justify-end gap-3 sm:gap-4 pt-6 sm:pt-10 border-t border-slate-100">
-                                                <button type="button" onClick={() => { setIsReguaEditorOpen(false); setEditingReguaId(null); setReguaFormData(JSON.parse(JSON.stringify(initialReguaForm))); }} className="w-full sm:w-auto px-8 py-4 sm:py-3 rounded-[1rem] sm:rounded-xl font-bold text-slate-400 bg-slate-50 sm:bg-transparent">Cancelar</button>
-                                                <button type="submit" className="w-full sm:w-auto bg-slate-900 text-white px-10 py-4 sm:py-4 rounded-[1rem] sm:rounded-[1.5rem] font-black text-xs sm:text-sm uppercase tracking-widest hover:bg-indigo-600 shadow-2xl sm:shadow-xl transition-all">
-                                                    {editingReguaId ? 'Confirmar Alterações' : 'Publicar no Roadmap'}
+                                                <button type="button" onClick={() => { setIsReguaEditorOpen(false); setEditingReguaId(null); setReguaFormData(getInitialReguaForm()); }} className="w-full sm:w-auto px-8 py-4 sm:py-3 rounded-[1rem] sm:rounded-xl font-bold text-slate-400 bg-slate-50 sm:bg-transparent">Cancelar</button>
+                                                <button type="submit" disabled={isSaving} className={`w-full sm:w-auto text-white px-10 py-4 sm:py-4 rounded-[1rem] sm:rounded-[1.5rem] font-black text-xs sm:text-sm uppercase tracking-widest shadow-2xl sm:shadow-xl transition-all ${isSaving ? 'bg-slate-400 cursor-not-allowed' : 'bg-slate-900 hover:bg-indigo-600'}`}>
+                                                    {isSaving ? 'Salvando...' : (editingReguaId ? 'Confirmar Alterações' : 'Publicar no Roadmap')}
                                                 </button>
                                             </div>
                                         </form>
@@ -1608,9 +1636,9 @@
                                                                                 passo.canal === 'Slack' ? <Icon name="hash" size={18} className="sm:w-[22px] sm:h-[22px]" /> : <Icon name="bell" size={18} className="sm:w-[22px] sm:h-[22px]" />}
                                                                             </div>
                                                                             <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleStepRegua(regua.id, regua.passos, idx); }}
-                                                                                className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full border-2 flex items-center justify-center transition-all relative z-20 cursor-pointer ${
-                                                                                    passo.concluido ? 'bg-emerald-500 border-emerald-500 text-white shadow-lg shadow-emerald-200' : 'bg-white border-slate-200 text-slate-200 hover:border-indigo-500 hover:text-indigo-500'
-                                                                                }`}>
+                                                                                    className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full border-2 flex items-center justify-center transition-all relative z-20 cursor-pointer ${
+                                                                                        passo.concluido ? 'bg-emerald-500 border-emerald-500 text-white shadow-lg shadow-emerald-200' : 'bg-white border-slate-200 text-slate-200 hover:border-indigo-500 hover:text-indigo-500'
+                                                                                    }`}>
                                                                                 <Icon name="check" size={16} className="sm:w-[18px] sm:h-[18px]" forceKey={passo.concluido ? 'y'+idx : 'n'+idx} />
                                                                             </button>
                                                                         </div>
