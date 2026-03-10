@@ -427,7 +427,7 @@
 
             // FUNÇÃO ANTI-DUPLICAÇÃO E LIMPEZA DA RÉGUA DE COMUNICAÇÃO
             const getInitialReguaForm = () => ({
-                nome: '', objetivo: 'Engajamento', publico: 'Público Geral',
+                nome: '', objetivo: 'Engajamento', publico: 'Interno (Seres)', // PADRÃO ATUALIZADO
                 dataInicio: reguaUtils.getRawDate(new Date()), incluirNPS: false, valorNPS: 5,
                 // AGORA INCLUIMOS A DATA PREVISTA MANUALMENTE EM CADA PASSO
                 passos: [{ titulo: '', canal: 'Email', dataPrevista: reguaUtils.getRawDate(new Date()), delayDias: 0, briefing: '', concluido: false }]
@@ -859,12 +859,17 @@
                 }).sort((a, b) => new Date(b.date) - new Date(a.date));
             }, [agenda, agendaFilterYear, agendaFilterMonth]);
 
-            const filteredReguas = useMemo(() => {
+            // NOVA CAMADA DE SEGURANÇA: Filtra dados corrompidos da base ANTES de ir para a tela ou contadores
+            const safeReguas = useMemo(() => {
                 return reguas.filter(r => {
-                    // --- FILTRO DE SEGURANÇA: Oculta a campanha 'CSAT MEXICO' corrompida permanentemente ---
                     const n = r.nome ? r.nome.toUpperCase() : '';
-                    if (n.includes('CSAT MEX') || n.includes('CSAT MÉX')) return false;
+                    if (n.includes('CSAT MEX') || n.includes('CSAT MÉX')) return false; // Remove permanentemente a campanha corrompida
+                    return true;
+                });
+            }, [reguas]);
 
+            const filteredReguas = useMemo(() => {
+                return safeReguas.filter(r => {
                     const date = new Date((r.dataInicio || '2026-01-01') + 'T12:00:00');
                     const mes = date.getMonth();
                     const ano = date.getFullYear().toString();
@@ -875,9 +880,9 @@
 
                     return matchPublico && matchMes && matchAno;
                 });
-            }, [reguas, filterPublicoRegua, filterMesRegua, filterAnoRegua]);
+            }, [safeReguas, filterPublicoRegua, filterMesRegua, filterAnoRegua]);
 
-            const publicosUnicos = ['Todos', ...new Set(reguas.map(r => r.publico).filter(Boolean))];
+            const publicosUnicos = ['Todos', ...new Set(safeReguas.map(r => r.publico).filter(Boolean))];
             const anosUnicos = ['Todos', '2024', '2025', '2026'];
 
             const statsImpacto = useMemo(() => {
@@ -1040,7 +1045,6 @@
                                     </div>
                                     
                                     <div className="flex w-full sm:w-auto sm:ml-auto gap-2">
-                                        {/* Input oculto para carregar arquivo */}
                                         <input 
                                             type="file" 
                                             accept=".csv" 
@@ -1445,28 +1449,28 @@
                                             )}
                                         </div>
 
-                                        {/* INDICADORES (MANTIDOS) */}
+                                        {/* INDICADORES (MANTIDOS E CORRIGIDOS PARA NÃO CONTAR DADOS FANTASMAS) */}
                                         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-8 pt-10 sm:pt-16 border-t border-slate-100">
                                             <div className="bg-white p-5 sm:p-8 rounded-[1.5rem] sm:rounded-[3rem] border border-slate-100 shadow-sm transition-all hover:shadow-xl group col-span-1">
                                                 <div className="text-3xl sm:text-5xl font-black text-rose-500 sm:group-hover:scale-110 transition-transform origin-left">
-                                                    {reguas.reduce((acc, r) => acc + calculateTimeline(r).steps.filter(p => p.status === 'Atrasado').length, 0)}
+                                                    {filteredReguas.reduce((acc, r) => acc + calculateTimeline(r).steps.filter(p => p.status === 'Atrasado').length, 0)}
                                                 </div>
                                                 <div className="text-[8px] sm:text-[11px] font-black text-slate-400 uppercase tracking-widest mt-2 sm:mt-3">Ações Pendentes</div>
                                             </div>
                                             <div className="bg-white p-5 sm:p-8 rounded-[1.5rem] sm:rounded-[3rem] border border-slate-100 shadow-sm transition-all hover:shadow-xl group col-span-1">
                                                 <div className="text-3xl sm:text-5xl font-black text-indigo-600 sm:group-hover:scale-110 transition-transform origin-left">
-                                                    {reguas.reduce((acc, r) => acc + calculateTimeline(r).steps.filter(p => p.status === 'Hoje').length, 0)}
+                                                    {filteredReguas.reduce((acc, r) => acc + calculateTimeline(r).steps.filter(p => p.status === 'Hoje').length, 0)}
                                                 </div>
                                                 <div className="text-[8px] sm:text-[11px] font-black text-slate-400 uppercase tracking-widest mt-2 sm:mt-3">Para Hoje</div>
                                             </div>
                                             <div className="bg-white p-5 sm:p-8 rounded-[1.5rem] sm:rounded-[3rem] border border-slate-100 shadow-sm transition-all hover:shadow-xl group col-span-1">
                                                 <div className="text-3xl sm:text-5xl font-black text-emerald-500 sm:group-hover:scale-110 transition-transform origin-left">
-                                                    {reguas.reduce((acc, r) => acc + calculateTimeline(r).steps.filter(p => p.concluido).length, 0)}
+                                                    {filteredReguas.reduce((acc, r) => acc + calculateTimeline(r).steps.filter(p => p.concluido).length, 0)}
                                                 </div>
                                                 <div className="text-[8px] sm:text-[11px] font-black text-slate-400 uppercase tracking-widest mt-2 sm:mt-3">Concluídos</div>
                                             </div>
                                             <div className="bg-slate-900 p-5 sm:p-8 rounded-[1.5rem] sm:rounded-[3rem] shadow-xl sm:shadow-2xl shadow-slate-200 transition-all hover:scale-[1.02] col-span-1">
-                                                <div className="text-3xl sm:text-5xl font-black text-white">{reguas.length}</div>
+                                                <div className="text-3xl sm:text-5xl font-black text-white">{filteredReguas.length}</div>
                                                 <div className="text-[8px] sm:text-[11px] font-black text-slate-400 uppercase tracking-widest mt-2 sm:mt-3">Réguas Ativas</div>
                                             </div>
                                         </div>
@@ -1494,7 +1498,13 @@
                                                     </div>
                                                     <div>
                                                         <label className="block text-[10px] font-black uppercase text-slate-500 mb-2 ml-1">Público Alvo</label>
-                                                        <input required value={reguaFormData.publico} onChange={e => setReguaFormData({...reguaFormData, publico: e.target.value})} className="w-full bg-white border border-slate-200 rounded-xl p-4 outline-none focus:border-indigo-500 text-sm shadow-sm transition-colors" placeholder="Ex: Clientes VIP" />
+                                                        <div className="relative">
+                                                            <select required value={reguaFormData.publico} onChange={e => setReguaFormData({...reguaFormData, publico: e.target.value})} className="w-full bg-white border border-slate-200 rounded-xl p-4 outline-none focus:border-indigo-500 text-sm shadow-sm transition-colors appearance-none cursor-pointer">
+                                                                <option value="Interno (Seres)">Interno (Seres)</option>
+                                                                <option value="Externo (Clientes)">Externo (Clientes)</option>
+                                                            </select>
+                                                            <Icon name="chevron-down" size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"/>
+                                                        </div>
                                                     </div>
                                                     <div>
                                                         <label className="block text-[10px] font-black uppercase text-slate-500 mb-2 ml-1">Data Início (Marco Zero)</label>
