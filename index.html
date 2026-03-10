@@ -429,7 +429,8 @@
             const getInitialReguaForm = () => ({
                 nome: '', objetivo: 'Engajamento', publico: 'Público Geral',
                 dataInicio: reguaUtils.getRawDate(new Date()), incluirNPS: false, valorNPS: 5,
-                passos: [{ titulo: '', canal: 'Email', delayDias: 0, briefing: '', concluido: false }]
+                // AGORA INCLUIMOS A DATA PREVISTA MANUALMENTE EM CADA PASSO
+                passos: [{ titulo: '', canal: 'Email', dataPrevista: reguaUtils.getRawDate(new Date()), delayDias: 0, briefing: '', concluido: false }]
             });
             const [reguaFormData, setReguaFormData] = useState(getInitialReguaForm());
             const [isSaving, setIsSaving] = useState(false);
@@ -701,7 +702,8 @@
                 return steps.map(s => ({
                     titulo: s.titulo || '',
                     canal: s.canal || 'Email',
-                    delayDias: Number(s.delayDias) || 0,
+                    dataPrevista: s.dataPrevista || '', // DATA AGORA É SALVA INDIVIDUALMENTE
+                    delayDias: Number(s.delayDias) || 0, // Apenas para referência visual
                     briefing: s.briefing || '',
                     concluido: !!s.concluido
                 }));
@@ -753,7 +755,11 @@
                     dataInicio: regua.dataInicio || reguaUtils.getRawDate(new Date()),
                     incluirNPS: !!regua.incluirNPS,
                     valorNPS: regua.valorNPS || 5,
-                    passos: sanitizeStepsForDB(regua.passos) // Limpa os cálculos visuais da tela!
+                    passos: sanitizeStepsForDB(regua.passos).map(s => ({
+                        ...s,
+                        // Se for uma régua legada sem data individual, usamos a data de início como fallback visual
+                        dataPrevista: s.dataPrevista || regua.dataInicio || reguaUtils.getRawDate(new Date())
+                    }))
                 });
                 setIsReguaEditorOpen(true);
                 window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -785,16 +791,15 @@
 
             // Calcula apenas visualmente para renderizar na listagem. (Isso nunca será salvo no banco!)
             const calculateTimeline = (regua) => {
-                let current = 0;
                 const today = new Date();
                 today.setHours(0,0,0,0);
 
                 const safePassos = Array.isArray(regua.passos) ? regua.passos : [];
-                const safeDataInicio = regua.dataInicio || reguaUtils.getRawDate(new Date());
 
                 const steps = safePassos.map(p => {
-                    current += parseInt(p.delayDias || 0);
-                    const dateObj = reguaUtils.addDays(safeDataInicio, current);
+                    // Pega a data preenchida manualmente pelo usuário
+                    const dataBase = p.dataPrevista || regua.dataInicio || reguaUtils.getRawDate(new Date());
+                    const dateObj = new Date(dataBase + 'T12:00:00');
                     const dateStripped = new Date(dateObj);
                     dateStripped.setHours(0,0,0,0);
 
@@ -1527,18 +1532,18 @@
                                             <div className="pt-6 border-t border-slate-100">
                                                 <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
                                                     <h3 className="text-sm font-black uppercase tracking-widest text-slate-800 flex items-center gap-2"><Icon name="list" size={18}/> Passos de Comunicação</h3>
-                                                    <button type="button" onClick={() => setReguaFormData({...reguaFormData, passos: [...reguaFormData.passos, { titulo: '', canal: 'Email', delayDias: 1, briefing: '', concluido: false }]})} className="w-full sm:w-auto text-[10px] font-black uppercase text-indigo-600 bg-indigo-50 px-5 py-3 rounded-xl hover:bg-indigo-100 transition-colors flex items-center justify-center gap-2 border border-indigo-100"><Icon name="plus" size={14}/> Adicionar Nova Etapa</button>
+                                                    <button type="button" onClick={() => setReguaFormData({...reguaFormData, passos: [...reguaFormData.passos, { titulo: '', canal: 'Email', dataPrevista: reguaFormData.dataInicio, delayDias: 0, briefing: '', concluido: false }]})} className="w-full sm:w-auto text-[10px] font-black uppercase text-indigo-600 bg-indigo-50 px-5 py-3 rounded-xl hover:bg-indigo-100 transition-colors flex items-center justify-center gap-2 border border-indigo-100"><Icon name="plus" size={14}/> Adicionar Nova Etapa</button>
                                                 </div>
                                                 <div className="space-y-4">
                                                     {reguaFormData.passos.map((p, i) => (
                                                         <div key={i} className="flex flex-col md:flex-row gap-4 bg-white p-5 rounded-[1.5rem] border-2 border-slate-100 relative shadow-sm hover:border-indigo-100 transition-all group">
                                                             <div className="hidden md:flex shrink-0 w-8 h-8 bg-slate-900 text-white rounded-full items-center justify-center text-xs font-black shadow-md">{i+1}</div>
                                                             <div className="flex-1 grid grid-cols-1 md:grid-cols-12 gap-4">
-                                                                <div className="md:col-span-5">
-                                                                    <label className="block text-[9px] font-black uppercase text-slate-400 mb-1 ml-1">Assunto / Título da Mensagem</label>
+                                                                <div className="md:col-span-4">
+                                                                    <label className="block text-[9px] font-black uppercase text-slate-400 mb-1 ml-1">Assunto / Título</label>
                                                                     <input required value={p.titulo} onChange={e => { const newPassos = [...reguaFormData.passos]; newPassos[i].titulo = e.target.value; setReguaFormData({...reguaFormData, passos: newPassos}); }} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm font-bold outline-none focus:border-indigo-500 focus:bg-white transition-colors" placeholder="Ex: Bem-vindo!" />
                                                                 </div>
-                                                                <div className="md:col-span-3">
+                                                                <div className="md:col-span-2">
                                                                     <label className="block text-[9px] font-black uppercase text-slate-400 mb-1 ml-1">Canal</label>
                                                                     <div className="relative">
                                                                         <select value={p.canal} onChange={e => { const newPassos = [...reguaFormData.passos]; newPassos[i].canal = e.target.value; setReguaFormData({...reguaFormData, passos: newPassos}); }} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm font-bold outline-none focus:border-indigo-500 appearance-none cursor-pointer focus:bg-white transition-colors">
@@ -1547,11 +1552,15 @@
                                                                         <Icon name="chevron-down" size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"/>
                                                                     </div>
                                                                 </div>
-                                                                <div className="md:col-span-4">
-                                                                    <label className="block text-[9px] font-black uppercase text-slate-400 mb-1 ml-1">Gatilho (Dias após Início)</label>
+                                                                <div className="md:col-span-3">
+                                                                    <label className="block text-[9px] font-black uppercase text-slate-400 mb-1 ml-1">Data Disparo (Manual)</label>
+                                                                    <input type="date" required value={p.dataPrevista} onChange={e => { const newPassos = [...reguaFormData.passos]; newPassos[i].dataPrevista = e.target.value; setReguaFormData({...reguaFormData, passos: newPassos}); }} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm font-bold outline-none focus:border-indigo-500 focus:bg-white transition-colors" />
+                                                                </div>
+                                                                <div className="md:col-span-3">
+                                                                    <label className="block text-[9px] font-black uppercase text-slate-400 mb-1 ml-1">T+ (Visual / Ref.)</label>
                                                                     <div className="relative">
                                                                         <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-black text-[10px]">T+</span>
-                                                                        <input type="number" min="0" required value={p.delayDias} onChange={e => { const newPassos = [...reguaFormData.passos]; newPassos[i].delayDias = e.target.value; setReguaFormData({...reguaFormData, passos: newPassos}); }} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 pl-10 text-sm font-bold outline-none focus:border-indigo-500 focus:bg-white transition-colors" />
+                                                                        <input type="number" min="0" value={p.delayDias} onChange={e => { const newPassos = [...reguaFormData.passos]; newPassos[i].delayDias = e.target.value; setReguaFormData({...reguaFormData, passos: newPassos}); }} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 pl-10 text-sm font-bold outline-none focus:border-indigo-500 focus:bg-white transition-colors" />
                                                                     </div>
                                                                 </div>
                                                                 <div className="md:col-span-12">
@@ -1572,6 +1581,7 @@
                                             
                                             {/* Submit */}
                                             <div className="pt-8 border-t border-slate-200 flex flex-col sm:flex-row justify-end gap-4">
+                                                <button type="button" onClick={() => { setIsReguaEditorOpen(false); setEditingReguaId(null); setReguaFormData(getInitialReguaForm()); }} className="w-full sm:w-auto px-10 py-4 sm:py-5 rounded-2xl font-bold uppercase tracking-widest text-[10px] sm:text-xs text-slate-500 bg-slate-100 hover:bg-slate-200 transition-colors">Cancelar e Voltar</button>
                                                 <button type="submit" disabled={isSaving} className={`w-full sm:w-auto px-10 py-4 sm:py-5 rounded-2xl font-black uppercase tracking-widest text-[10px] sm:text-xs transition-all ${isSaving ? 'bg-slate-400 text-white cursor-not-allowed' : 'bg-black text-white hover:bg-indigo-600 shadow-xl'}`}>
                                                     {isSaving ? 'Processando e Salvando...' : (editingReguaId ? 'Confirmar e Atualizar Régua' : 'Publicar Nova Régua')}
                                                 </button>
