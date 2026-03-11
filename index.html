@@ -374,6 +374,7 @@
             const [reguas, setReguas] = useState([]);
             const [message, setMessage] = useState("");
             const fileInputRef = useRef(null);
+            const agendaFileInputRef = useRef(null);
             
             const [isModalCommOpen, setIsModalCommOpen] = useState(false);
             const [isModalExternalOpen, setIsModalExternalOpen] = useState(false);
@@ -653,6 +654,67 @@
                     }
                     setMessage(`${importedCount} comunicados importados!`);
                     if (fileInputRef.current) fileInputRef.current.value = ""; 
+                };
+                reader.readAsText(file);
+            };
+
+            const handleImportAgendaCSV = (event) => {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = async (e) => {
+                    const text = e.target.result;
+                    const lines = text.split('\n');
+                    if (lines.length < 2) {
+                        setMessage("Arquivo CSV inválido ou vazio.");
+                        return;
+                    }
+
+                    const headers = lines[0].split(',').map(h => h.trim());
+                    let importedCount = 0;
+
+                    for (let i = 1; i < lines.length; i++) {
+                        const line = lines[i].trim();
+                        if (!line) continue;
+                        const values = line.split(','); 
+                        
+                        let data = {};
+                        headers.forEach((header, index) => {
+                            data[header] = values[index] ? values[index].trim() : '';
+                        });
+
+                        // Estrutura adaptada para os campos da Agenda
+                        // Dica de CSV: Para múltiplos responsáveis na mesma célula do CSV, separe por ";" (ponto e vírgula)
+                        const formattedData = {
+                            title: data.atividade || data.title || 'Sem Título',
+                            date: data.date || '',
+                            sponsor: data.sponsor || '',
+                            description: data.description || '',
+                            meetingLink: data.meetingLink || '',
+                            status: data.status || 'Planejado',
+                            budget: Number(data.budget) || 0,
+                            hasVendor: false,
+                            selectedVendorIndices: [],
+                            vendors: [{ name: '', value: 0 }],
+                            includeNPS: false,
+                            npsValue: 5,
+                            responsavel: data.responsavel ? data.responsavel.split(';').map(a => a.trim()) : [],
+                            startTime: data.startTime || '',
+                            endTime: data.endTime || '',
+                            modelo: data.modelo || 'Híbrido',
+                            updatedAt: new Date().toISOString()
+                        };
+
+                        try {
+                            await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'agenda'), formattedData);
+                            importedCount++;
+                        } catch (err) {
+                            console.error("Erro ao importar linha da agenda", i, err);
+                        }
+                    }
+                    setMessage(`${importedCount} atividades importadas para a Agenda!`);
+                    if (agendaFileInputRef.current) agendaFileInputRef.current.value = ""; 
                 };
                 reader.readAsText(file);
             };
@@ -1312,7 +1374,19 @@
                                         </select>
                                         <select value={agendaFilterMonth} onChange={(e) => setAgendaFilterMonth(e.target.value)} className="impact-filter flex-1 sm:flex-none"><option value="Todos">Mês: Todos</option>{MESES_MAP.map(m => <option key={m.val} value={m.val}>{m.label}</option>)}</select>
                                     </div>
-                                    <button onClick={() => openAgendaModal()} className="w-full sm:w-auto sm:ml-auto bg-[#397394] text-white px-6 sm:px-8 py-3 sm:py-4 rounded-2xl text-[10px] font-black uppercase flex items-center justify-center gap-2 shadow-xl hover:bg-[#2d5c78] transition-all"><Icon name="calendar" size={14} /> Novo Planejamento</button>
+                                    <div className="flex w-full sm:w-auto sm:ml-auto gap-2">
+                                        <input 
+                                            type="file" 
+                                            accept=".csv" 
+                                            ref={agendaFileInputRef} 
+                                            style={{ display: 'none' }} 
+                                            onChange={handleImportAgendaCSV} 
+                                        />
+                                        <button onClick={() => agendaFileInputRef.current.click()} className="flex-1 sm:flex-none bg-slate-100 text-slate-600 px-4 sm:px-6 py-3 sm:py-4 rounded-2xl text-[10px] font-black uppercase flex items-center justify-center gap-2 shadow-sm hover:bg-slate-200 transition-all" title="Importar Agenda via CSV">
+                                            <Icon name="upload" size={14} /> Importar
+                                        </button>
+                                        <button onClick={() => openAgendaModal()} className="flex-1 sm:flex-none bg-[#397394] text-white px-6 sm:px-8 py-3 sm:py-4 rounded-2xl text-[10px] font-black uppercase flex items-center justify-center gap-2 shadow-xl hover:bg-[#2d5c78] transition-all"><Icon name="calendar" size={14} /> Novo</button>
+                                    </div>
                                 </div>
                                 <div className="bg-white rounded-[1.5rem] sm:rounded-[3rem] border border-slate-100 overflow-hidden shadow-sm overflow-x-auto custom-scroll">
                                     <table className="w-full text-left min-w-[750px]">
@@ -1450,7 +1524,7 @@
                                                                 {steps.map((step, idx) => (
                                                                     <div key={idx} className={`flex items-start gap-4 p-4 sm:p-5 rounded-2xl border-2 transition-colors ${step.concluido ? 'border-emerald-100 bg-emerald-50/50' : 'border-slate-100 bg-slate-50/50 hover:border-indigo-100'}`}>
                                                                         <button onClick={() => toggleStepRegua(regua.id, regua.passos, idx)} disabled={isSaving} 
-                                                                                className={`mt-1 shrink-0 w-8 h-8 rounded-full border-2 flex items-center justify-center transition-all disabled:cursor-not-allowed ${step.concluido ? 'bg-emerald-500 border-emerald-500 text-white shadow-md shadow-emerald-200' : 'bg-white border-slate-300 text-slate-300 hover:border-indigo-500 hover:text-indigo-500'}`}>
+                                                                            className={`mt-1 shrink-0 w-8 h-8 rounded-full border-2 flex items-center justify-center transition-all disabled:cursor-not-allowed ${step.concluido ? 'bg-emerald-500 border-emerald-500 text-white shadow-md shadow-emerald-200' : 'bg-white border-slate-300 text-slate-300 hover:border-indigo-500 hover:text-indigo-500'}`}>
                                                                             <Icon name="check" size={16} forceKey={`chk-${regua.id}-${idx}-${step.concluido}`}/>
                                                                         </button>
                                                                         <div className="flex-1">
