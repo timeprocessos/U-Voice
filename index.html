@@ -425,6 +425,9 @@
             const [includeAgendaNPS, setIncludeAgendaNPS] = useState(false);
             const [agendaNPSValue, setAgendaNPSValue] = useState(5);
 
+            // NOVO ESTADO: Controla os analistas selecionados na Agenda
+            const [agendaResponsavel, setAgendaResponsavel] = useState([]);
+
             // FUNÇÃO ANTI-DUPLICAÇÃO E LIMPEZA DA RÉGUA DE COMUNICAÇÃO
             const getInitialReguaForm = () => ({
                 nome: '', objetivo: 'Engajamento', publico: 'Interno (Seres)', // PADRÃO ATUALIZADO
@@ -541,6 +544,9 @@
                     
                     setIncludeAgendaNPS(ev.includeNPS || false);
                     setAgendaNPSValue(ev.npsValue !== undefined ? ev.npsValue : 5);
+
+                    // Resgata responsáveis salvos, se não existirem define vazio
+                    setAgendaResponsavel(Array.isArray(ev.responsavel) ? ev.responsavel : []);
                     
                     if (ev.selectedVendorIndices !== undefined) {
                         setSelectedVendorIndices(ev.selectedVendorIndices);
@@ -569,12 +575,18 @@
                     setLocalVendors([{ name: '', value: 0 }]);
                     setIncludeAgendaNPS(false);
                     setAgendaNPSValue(5);
+                    setAgendaResponsavel([]); // Limpa a seleção ao criar nova
                 }
                 setIsModalAgendaOpen(true);
             };
 
             const toggleAnalyst = (name) => {
                 setSelectedAnalysts(prev => prev.includes(name) ? prev.filter(n => n !== name) : [...prev, name]);
+            };
+
+            // NOVA FUNÇÃO: Toggle para selecionar responsáveis na agenda
+            const toggleAgendaResponsavel = (name) => {
+                setAgendaResponsavel(prev => Array.isArray(prev) ? (prev.includes(name) ? prev.filter(n => n !== name) : [...prev, name]) : [name]);
             };
 
             const toggleFormat = (f) => setSelectedFormats(prev => prev.includes(f) ? prev.filter(item => item !== f) : [...prev, f]);
@@ -681,10 +693,23 @@
                 e.preventDefault();
                 const fd = new FormData(e.target);
                 const data = { 
-                    title: fd.get('atividade'), date: fd.get('date'), sponsor: fd.get('sponsor'), 
-                    description: fd.get('description'), meetingLink: fd.get('meetingLink'), status: fd.get('status'), 
-                    budget: localBudget, hasVendor: vendorToggle, selectedVendorIndices: selectedVendorIndices, 
-                    vendors: localVendors, includeNPS: includeAgendaNPS, npsValue: agendaNPSValue, updatedAt: new Date().toISOString() 
+                    title: fd.get('atividade'), 
+                    date: fd.get('date'), 
+                    sponsor: fd.get('sponsor'), 
+                    description: fd.get('description'), 
+                    meetingLink: fd.get('meetingLink'), 
+                    status: fd.get('status'), 
+                    budget: localBudget, 
+                    hasVendor: vendorToggle, 
+                    selectedVendorIndices: selectedVendorIndices, 
+                    vendors: localVendors, 
+                    includeNPS: includeAgendaNPS, 
+                    npsValue: agendaNPSValue,
+                    responsavel: agendaResponsavel, // Salvando array de responsáveis
+                    startTime: fd.get('startTime'), // Salvando horário início
+                    endTime: fd.get('endTime'),     // Salvando horário fim
+                    modelo: fd.get('modelo'),       // Salvando modelo
+                    updatedAt: new Date().toISOString() 
                 };
                 setIsModalAgendaOpen(false);
                 if (editingAgenda) await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'agenda', editingAgenda.id), data);
@@ -1300,6 +1325,7 @@
                                                     <td className="px-6 sm:px-10 py-6 sm:py-8 text-slate-800">
                                                         <div className="flex items-center gap-2 flex-wrap">
                                                             <div className="font-black uppercase italic text-lg sm:text-xl text-slate-800 leading-none">{ev.title}</div>
+                                                            {ev.modelo && <span className="bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded text-[8px] font-black uppercase border border-indigo-100">{ev.modelo}</span>}
                                                             {ev.meetingLink && <a href={ev.meetingLink} target="_blank" title="Abrir Reunião" className="text-[#397394] hover:scale-110 transition-transform ml-1"><Icon name="video" size={16} /></a>}
                                                             {ev.includeNPS && (
                                                                 <div className={`ml-1 flex items-center gap-1 px-2 py-0.5 rounded-full text-[8px] sm:text-[9px] font-black uppercase ${reguaUtils.getNPSCategory(ev.npsValue).bg} ${reguaUtils.getNPSCategory(ev.npsValue).text} border border-current shadow-sm`}>
@@ -1308,11 +1334,14 @@
                                                             )}
                                                         </div>
                                                         <div className="text-[8px] sm:text-[9px] font-bold text-slate-400 uppercase mt-2 tracking-widest italic">
-                                                            {ev.sponsor} 
+                                                            Sponsor: <span className="text-slate-600">{ev.sponsor || '--'}</span> | Responsável: <span className="text-indigo-400">{Array.isArray(ev.responsavel) && ev.responsavel.length > 0 ? ev.responsavel.join(', ') : '--'}</span>
                                                             {((ev.selectedVendorIndices && ev.selectedVendorIndices.length > 0) || (ev.hasVendor && ev.selectedVendorIdx >= 0)) && <span className="text-[#BED993] font-black uppercase ml-2 block sm:inline mt-1 sm:mt-0">• Fornecedores Atribuídos</span>}
                                                         </div>
                                                     </td>
-                                                    <td className="px-6 sm:px-10 py-6 sm:py-8 text-center text-[10px] sm:text-xs font-bold text-slate-500">{ev.date ? formatLocalDate(ev.date) : '--'}</td>
+                                                    <td className="px-6 sm:px-10 py-6 sm:py-8 text-center text-[10px] sm:text-xs font-bold text-slate-500">
+                                                        <div>{ev.date ? formatLocalDate(ev.date) : '--'}</div>
+                                                        {(ev.startTime || ev.endTime) && <div className="text-[8px] mt-1 text-slate-400">{ev.startTime || '--:--'} às {ev.endTime || '--:--'}</div>}
+                                                    </td>
                                                     <td className="px-6 sm:px-10 py-6 sm:py-8 text-center"><span className="px-3 sm:px-4 py-1.5 bg-blue-50 text-blue-700 text-[8px] sm:text-[9px] font-black uppercase rounded-full">{ev.status}</span></td>
                                                     <td className="px-6 sm:px-10 py-6 sm:py-8 text-right flex items-center justify-end gap-1">
                                                         <button onClick={() => openAgendaModal(ev)} className="p-2 sm:p-3 hover:text-blue-600 transition-all"><Icon name="pencil" size={16} /></button>
@@ -1807,11 +1836,41 @@
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-10">
                                         <div className="space-y-6 sm:space-y-8">
                                             <div><label className="text-[9px] sm:text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold">Atividade</label><input name="atividade" defaultValue={editingAgenda?.title} required className="w-full bg-slate-50 border-none rounded-xl sm:rounded-2xl p-4 sm:p-5 font-bold outline-none shadow-sm text-sm sm:text-base" /></div>
-                                            <div><label className="text-[9px] sm:text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold">Sponsor Responsável</label><input name="sponsor" defaultValue={editingAgenda?.sponsor} required className="w-full bg-slate-50 border-none rounded-xl sm:rounded-2xl p-4 sm:p-5 font-bold outline-none shadow-sm text-sm sm:text-base" /></div>
-                                            <div><label className="text-[9px] sm:text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold">Descrição / Briefing</label><textarea name="description" defaultValue={editingAgenda?.description} rows="4" className="w-full bg-slate-50 border-none rounded-xl sm:rounded-2xl p-4 sm:p-5 font-bold outline-none shadow-sm resize-none text-xs sm:text-sm"></textarea></div>
-                                            <div><label className="text-[9px] sm:text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold">Link da Reunião</label><div className="relative"><input name="meetingLink" defaultValue={editingAgenda?.meetingLink} className="w-full bg-slate-50 border-none rounded-xl p-4 sm:p-5 pl-10 sm:pl-12 font-bold outline-none shadow-sm text-xs sm:text-sm" placeholder="URL da videoconferência" /><Icon name="video" size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" /></div></div>
-                                            <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                                            
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                <div><label className="text-[9px] sm:text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold">Sponsor Responsável</label><input name="sponsor" defaultValue={editingAgenda?.sponsor} required className="w-full bg-slate-50 border-none rounded-xl p-3 sm:p-4 font-bold outline-none shadow-sm text-sm" /></div>
+                                                <div>
+                                                    <label className="text-[9px] sm:text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold">Modelo</label>
+                                                    <select name="modelo" defaultValue={editingAgenda?.modelo || 'Híbrido'} className="w-full bg-slate-50 border-none rounded-xl p-3 sm:p-4 font-black outline-none shadow-sm text-xs sm:text-sm">
+                                                        <option>Híbrido</option>
+                                                        <option>Presencial</option>
+                                                        <option>Remoto</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+
+                                            <div>
+                                                <label className="text-[9px] sm:text-[10px] font-black uppercase text-slate-400 block font-bold mb-2">Responsável (Analista)</label>
+                                                <div className="flex flex-wrap gap-2">
+                                                    {ANALYSTS_LIST.map(a => (
+                                                        <div key={a} onClick={() => toggleAgendaResponsavel(a)} className={`checkbox-flag ${agendaResponsavel.includes(a) ? 'active' : ''}`}>
+                                                            <Icon name={agendaResponsavel.includes(a) ? "check-circle-2" : "circle"} size={14} forceKey={`ag-resp-${agendaResponsavel.includes(a) ? 'y' : 'n'}-${a}`} />
+                                                            {a}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+
+                                            <div><label className="text-[9px] sm:text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold">Descrição / Briefing</label><textarea name="description" defaultValue={editingAgenda?.description} rows="3" className="w-full bg-slate-50 border-none rounded-xl sm:rounded-2xl p-4 sm:p-5 font-bold outline-none shadow-sm resize-none text-xs sm:text-sm"></textarea></div>
+                                            
+                                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
                                                 <div><label className="text-[9px] sm:text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold">Data Prevista</label><input name="date" type="date" defaultValue={editingAgenda?.date} required className="w-full bg-slate-50 border-none rounded-xl p-3 sm:p-4 font-bold outline-none shadow-sm text-xs sm:text-sm" /></div>
+                                                <div><label className="text-[9px] sm:text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold">Horário Início</label><input name="startTime" type="time" defaultValue={editingAgenda?.startTime} className="w-full bg-slate-50 border-none rounded-xl p-3 sm:p-4 font-bold outline-none shadow-sm text-xs sm:text-sm" /></div>
+                                                <div><label className="text-[9px] sm:text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold">Horário Fim</label><input name="endTime" type="time" defaultValue={editingAgenda?.endTime} className="w-full bg-slate-50 border-none rounded-xl p-3 sm:p-4 font-bold outline-none shadow-sm text-xs sm:text-sm" /></div>
+                                            </div>
+
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                                                <div><label className="text-[9px] sm:text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold">Link da Reunião</label><div className="relative"><input name="meetingLink" defaultValue={editingAgenda?.meetingLink} className="w-full bg-slate-50 border-none rounded-xl p-3 sm:p-4 pl-10 sm:pl-12 font-bold outline-none shadow-sm text-xs sm:text-sm" placeholder="URL da videoconferência" /><Icon name="video" size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" /></div></div>
                                                 <div><label className="text-[9px] sm:text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold">Status</label><select name="status" defaultValue={editingAgenda?.status || 'Planejado'} className="w-full bg-slate-50 border-none rounded-xl p-3 sm:p-4 font-black outline-none shadow-sm text-xs sm:text-sm"><option>Planejado</option><option>Em Progresso</option><option>Concluído</option><option>Cancelado</option></select></div>
                                             </div>
                                         </div>
