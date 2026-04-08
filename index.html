@@ -49,7 +49,18 @@
         }
         @keyframes blinker { from { opacity: 1; } to { opacity: 0.5; } }
 
-        .message-box { position: fixed; bottom: 85px; left: 50%; transform: translateX(-50%); background: #1e293b; color: white; padding: 12px 24px; border-radius: 12px; z-index: 200; font-weight: 900; font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; box-shadow: 0 20px 40px rgba(0,0,0,0.3); width: 90%; max-width: 300px; text-align: center; }
+        .toast-container {
+            position: fixed; bottom: 85px; left: 50%; transform: translateX(-50%);
+            z-index: 9999; display: flex; align-items: center; gap: 10px;
+            padding: 14px 28px; border-radius: 99px; font-weight: 900; font-size: 10px;
+            text-transform: uppercase; letter-spacing: 0.1em;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.25); width: max-content; max-width: 90%;
+            animation: slideUpToast 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        .toast-success { background: #10b981; color: white; border: 2px solid #059669; }
+        .toast-error { background: #ef4444; color: white; border: 2px solid #dc2626; }
+        .toast-info { background: #1e293b; color: white; border: 2px solid #0f172a; }
+        @keyframes slideUpToast { from { transform: translate(-50%, 30px); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
 
         .round-flag-container {
             width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center;
@@ -71,6 +82,13 @@
             flex-shrink: 0; border: 2px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.1);
             overflow: hidden;
         }
+
+        .spinner {
+            border: 2px solid rgba(255,255,255,0.3); border-radius: 50%;
+            border-top: 2px solid white; width: 14px; height: 14px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
@@ -84,7 +102,7 @@
             signInAnonymously, 
             signInWithCustomToken 
         } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, doc, onSnapshot, deleteDoc, addDoc, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, doc, onSnapshot, deleteDoc, addDoc, updateDoc, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // Configuração segura para o ambiente Canvas e seu projeto
         const firebaseConfig = typeof __firebase_config !== 'undefined' 
@@ -173,6 +191,93 @@
             return <div className="analyst-avatar rounded-full" style={{ backgroundColor: color }}>{initials}</div>;
         }
 
+        // --- COMPONENTES DE TEXTO FORMATADO ---
+        function RichTextDisplay({ text, className = "" }) {
+            if (!text) return <p className={`italic opacity-50 ${className}`}>Sem descrição.</p>;
+            const lines = String(text).split('\n');
+            return (
+                <div className={`space-y-2 ${className}`}>
+                    {lines.map((line, i) => {
+                        if (!line.trim()) return <div key={i} className="h-2"></div>;
+                        const parts = line.split(/(https?:\/\/[^\s]+)/g);
+                        return (
+                            <div key={i} className="leading-relaxed break-words">
+                                {parts.map((part, j) => {
+                                    if (part.match(/^https?:\/\//)) {
+                                        return <a key={j} href={part} target="_blank" rel="noopener noreferrer" className="text-indigo-600 font-black hover:text-indigo-800 underline transition-colors" onClick={e => e.stopPropagation()}>{part}</a>;
+                                    }
+                                    return <span key={j}>{part}</span>;
+                                })}
+                            </div>
+                        );
+                    })}
+                </div>
+            );
+        }
+
+        function SmartTextArea({ value, defaultValue, onChange, placeholder, name, rows = 3, className = "" }) {
+            const [isEditing, setIsEditing] = useState(false);
+            const [internalVal, setInternalVal] = useState(defaultValue || "");
+            const textareaRef = useRef(null);
+
+            const isControlled = value !== undefined;
+            const displayVal = (isControlled ? value : internalVal) || "";
+
+            useEffect(() => {
+                if (!isControlled && defaultValue !== undefined && defaultValue !== internalVal) {
+                    setInternalVal(defaultValue || "");
+                }
+            }, [defaultValue, isControlled]);
+
+            useEffect(() => {
+                if (isEditing && textareaRef.current) {
+                    textareaRef.current.focus();
+                    textareaRef.current.selectionStart = textareaRef.current.value.length;
+                }
+            }, [isEditing]);
+
+            const handleChange = (e) => {
+                if (!isControlled) setInternalVal(e.target.value);
+                if (onChange) onChange(e);
+            };
+
+            return (
+                <div className="w-full relative">
+                    {!isControlled && <textarea name={name} value={displayVal} onChange={()=>{}} className="hidden" readOnly />}
+                    
+                    {isEditing ? (
+                        <textarea
+                            ref={textareaRef}
+                            name={isControlled ? name : undefined}
+                            value={displayVal}
+                            onChange={handleChange}
+                            onBlur={() => setIsEditing(false)}
+                            placeholder={placeholder}
+                            rows={rows}
+                            className={`w-full bg-white border-2 border-indigo-500 rounded-xl sm:rounded-2xl p-4 sm:p-5 outline-none shadow-md resize-y text-xs sm:text-sm font-medium leading-loose ${className}`}
+                        />
+                    ) : (
+                        <div 
+                            onClick={() => setIsEditing(true)}
+                            className={`w-full bg-slate-50 border border-slate-200 hover:border-indigo-300 rounded-xl sm:rounded-2xl p-4 sm:p-5 cursor-text shadow-sm text-xs sm:text-sm font-medium overflow-y-auto transition-all group ${className}`}
+                            style={{ minHeight: `${rows * 2.5}rem` }}
+                        >
+                            {displayVal ? (
+                                <RichTextDisplay text={displayVal} className="text-slate-700" />
+                            ) : (
+                                <span className="text-slate-400 italic">{placeholder}</span>
+                            )}
+                            <div className="mt-4 flex justify-end opacity-0 group-hover:opacity-100 transition-opacity">
+                                <span className="text-[9px] text-indigo-500 uppercase font-black tracking-widest bg-indigo-100 px-2 py-1 rounded flex items-center gap-1 shadow-sm">
+                                    <Icon name="edit-3" size={12}/> Clique para Editar
+                                </span>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
         function checkIsDelayed(date, time, status) {
             if (status === 'Enviado' || status === 'Cancelado' || !date) return false;
             const scheduledTime = time || "00:00";
@@ -189,7 +294,7 @@
         
         const parseCurrency = (str) => {
             if (!str) return 0;
-            const digits = str.replace(/\D/g, '');
+            const digits = String(str).replace(/\D/g, '');
             return Number(digits) / 100;
         };
 
@@ -372,7 +477,16 @@
             const [agenda, setAgenda] = useState([]);
             const [externalComms, setExternalComms] = useState([]);
             const [reguas, setReguas] = useState([]);
-            const [message, setMessage] = useState("");
+            
+            // NOVO: Controle das Metas de Orçamento
+            const [budgetGoalsDb, setBudgetGoalsDb] = useState({});
+            const [budgetYear, setBudgetYear] = useState(new Date().getFullYear().toString());
+            const [localGoals, setLocalGoals] = useState(Array(12).fill(0));
+            const [isEditingBudget, setIsEditingBudget] = useState(false);
+            const [isSavingGoals, setIsSavingGoals] = useState(false);
+
+            const [toast, setToast] = useState({ visible: false, text: '', type: 'info' });
+            
             const fileInputRef = useRef(null);
             const agendaFileInputRef = useRef(null);
             
@@ -388,7 +502,10 @@
             const [editingReguaId, setEditingReguaId] = useState(null);
             const [targetDelete, setTargetDelete] = useState(null);
 
-            // Estados locais para cálculos instantâneos
+            const [isSavingComm, setIsSavingComm] = useState(false);
+            const [isSavingExt, setIsSavingExt] = useState(false);
+            const [isSavingAgenda, setIsSavingAgenda] = useState(false);
+
             const [commReach, setCommReach] = useState(0);
             const [commReactions, setCommReactions] = useState(0);
             const [commComments, setCommComments] = useState(0);
@@ -425,15 +542,11 @@
 
             const [includeAgendaNPS, setIncludeAgendaNPS] = useState(false);
             const [agendaNPSValue, setAgendaNPSValue] = useState(5);
-
-            // NOVO ESTADO: Controla os analistas selecionados na Agenda
             const [agendaResponsavel, setAgendaResponsavel] = useState([]);
 
-            // FUNÇÃO ANTI-DUPLICAÇÃO E LIMPEZA DA RÉGUA DE COMUNICAÇÃO
             const getInitialReguaForm = () => ({
-                nome: '', objetivo: 'Engajamento', publico: 'Interno (Seres)', // PADRÃO ATUALIZADO
+                nome: '', objetivo: 'Engajamento', publico: 'Interno (Seres)', 
                 dataInicio: reguaUtils.getRawDate(new Date()), incluirNPS: false, valorNPS: 5,
-                // AGORA INCLUIMOS A DATA PREVISTA MANUALMENTE EM CADA PASSO
                 passos: [{ titulo: '', canal: 'Email', dataPrevista: reguaUtils.getRawDate(new Date()), delayDias: 0, briefing: '', concluido: false }]
             });
             const [reguaFormData, setReguaFormData] = useState(getInitialReguaForm());
@@ -447,6 +560,11 @@
             const [openedCount, setOpenedCount] = useState(0);
             const autoOpenRate = useMemo(() => (!sentCount || sentCount === 0) ? "0.00" : ((openedCount / sentCount) * 100).toFixed(2), [sentCount, openedCount]);
             const autoCtrRate = useMemo(() => (!sentCount || sentCount === 0) ? "0.00" : ((clickCount / sentCount) * 100).toFixed(2), [sentCount, clickCount]);
+
+            const showToast = (text, type = 'info') => {
+                setToast({ visible: true, text, type });
+                setTimeout(() => setToast({ visible: false, text: '', type: 'info' }), 3000);
+            };
 
             // Inicialização de Autenticação Automática
             useEffect(() => {
@@ -464,7 +582,7 @@
                 initAuth();
                 const unsubscribe = onAuthStateChanged(auth, (u) => { 
                     setUser(u); 
-                    if (u) setMessage("Sistemas Ativos"); 
+                    if (u) showToast("Sistemas Ativos", "success"); 
                 });
                 return () => unsubscribe();
             }, []);
@@ -477,28 +595,41 @@
                 const agendaRef = collection(db, 'artifacts', appId, 'public', 'data', 'agenda');
                 const extRef = collection(db, 'artifacts', appId, 'public', 'data', 'external');
                 const reguasRef = collection(db, 'artifacts', appId, 'public', 'data', 'reguas_planejamento');
+                const goalsRef = collection(db, 'artifacts', appId, 'public', 'data', 'budget_goals'); // Nova Coleção
 
                 const unsubC = onSnapshot(commsRef, 
                     (snap) => setComms(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
-                    (err) => console.error("Error loading comms:", err)
+                    (err) => { console.error(err); showToast("Erro ao carregar comunicados", "error"); }
                 );
                 const unsubA = onSnapshot(agendaRef, 
                     (snap) => setAgenda(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
-                    (err) => console.error("Error loading agenda:", err)
+                    (err) => { console.error(err); showToast("Erro ao carregar agenda", "error"); }
                 );
                 const unsubE = onSnapshot(extRef, 
                     (snap) => setExternalComms(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
-                    (err) => console.error("Error loading external:", err)
+                    (err) => { console.error(err); showToast("Erro ao carregar externos", "error"); }
                 );
                 const unsubR = onSnapshot(reguasRef, 
                     (snap) => setReguas(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
-                    (err) => console.error("Error loading reguas:", err)
+                    (err) => { console.error(err); showToast("Erro ao carregar planejamento", "error"); }
+                );
+                const unsubG = onSnapshot(goalsRef, 
+                    (snap) => {
+                        const goalsData = {};
+                        snap.docs.forEach(d => { goalsData[d.id] = d.data().goals || Array(12).fill(0); });
+                        setBudgetGoalsDb(goalsData);
+                    },
+                    (err) => { console.error(err); showToast("Erro ao carregar metas de orçamento", "error"); }
                 );
                 
-                return () => { unsubC(); unsubA(); unsubE(); unsubR(); };
+                return () => { unsubC(); unsubA(); unsubE(); unsubR(); unsubG(); };
             }, [user]);
 
-            // Handlers de Exclusão Global
+            // Efeito para sincronizar os goals locais do Orçamento
+            useEffect(() => {
+                setLocalGoals(budgetGoalsDb[budgetYear] || Array(12).fill(0));
+            }, [budgetYear, budgetGoalsDb]);
+
             const promptDelete = (id, col) => { 
                 setTargetDelete({ id, collection: col }); 
                 setIsDeleteModalOpen(true); 
@@ -508,10 +639,10 @@
                 if (!targetDelete) return;
                 try { 
                     await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', targetDelete.collection, targetDelete.id)); 
-                    setMessage("Removido com sucesso!"); 
+                    showToast("Removido com sucesso!", "success"); 
                 } catch (e) { 
                     console.error("Erro ao excluir:", e);
-                    setMessage("Erro de permissão no Banco de Dados!"); 
+                    showToast("Erro de permissão no Banco de Dados!", "error"); 
                 }
                 setIsDeleteModalOpen(false); 
                 setTargetDelete(null);
@@ -542,11 +673,8 @@
                     setEditingAgenda(ev); 
                     setLocalBudget(Number(ev.budget || 0)); 
                     setVendorToggle(ev.hasVendor || false); 
-                    
                     setIncludeAgendaNPS(ev.includeNPS || false);
                     setAgendaNPSValue(ev.npsValue !== undefined ? ev.npsValue : 5);
-
-                    // Resgata responsáveis salvos, se não existirem define vazio
                     setAgendaResponsavel(Array.isArray(ev.responsavel) ? ev.responsavel : []);
                     
                     if (ev.selectedVendorIndices !== undefined) {
@@ -576,7 +704,7 @@
                     setLocalVendors([{ name: '', value: 0 }]);
                     setIncludeAgendaNPS(false);
                     setAgendaNPSValue(5);
-                    setAgendaResponsavel([]); // Limpa a seleção ao criar nova
+                    setAgendaResponsavel([]); 
                 }
                 setIsModalAgendaOpen(true);
             };
@@ -585,7 +713,6 @@
                 setSelectedAnalysts(prev => prev.includes(name) ? prev.filter(n => n !== name) : [...prev, name]);
             };
 
-            // NOVA FUNÇÃO: Toggle para selecionar responsáveis na agenda
             const toggleAgendaResponsavel = (name) => {
                 setAgendaResponsavel(prev => Array.isArray(prev) ? (prev.includes(name) ? prev.filter(n => n !== name) : [...prev, name]) : [name]);
             };
@@ -609,7 +736,7 @@
                     const text = e.target.result;
                     const lines = text.split('\n');
                     if (lines.length < 2) {
-                        setMessage("Arquivo CSV inválido ou vazio.");
+                        showToast("Arquivo CSV inválido ou vazio.", "error");
                         return;
                     }
 
@@ -652,7 +779,7 @@
                             console.error("Erro ao importar linha", i, err);
                         }
                     }
-                    setMessage(`${importedCount} comunicados importados!`);
+                    showToast(`${importedCount} comunicados importados!`, "success");
                     if (fileInputRef.current) fileInputRef.current.value = ""; 
                 };
                 reader.readAsText(file);
@@ -667,7 +794,7 @@
                     const text = e.target.result;
                     const lines = text.split('\n');
                     if (lines.length < 2) {
-                        setMessage("Arquivo CSV inválido ou vazio.");
+                        showToast("Arquivo CSV inválido ou vazio.", "error");
                         return;
                     }
 
@@ -684,8 +811,6 @@
                             data[header] = values[index] ? values[index].trim() : '';
                         });
 
-                        // Estrutura adaptada para os campos da Agenda
-                        // Dica de CSV: Para múltiplos responsáveis na mesma célula do CSV, separe por ";" (ponto e vírgula)
                         const formattedData = {
                             title: data.atividade || data.title || 'Sem Título',
                             date: data.date || '',
@@ -713,7 +838,7 @@
                             console.error("Erro ao importar linha da agenda", i, err);
                         }
                     }
-                    setMessage(`${importedCount} atividades importadas para a Agenda!`);
+                    showToast(`${importedCount} atividades importadas para a Agenda!`, "success");
                     if (agendaFileInputRef.current) agendaFileInputRef.current.value = ""; 
                 };
                 reader.readAsText(file);
@@ -721,6 +846,9 @@
 
             const handleSaveComm = async (e) => {
                 e.preventDefault();
+                if (isSavingComm) return;
+                setIsSavingComm(true);
+                
                 const fd = new FormData(e.target);
                 const data = { 
                     title: fd.get('title'), commLink: fd.get('commLink'), channelName: fd.get('channelName'), 
@@ -730,13 +858,25 @@
                     views: Number(fd.get('views')) || 0, reactions: Number(fd.get('reactions')) || 0, 
                     comments: Number(fd.get('comments')) || 0, notas: fd.get('notas') || '', updatedAt: new Date().toISOString() 
                 };
-                setIsModalCommOpen(false);
-                if (editingComm) await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'comms', editingComm.id), data);
-                else await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'comms'), data);
+                
+                try {
+                    if (editingComm) await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'comms', editingComm.id), data);
+                    else await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'comms'), data);
+                    setIsModalCommOpen(false);
+                    showToast("Comunicado salvo com sucesso!", "success");
+                } catch(error) {
+                    console.error("Erro ao salvar:", error);
+                    showToast("Falha ao salvar comunicado.", "error");
+                } finally {
+                    setIsSavingComm(false);
+                }
             };
 
             const handleSaveExternal = async (e) => {
                 e.preventDefault();
+                if (isSavingExt) return;
+                setIsSavingExt(true);
+
                 const fd = new FormData(e.target);
                 const data = { 
                     title: fd.get('title'), analyst: fd.get('analyst'), objective: fd.get('objective'), 
@@ -746,13 +886,25 @@
                     monitorClicks: monitorClicks, clickCount: monitorClicks ? Number(fd.get('clickCount') || 0) : 0,
                     ctrRate: monitorClicks ? autoCtrRate : "0.00", updatedAt: new Date().toISOString() 
                 };
-                setIsModalExternalOpen(false);
-                if (editingExternal) await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'external', editingExternal.id), data);
-                else await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'external'), data);
+                
+                try {
+                    if (editingExternal) await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'external', editingExternal.id), data);
+                    else await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'external'), data);
+                    setIsModalExternalOpen(false);
+                    showToast("Registro externo salvo!", "success");
+                } catch(error) {
+                    console.error("Erro ao salvar:", error);
+                    showToast("Falha ao salvar registro externo.", "error");
+                } finally {
+                    setIsSavingExt(false);
+                }
             };
 
             const handleSaveAgenda = async (e) => {
                 e.preventDefault();
+                if (isSavingAgenda) return;
+                setIsSavingAgenda(true);
+
                 const fd = new FormData(e.target);
                 const data = { 
                     title: fd.get('atividade'), 
@@ -767,30 +919,54 @@
                     vendors: localVendors, 
                     includeNPS: includeAgendaNPS, 
                     npsValue: agendaNPSValue,
-                    responsavel: agendaResponsavel, // Salvando array de responsáveis
-                    startTime: fd.get('startTime'), // Salvando horário início
-                    endTime: fd.get('endTime'),     // Salvando horário fim
-                    modelo: fd.get('modelo'),       // Salvando modelo
+                    responsavel: agendaResponsavel, 
+                    startTime: fd.get('startTime'), 
+                    endTime: fd.get('endTime'),     
+                    modelo: fd.get('modelo'),       
                     updatedAt: new Date().toISOString() 
                 };
-                setIsModalAgendaOpen(false);
-                if (editingAgenda) await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'agenda', editingAgenda.id), data);
-                else await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'agenda'), data);
+                
+                try {
+                    if (editingAgenda) await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'agenda', editingAgenda.id), data);
+                    else await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'agenda'), data);
+                    setIsModalAgendaOpen(false);
+                    showToast("Atividade na agenda salva!", "success");
+                } catch(error) {
+                    console.error("Erro ao salvar agenda:", error);
+                    showToast("Falha ao salvar atividade.", "error");
+                } finally {
+                    setIsSavingAgenda(false);
+                }
             };
 
-            // =========================================================================
-            // CORE FUNCIONALIDADES - PÁGINA "PLANEJAMENTO" - REESCRITO E PROTEGIDO
-            // =========================================================================
+            // NOVA LÓGICA: Salvar as Metas do Orçamento
+            const handleSaveGoals = async (e) => {
+                e.preventDefault();
+                if (isSavingGoals) return;
+                setIsSavingGoals(true);
 
-            // SANITIZAÇÃO DE SEGURANÇA: Firebase SDK quebra se enviarmos objetos instanciados na tela
-            // Esta função limpa tudo garantindo que apenas Strings, Numbers e Booleans puros sejam gravados.
+                try {
+                    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'budget_goals', budgetYear), {
+                        goals: localGoals,
+                        updatedAt: new Date().toISOString()
+                    });
+                    setIsEditingBudget(false);
+                    showToast("Metas atualizadas com sucesso!", "success");
+                } catch (err) {
+                    console.error(err);
+                    showToast("Erro ao salvar metas.", "error");
+                } finally {
+                    setIsSavingGoals(false);
+                }
+            };
+
             const sanitizeStepsForDB = (steps) => {
                 if (!Array.isArray(steps)) return [];
                 return steps.map(s => ({
                     titulo: s.titulo || '',
                     canal: s.canal || 'Email',
-                    dataPrevista: s.dataPrevista || '', // DATA AGORA É SALVA INDIVIDUALMENTE
-                    delayDias: Number(s.delayDias) || 0, // Apenas para referência visual
+                    dataPrevista: s.dataPrevista || '', 
+                    delayDias: Number(s.delayDias) || 0, 
                     briefing: s.briefing || '',
                     concluido: !!s.concluido
                 }));
@@ -823,10 +999,10 @@
                     
                     setEditingReguaId(null);
                     setReguaFormData(getInitialReguaForm());
-                    setMessage("Planejamento salvo com sucesso!");
+                    showToast("Planejamento salvo com sucesso!", "success");
                 } catch (err) {
                     console.error(err);
-                    setMessage("Erro ao salvar! Verifique as permissões de banco.");
+                    showToast("Erro ao salvar! Verifique as permissões de banco.", "error");
                 } finally {
                     setIsSaving(false);
                 }
@@ -834,7 +1010,6 @@
 
             const handleEditRegua = (regua) => {
                 setEditingReguaId(regua.id);
-                // Garantimos a recuperação com valores defaults corretos
                 setReguaFormData({
                     nome: regua.nome || '',
                     objetivo: regua.objetivo || 'Engajamento',
@@ -844,7 +1019,6 @@
                     valorNPS: regua.valorNPS || 5,
                     passos: sanitizeStepsForDB(regua.passos).map(s => ({
                         ...s,
-                        // Se for uma régua legada sem data individual, usamos a data de início como fallback visual
                         dataPrevista: s.dataPrevista || regua.dataInicio || reguaUtils.getRawDate(new Date())
                     }))
                 });
@@ -856,27 +1030,22 @@
                 if (isSaving) return;
                 setIsSaving(true);
                 try {
-                    // Deep clone and clean
                     const cleanSteps = sanitizeStepsForDB(reguaSteps);
-                    
-                    // Toggle a etapa exata
                     if (cleanSteps[stepIdx]) {
                         cleanSteps[stepIdx].concluido = !cleanSteps[stepIdx].concluido;
                     }
-                    
                     await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'reguas_planejamento', reguaId), { 
                         passos: cleanSteps, 
                         updatedAt: new Date().toISOString() 
                     });
                 } catch (error) {
                     console.error("Erro ao atualizar status do card:", error);
-                    setMessage("Erro de sincronização. Tente novamente.");
+                    showToast("Erro de sincronização. Tente novamente.", "error");
                 } finally {
                     setIsSaving(false);
                 }
             };
 
-            // Calcula apenas visualmente para renderizar na listagem. (Isso nunca será salvo no banco!)
             const calculateTimeline = (regua) => {
                 const today = new Date();
                 today.setHours(0,0,0,0);
@@ -884,7 +1053,6 @@
                 const safePassos = Array.isArray(regua.passos) ? regua.passos : [];
 
                 const steps = safePassos.map(p => {
-                    // Pega a data preenchida manualmente pelo usuário
                     const dataBase = p.dataPrevista || regua.dataInicio || reguaUtils.getRawDate(new Date());
                     const dateObj = new Date(dataBase + 'T12:00:00');
                     const dateStripped = new Date(dateObj);
@@ -903,8 +1071,6 @@
 
                 return { steps, lastDate, progress };
             };
-
-            // =========================================================================
 
             const renderIndividualSaving = (vendorValue) => {
                 if (!localBudget || localBudget <= 0 || !vendorValue) return null;
@@ -946,11 +1112,10 @@
                 }).sort((a, b) => new Date(b.date) - new Date(a.date));
             }, [agenda, agendaFilterYear, agendaFilterMonth]);
 
-            // NOVA CAMADA DE SEGURANÇA: Filtra dados corrompidos da base ANTES de ir para a tela ou contadores
             const safeReguas = useMemo(() => {
                 return reguas.filter(r => {
                     const n = r.nome ? r.nome.toUpperCase() : '';
-                    if (n.includes('CSAT MEX') || n.includes('CSAT MÉX')) return false; // Remove permanentemente a campanha corrompida
+                    if (n.includes('CSAT MEX') || n.includes('CSAT MÉX')) return false; 
                     return true;
                 });
             }, [reguas]);
@@ -1088,9 +1253,63 @@
                 return { budgetTotal, custoReal, economiaTotal, savingPct, monthlyFinanceData };
             }, [agenda, impactFilterYear, impactFilterMonth]);
 
+            // NOVO: KPIs e Inteligência da Aba de Orçamento
+            const orcamentoStats = useMemo(() => {
+                const yearlyEvents = agenda.filter(ev => {
+                    if(!ev.date) return false;
+                    return ev.date.startsWith(budgetYear);
+                }).sort((a,b) => new Date(a.date) - new Date(b.date));
+
+                let totalPlanejado = localGoals.reduce((a,b)=>a+b, 0);
+                let totalAlocado = 0;
+                let totalGastoReal = 0;
+
+                const monthlyData = Array(12).fill(null).map(()=>({ alocado: 0, gasto: 0 }));
+
+                yearlyEvents.forEach(ev => {
+                    const dateObj = new Date(ev.date + 'T12:00:00');
+                    const month = dateObj.getMonth();
+                    const b = Number(ev.budget) || 0;
+                    let c = 0;
+
+                    let vendorsToCalc = ev.vendors || [];
+                    if (!ev.vendors && ev.vendor1 !== undefined) {
+                        vendorsToCalc = [{value: Number(ev.vendorValue1||0)}, {value: Number(ev.vendorValue2||0)}, {value: Number(ev.vendorValue3||0)}];
+                    }
+
+                    let indices = ev.selectedVendorIndices || [];
+                    if(indices.length === 0 && ev.selectedVendorIdx !== undefined && ev.selectedVendorIdx >= 0) indices = [ev.selectedVendorIdx];
+
+                    if(ev.hasVendor && vendorsToCalc.length > 0) {
+                        c = vendorsToCalc.reduce((acc, v, i) => indices.includes(i) ? acc + Number(v.value) : acc, 0);
+                    }
+
+                    totalAlocado += b;
+                    totalGastoReal += c;
+                    monthlyData[month].alocado += b;
+                    monthlyData[month].gasto += c;
+                });
+
+                const savingTotal = totalAlocado - totalGastoReal;
+                const saldoDisponivel = totalPlanejado - totalAlocado;
+
+                const currentMonth = new Date().getMonth();
+                const metaMesAtual = localGoals[currentMonth];
+                const gastoMesAtual = monthlyData[currentMonth].gasto;
+
+                return { totalPlanejado, totalAlocado, totalGastoReal, savingTotal, saldoDisponivel, monthlyData, metaMesAtual, gastoMesAtual, yearlyEvents };
+
+            }, [agenda, budgetYear, localGoals]);
+
             return (
                 <div className="min-h-screen pb-32 text-left">
-                    {message && <div className="message-box" onClick={() => setMessage("")}>{message}</div>}
+                    {/* NOVO SISTEMA DE TOASTS */}
+                    {toast.visible && (
+                        <div className={`toast-container toast-${toast.type}`}>
+                            <Icon name={toast.type === 'success' ? 'check-circle' : toast.type === 'error' ? 'alert-triangle' : 'info'} size={16} />
+                            <span>{toast.text}</span>
+                        </div>
+                    )}
                     
                     {/* HEADER */}
                     <nav className="bg-white border-b px-4 sm:px-10 py-4 sm:py-5 flex flex-col md:flex-row justify-between items-center gap-4 sticky top-0 z-50 shadow-sm">
@@ -1100,7 +1319,7 @@
                         
                         <div className="flex items-center justify-between w-full md:w-auto gap-6 overflow-x-auto custom-scroll pb-1 md:pb-0">
                             <div className="flex bg-slate-100 p-1 rounded-full gap-1 shrink-0">
-                                {['comunicados', 'external', 'agenda', 'planejamento', 'impacto'].map(tab => (
+                                {['comunicados', 'external', 'agenda', 'planejamento', 'impacto', 'orcamento'].map(tab => (
                                     <button key={tab} onClick={() => setActiveTab(tab)} className={`px-4 sm:px-6 py-2 sm:py-2.5 rounded-full text-[9px] sm:text-[10px] font-black uppercase transition-all whitespace-nowrap ${activeTab === tab ? 'bg-black text-white shadow-lg' : 'text-slate-400 hover:text-slate-600'}`}>
                                         {tab === 'external' ? 'Comm Externo' : tab}
                                     </button>
@@ -1112,10 +1331,215 @@
                     <main className="max-w-7xl mx-auto px-4 sm:px-10 py-6 sm:py-10">
                         <header className="mb-8 sm:mb-12">
                             <h2 className="text-4xl sm:text-7xl lg:text-8xl font-black italic tracking-tighter leading-tight text-slate-900 uppercase">
-                                {activeTab === 'comunicados' ? 'flow.feed' : activeTab === 'external' ? 'Comm.Externo' : activeTab === 'agenda' ? 'next.steps' : activeTab === 'planejamento' ? 'planejamento' : 'impact.metrics'}
+                                {activeTab === 'comunicados' ? 'flow.feed' : activeTab === 'external' ? 'Comm.Externo' : activeTab === 'agenda' ? 'next.steps' : activeTab === 'planejamento' ? 'planejamento' : activeTab === 'orcamento' ? 'budget.control' : 'impact.metrics'}
                             </h2>
                             <p className="text-slate-400 font-black uppercase text-[10px] sm:text-xs tracking-[0.2em] sm:tracking-[0.4em] mt-2 sm:mt-4 ml-1 italic leading-none">Gestão Estratégica Operacional</p>
                         </header>
+
+                        {/* ================= ABAS PRINCIPAIS ================= */}
+
+                        {activeTab === 'orcamento' && (
+                            <section className="animate-in fade-in duration-500">
+                                <div className="flex flex-col sm:flex-row flex-wrap items-start sm:items-center justify-between gap-4 mb-8 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm sticky top-[70px] sm:top-[85px] z-40">
+                                    <div className="flex items-center gap-3">
+                                        <div className="bg-emerald-500 p-2 sm:p-2.5 rounded-xl">
+                                            <Icon name="dollar-sign" size={20} className="text-white sm:w-6 sm:h-6" />
+                                        </div>
+                                        <h2 className="text-lg sm:text-xl font-black tracking-tight text-slate-900 uppercase">Painel Financeiro</h2>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Ano Fiscal:</span>
+                                        <select value={budgetYear} onChange={(e) => setBudgetYear(e.target.value)} className="bg-slate-100 border-none text-xs font-black rounded-xl px-4 py-2 outline-none cursor-pointer uppercase">
+                                            <option value="2024">2024</option>
+                                            <option value="2025">2025</option>
+                                            <option value="2026">2026</option>
+                                            <option value="2027">2027</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-10">
+                                    <div className="col-span-2 lg:col-span-1 bg-slate-900 p-5 sm:p-8 rounded-[1.5rem] sm:rounded-[2rem] shadow-xl text-white relative overflow-hidden group">
+                                        <div className="absolute top-0 right-0 p-4 opacity-20"><Icon name="target" size={60} /></div>
+                                        <div className="relative z-10">
+                                            <div className="text-[9px] sm:text-[10px] font-black uppercase text-indigo-400 tracking-widest mb-2 flex items-center gap-1"><Icon name="calendar" size={12}/> Mês Atual ({MESES_ABREV[new Date().getMonth()]})</div>
+                                            <div className="text-3xl sm:text-4xl font-black tracking-tighter leading-none">R$ {formatCurrency(orcamentoStats.metaMesAtual)}</div>
+                                            <div className="text-[10px] sm:text-xs font-bold text-slate-400 mt-2">Gasto Real: <span className="text-white">R$ {formatCurrency(orcamentoStats.gastoMesAtual)}</span></div>
+                                        </div>
+                                    </div>
+                                    <div className="col-span-2 lg:col-span-1 bg-white p-5 sm:p-8 rounded-[1.5rem] sm:rounded-[2rem] border border-slate-100 shadow-sm flex flex-col justify-center">
+                                        <div className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tighter leading-none">R$ {formatCurrency(orcamentoStats.totalAlocado)}</div>
+                                        <div className="text-[8px] sm:text-[9px] font-black uppercase text-slate-400 tracking-widest mt-2 sm:mt-3">Budget Comprometido ({budgetYear})</div>
+                                    </div>
+                                    <div className="col-span-2 lg:col-span-1 bg-[#f8fafc] p-5 sm:p-8 rounded-[1.5rem] sm:rounded-[2rem] border border-slate-100 shadow-sm flex flex-col justify-center">
+                                        <div className={`text-3xl sm:text-4xl font-black tracking-tighter leading-none ${orcamentoStats.savingTotal >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>R$ {formatCurrency(Math.abs(orcamentoStats.savingTotal))}</div>
+                                        <div className="text-[8px] sm:text-[9px] font-black uppercase text-slate-400 tracking-widest mt-2 sm:mt-3">{orcamentoStats.savingTotal >= 0 ? 'Saving Gerado' : 'Excesso de Custo'}</div>
+                                    </div>
+                                    <div className="col-span-2 lg:col-span-1 bg-white p-5 sm:p-8 rounded-[1.5rem] sm:rounded-[2rem] border border-slate-100 shadow-sm flex flex-col justify-center">
+                                        <div className={`text-3xl sm:text-4xl font-black tracking-tighter leading-none ${orcamentoStats.saldoDisponivel >= 0 ? 'text-indigo-600' : 'text-rose-600'}`}>R$ {formatCurrency(Math.abs(orcamentoStats.saldoDisponivel))}</div>
+                                        <div className="text-[8px] sm:text-[9px] font-black uppercase text-slate-400 tracking-widest mt-2 sm:mt-3">{orcamentoStats.saldoDisponivel >= 0 ? 'Saldo Anual Disponível' : 'Déficit no Orçamento'}</div>
+                                    </div>
+                                </div>
+
+                                <div className="mb-10 bg-white p-6 sm:p-10 rounded-[1.5rem] sm:rounded-[3rem] border border-slate-100 shadow-sm">
+                                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+                                        <h3 className="text-base sm:text-lg font-black text-slate-800 uppercase tracking-widest flex items-center gap-2">
+                                            <Icon name="sliders" size={20} className="text-indigo-600" /> Configuração de Metas ({budgetYear})
+                                        </h3>
+                                        <button onClick={() => setIsEditingBudget(!isEditingBudget)} className="text-[10px] font-black uppercase text-indigo-600 bg-indigo-50 px-4 py-2 rounded-xl hover:bg-indigo-100 transition-colors flex items-center justify-center gap-2">
+                                            <Icon name={isEditingBudget ? "x" : "edit-3"} size={14}/> {isEditingBudget ? "Cancelar Edição" : "Editar Metas Mensais"}
+                                        </button>
+                                    </div>
+                                    
+                                    {isEditingBudget ? (
+                                        <form onSubmit={handleSaveGoals} className="animate-in fade-in duration-300">
+                                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                                                {MESES_ABREV.map((mes, i) => (
+                                                    <div key={mes} className="bg-slate-50 p-3 sm:p-4 rounded-2xl border border-slate-200">
+                                                        <label className="block text-[10px] font-black uppercase text-slate-500 mb-2 text-center">{mes}</label>
+                                                        <div className="relative">
+                                                            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-[10px] font-bold">R$</span>
+                                                            <input 
+                                                                type="text" 
+                                                                value={formatCurrency(localGoals[i])} 
+                                                                onChange={(e) => {
+                                                                    const newGoals = [...localGoals];
+                                                                    newGoals[i] = parseCurrency(e.target.value);
+                                                                    setLocalGoals(newGoals);
+                                                                }} 
+                                                                className="w-full bg-white border border-slate-200 rounded-xl p-2.5 pl-7 font-bold text-xs sm:text-sm outline-none focus:border-indigo-500 text-right shadow-sm" 
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            <div className="mt-6 flex justify-end">
+                                                <button type="submit" disabled={isSavingGoals} className={`px-8 py-3 rounded-xl font-black uppercase tracking-widest text-[10px] sm:text-xs transition-all flex items-center justify-center gap-2 ${isSavingGoals ? 'bg-slate-400 text-white cursor-not-allowed' : 'bg-black text-white hover:bg-indigo-600 shadow-xl'}`}>
+                                                    {isSavingGoals ? <><div className="spinner"></div> SALVANDO...</> : 'SALVAR METAS'}
+                                                </button>
+                                            </div>
+                                        </form>
+                                    ) : (
+                                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 animate-in fade-in duration-300">
+                                            {MESES_ABREV.map((mes, i) => (
+                                                <div key={mes} className="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex flex-col items-center justify-center">
+                                                    <span className="text-[9px] font-black uppercase text-slate-400 mb-1 tracking-widest">{mes}</span>
+                                                    <span className="text-sm font-black text-slate-800">R$ {formatCurrency(localGoals[i])}</span>
+                                                </div>
+                                            ))}
+                                            <div className="col-span-2 sm:col-span-3 md:col-span-4 lg:col-span-6 mt-4 pt-4 border-t border-slate-100 flex justify-between items-center text-xs">
+                                                <span className="font-black text-slate-500 uppercase tracking-widest">Soma Anual Projetada:</span>
+                                                <span className="font-black text-indigo-600 text-lg">R$ {formatCurrency(orcamentoStats.totalPlanejado)}</span>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="mb-10 bg-white rounded-[1.5rem] sm:rounded-[3rem] border border-slate-100 overflow-hidden shadow-sm">
+                                    <div className="p-6 sm:p-8 border-b border-slate-100 bg-slate-50">
+                                        <h3 className="text-sm sm:text-base font-black text-slate-800 uppercase tracking-widest flex items-center gap-2">
+                                            <Icon name="bar-chart" size={20} className="text-indigo-600" /> Fluxo de Caixa Mensal ({budgetYear})
+                                        </h3>
+                                    </div>
+                                    <div className="overflow-x-auto custom-scroll">
+                                        <table className="w-full text-left min-w-[700px]">
+                                            <thead className="bg-white border-b text-slate-400 text-[9px] sm:text-[10px] font-black uppercase tracking-widest italic">
+                                                <tr>
+                                                    <th className="px-6 py-4">Mês</th>
+                                                    <th className="px-6 py-4 text-right">Meta (Budget)</th>
+                                                    <th className="px-6 py-4 text-right">Alocado (Eventos)</th>
+                                                    <th className="px-6 py-4 text-right text-emerald-600">Gasto Real</th>
+                                                    <th className="px-6 py-4 text-right">Diferença (Meta - Gasto)</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-50">
+                                                {MESES_ABREV.map((mes, i) => {
+                                                    const meta = localGoals[i];
+                                                    const alocado = orcamentoStats.monthlyData[i].alocado;
+                                                    const gasto = orcamentoStats.monthlyData[i].gasto;
+                                                    const diferenca = meta - gasto;
+                                                    
+                                                    return (
+                                                        <tr key={mes} className="hover:bg-slate-50 transition-colors">
+                                                            <td className="px-6 py-4 font-black text-slate-800 uppercase tracking-widest text-xs">{mes}</td>
+                                                            <td className="px-6 py-4 text-right font-bold text-slate-500">R$ {formatCurrency(meta)}</td>
+                                                            <td className="px-6 py-4 text-right font-bold text-slate-500">R$ {formatCurrency(alocado)}</td>
+                                                            <td className="px-6 py-4 text-right font-black text-emerald-600">R$ {formatCurrency(gasto)}</td>
+                                                            <td className="px-6 py-4 text-right">
+                                                                <span className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase ${diferenca >= 0 ? 'bg-indigo-50 text-indigo-600' : 'bg-rose-50 text-rose-600'}`}>
+                                                                    R$ {formatCurrency(Math.abs(diferenca))} {diferenca >= 0 ? '(Sobra)' : '(Falta)'}
+                                                                </span>
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+
+                                <div className="bg-white rounded-[1.5rem] sm:rounded-[3rem] border border-slate-100 overflow-hidden shadow-sm">
+                                    <div className="p-6 sm:p-8 border-b border-slate-100">
+                                        <h3 className="text-sm sm:text-base font-black text-slate-800 uppercase tracking-widest flex items-center gap-2">
+                                            <Icon name="list" size={20} className="text-slate-400" /> Extrato de Atividades ({budgetYear})
+                                        </h3>
+                                    </div>
+                                    <div className="overflow-x-auto custom-scroll">
+                                        <table className="w-full text-left min-w-[700px]">
+                                            <thead className="bg-slate-50 border-b text-slate-400 text-[9px] sm:text-[10px] font-black uppercase tracking-widest italic">
+                                                <tr>
+                                                    <th className="px-6 py-4">Evento / Sponsor</th>
+                                                    <th className="px-6 py-4 text-center">Data</th>
+                                                    <th className="px-6 py-4 text-right">Budget Alocado</th>
+                                                    <th className="px-6 py-4 text-right">Custo Real (Forn.)</th>
+                                                    <th className="px-6 py-4 text-right">Saving</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-50">
+                                                {orcamentoStats.yearlyEvents.length === 0 && (
+                                                    <tr>
+                                                        <td colSpan="5" className="text-center py-12 text-slate-400 font-bold bg-white">
+                                                            Nenhum evento registrado com budget na Agenda para {budgetYear}.
+                                                        </td>
+                                                    </tr>
+                                                )}
+                                                {orcamentoStats.yearlyEvents.map(ev => {
+                                                    const b = Number(ev.budget) || 0;
+                                                    let c = 0;
+                                                    let vendorsToCalc = ev.vendors || [];
+                                                    if (!ev.vendors && ev.vendor1 !== undefined) {
+                                                        vendorsToCalc = [{value: Number(ev.vendorValue1||0)}, {value: Number(ev.vendorValue2||0)}, {value: Number(ev.vendorValue3||0)}];
+                                                    }
+                                                    let indices = ev.selectedVendorIndices || [];
+                                                    if(indices.length === 0 && ev.selectedVendorIdx !== undefined && ev.selectedVendorIdx >= 0) indices = [ev.selectedVendorIdx];
+                                                    if(ev.hasVendor && vendorsToCalc.length > 0) {
+                                                        c = vendorsToCalc.reduce((acc, v, i) => indices.includes(i) ? acc + Number(v.value) : acc, 0);
+                                                    }
+                                                    const sv = b - c;
+
+                                                    return (
+                                                        <tr key={ev.id} className="hover:bg-slate-50 transition-colors">
+                                                            <td className="px-6 py-4">
+                                                                <div className="font-black text-sm uppercase text-slate-800">{ev.title}</div>
+                                                                <div className="text-[9px] font-bold text-slate-400 uppercase mt-1">Sponsor: {ev.sponsor || '--'}</div>
+                                                            </td>
+                                                            <td className="px-6 py-4 text-center text-[10px] font-bold text-slate-500">{formatLocalDate(ev.date)}</td>
+                                                            <td className="px-6 py-4 text-right font-bold text-slate-600">R$ {formatCurrency(b)}</td>
+                                                            <td className="px-6 py-4 text-right font-black text-slate-800">R$ {formatCurrency(c)}</td>
+                                                            <td className="px-6 py-4 text-right">
+                                                                <span className={`text-[10px] font-black uppercase ${sv >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                                                                    R$ {formatCurrency(Math.abs(sv))} {sv >= 0 ? '(+' : '(-'}
+                                                                </span>
+                                                            </td>
+                                                        </tr>
+                                                    )
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </section>
+                        )}
 
                         {activeTab === 'comunicados' && (
                             <section className="animate-in fade-in duration-500">
@@ -1151,6 +1575,16 @@
                                             <tr><th className="px-6 sm:px-10 py-4 sm:py-6">Item / Editoria</th><th className="px-6 sm:px-10 py-4 sm:py-6 text-center">Data / Status</th><th className="px-6 sm:px-10 py-4 sm:py-6 text-center">Analistas / Canal</th><th className="px-6 sm:px-10 py-4 sm:py-6 text-right">TER / TA</th><th className="px-6 sm:px-10 py-4 sm:py-6 w-32"></th></tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-50 text-slate-800">
+                                            {filteredInternalComms.length === 0 && (
+                                                <tr>
+                                                    <td colSpan="5" className="text-center py-16 text-slate-400 font-bold bg-slate-50/30">
+                                                        <div className="flex flex-col items-center gap-3">
+                                                            <Icon name="inbox" size={32} className="text-slate-300" />
+                                                            Nenhum comunicado encontrado para este filtro.
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            )}
                                             {filteredInternalComms.map(c => {
                                                 const isDelayed = checkIsDelayed(c.date, c.postTime, c.status);
                                                 return (
@@ -1226,6 +1660,16 @@
                                             <tr><th className="px-6 sm:px-10 py-4 sm:py-6">Campanha / Objetivo</th><th className="px-6 sm:px-10 py-4 sm:py-6 text-center">Público (Países)</th><th className="px-6 sm:px-10 py-4 sm:py-6 text-center">Data / Status</th><th className="px-6 sm:px-10 py-4 sm:py-6 text-right">Open Rate</th><th className="px-6 sm:px-10 py-4 sm:py-6 w-32"></th></tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-50 text-slate-800">
+                                            {filteredExternalComms.length === 0 && (
+                                                <tr>
+                                                    <td colSpan="5" className="text-center py-16 text-slate-400 font-bold bg-slate-50/30">
+                                                        <div className="flex flex-col items-center gap-3">
+                                                            <Icon name="inbox" size={32} className="text-slate-300" />
+                                                            Nenhuma campanha externa encontrada.
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            )}
                                             {filteredExternalComms.map(e => (
                                                 <tr key={e.id} className="hover:bg-slate-50/50 transition-colors group">
                                                     <td className="px-6 sm:px-10 py-6 sm:py-8">
@@ -1394,6 +1838,16 @@
                                             <tr><th className="px-6 sm:px-10 py-4 sm:py-6">Atividade / Sponsor</th><th className="px-6 sm:px-10 py-4 sm:py-6 text-center">Data</th><th className="px-6 sm:px-10 py-4 sm:py-6 text-center">STATUS</th><th className="px-6 sm:px-10 py-4 sm:py-6 w-32"></th></tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-50">
+                                            {filteredAgenda.length === 0 && (
+                                                <tr>
+                                                    <td colSpan="4" className="text-center py-16 text-slate-400 font-bold bg-slate-50/30">
+                                                        <div className="flex flex-col items-center gap-3">
+                                                            <Icon name="calendar" size={32} className="text-slate-300" />
+                                                            Nenhuma atividade encontrada na agenda.
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            )}
                                             {filteredAgenda.map(ev => (
                                                 <tr key={ev.id} className={`hover:bg-slate-50 transition-colors group ${(ev.selectedVendorIndices && ev.selectedVendorIndices.length > 0) || (ev.hasVendor && ev.selectedVendorIdx >= 0) ? 'row-green-effect' : ''}`}>
                                                     <td className="px-6 sm:px-10 py-6 sm:py-8 text-slate-800">
@@ -1535,7 +1989,8 @@
                                                                                 <span className="text-[9px] font-black text-indigo-500 uppercase bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-md ml-auto flex items-center gap-1"><Icon name={step.canal === 'Email' ? 'mail' : step.canal === 'WhatsApp' ? 'message-square' : step.canal === 'Slack' ? 'hash' : 'bell'} size={10}/> {step.canal}</span>
                                                                             </div>
                                                                             <h4 className={`text-sm font-black mb-1 leading-tight ${step.concluido ? 'text-slate-400 line-through' : 'text-slate-800'}`}>{step.titulo || 'Sem Título'}</h4>
-                                                                            <p className="text-xs text-slate-500 italic leading-relaxed">{step.briefing || 'Sem descrição.'}</p>
+                                                                            
+                                                                            <RichTextDisplay text={step.briefing} className="text-xs text-slate-600 mt-2" />
                                                                         </div>
                                                                     </div>
                                                                 ))}
@@ -1552,7 +2007,7 @@
                                             )}
                                         </div>
 
-                                        {/* INDICADORES (MANTIDOS E CORRIGIDOS PARA NÃO CONTAR DADOS FANTASMAS) */}
+                                        {/* INDICADORES */}
                                         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-8 pt-10 sm:pt-16 border-t border-slate-100">
                                             <div className="bg-white p-5 sm:p-8 rounded-[1.5rem] sm:rounded-[3rem] border border-slate-100 shadow-sm transition-all hover:shadow-xl group col-span-1">
                                                 <div className="text-3xl sm:text-5xl font-black text-rose-500 sm:group-hover:scale-110 transition-transform origin-left">
@@ -1682,9 +2137,10 @@
                                                                         <input type="number" min="0" value={p.delayDias} onChange={e => { const newPassos = [...reguaFormData.passos]; newPassos[i].delayDias = e.target.value; setReguaFormData({...reguaFormData, passos: newPassos}); }} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 pl-10 text-sm font-bold outline-none focus:border-indigo-500 focus:bg-white transition-colors" />
                                                                     </div>
                                                                 </div>
+                                                                
                                                                 <div className="md:col-span-12">
                                                                     <label className="block text-[9px] font-black uppercase text-slate-400 mb-1 ml-1">Briefing / Conteúdo</label>
-                                                                    <input value={p.briefing} onChange={e => { const newPassos = [...reguaFormData.passos]; newPassos[i].briefing = e.target.value; setReguaFormData({...reguaFormData, passos: newPassos}); }} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm outline-none focus:border-indigo-500 focus:bg-white transition-colors" placeholder="Detalhes do que será enviado..." />
+                                                                    <SmartTextArea value={p.briefing} onChange={e => { const newPassos = [...reguaFormData.passos]; newPassos[i].briefing = e.target.value; setReguaFormData({...reguaFormData, passos: newPassos}); }} rows={2} placeholder="Detalhes do que será enviado, links úteis..." />
                                                                 </div>
                                                             </div>
                                                             <button type="button" onClick={() => { const newPassos = reguaFormData.passos.filter((_, idx) => idx !== i); setReguaFormData({...reguaFormData, passos: newPassos}); }} className="w-full md:w-12 h-12 md:h-auto bg-rose-50 border border-rose-100 text-rose-500 rounded-xl flex items-center justify-center hover:bg-rose-500 hover:text-white transition-colors shrink-0 mt-4 md:mt-0" title="Remover Etapa">
@@ -1701,8 +2157,8 @@
                                             {/* Submit */}
                                             <div className="pt-8 border-t border-slate-200 flex flex-col sm:flex-row justify-end gap-4">
                                                 <button type="button" onClick={() => { setIsReguaEditorOpen(false); setEditingReguaId(null); setReguaFormData(getInitialReguaForm()); }} className="w-full sm:w-auto px-10 py-4 sm:py-5 rounded-2xl font-bold uppercase tracking-widest text-[10px] sm:text-xs text-slate-500 bg-slate-100 hover:bg-slate-200 transition-colors">Cancelar e Voltar</button>
-                                                <button type="submit" disabled={isSaving} className={`w-full sm:w-auto px-10 py-4 sm:py-5 rounded-2xl font-black uppercase tracking-widest text-[10px] sm:text-xs transition-all ${isSaving ? 'bg-slate-400 text-white cursor-not-allowed' : 'bg-black text-white hover:bg-indigo-600 shadow-xl'}`}>
-                                                    {isSaving ? 'Processando e Salvando...' : (editingReguaId ? 'Confirmar e Atualizar Régua' : 'Publicar Nova Régua')}
+                                                <button type="submit" disabled={isSaving} className={`w-full sm:w-auto px-10 py-4 sm:py-5 rounded-2xl font-black uppercase tracking-widest text-[10px] sm:text-xs transition-all flex items-center justify-center gap-2 ${isSaving ? 'bg-slate-400 text-white cursor-not-allowed' : 'bg-black text-white hover:bg-indigo-600 shadow-xl'}`}>
+                                                    {isSaving ? <><div className="spinner"></div> PROCESSANDO...</> : (editingReguaId ? 'Confirmar e Atualizar Régua' : 'Publicar Nova Régua')}
                                                 </button>
                                             </div>
                                         </form>
@@ -1711,6 +2167,8 @@
                             </section>
                         )}
                     </main>
+
+                    {/* ================= MODAIS (AGORA CORRETAMENTE ISOLADOS) ================= */}
 
                     {/* MODAL COMUNICADOS INTERNOS */}
                     {isModalCommOpen && (
@@ -1800,14 +2258,16 @@
 
                                             <div>
                                                 <label className="text-[9px] sm:text-[10px] font-black uppercase text-slate-400 block mb-2 italic text-center">Notas de Performance / Comentários</label>
-                                                <textarea name="notas" defaultValue={editingComm?.notas} rows="2" className="w-full bg-white border-none rounded-xl sm:rounded-2xl p-3 sm:p-4 text-xs font-bold outline-none shadow-sm resize-none text-center" placeholder="Insira análises e observações aqui..."></textarea>
+                                                <SmartTextArea name="notas" defaultValue={editingComm?.notas} rows={3} placeholder="Insira análises, formatações e links aqui..." />
                                             </div>
                                         </div>
                                         <div className="grid grid-cols-2 gap-3 sm:gap-4">
                                             <div><label className="text-[9px] sm:text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold">Editoria</label><select name="editoria" defaultValue={editingComm?.editoria || EDITORIAS_LIST[0]} className="w-full bg-slate-50 border-none rounded-xl p-3 sm:p-4 text-xs sm:text-sm font-black shadow-sm">{EDITORIAS_LIST.map(e => <option key={e}>{e}</option>)}</select></div>
                                             <div><label className="text-[9px] sm:text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold">Status</label><select name="status" defaultValue={editingComm?.status || "Aguardando Envio"} className="w-full bg-slate-50 border-none rounded-xl p-3 sm:p-4 text-xs sm:text-sm font-bold shadow-sm">{STATUS_OPTIONS.map(s => <option key={s}>{s}</option>)}</select></div>
                                         </div>
-                                        <button type="submit" className="w-full py-5 sm:py-6 bg-black text-white rounded-[1.5rem] sm:rounded-[2rem] font-black uppercase text-[10px] sm:text-xs tracking-[0.2em] sm:tracking-[0.4em] active:scale-[0.98] shadow-2xl italic text-center">SALVAR REGISTRO</button>
+                                        <button type="submit" disabled={isSavingComm} className={`w-full py-5 sm:py-6 rounded-[1.5rem] sm:rounded-[2rem] font-black uppercase text-[10px] sm:text-xs tracking-[0.2em] sm:tracking-[0.4em] active:scale-[0.98] shadow-2xl italic text-center flex items-center justify-center gap-2 transition-all ${isSavingComm ? 'bg-slate-400 text-white cursor-not-allowed' : 'bg-black text-white hover:bg-slate-800'}`}>
+                                            {isSavingComm ? <><div className="spinner"></div> SALVANDO...</> : 'SALVAR REGISTRO'}
+                                        </button>
                                     </div>
                                 </form>
                             </div>
@@ -1828,7 +2288,11 @@
                                             <div className="flex items-center justify-between gap-3 mb-2 sm:mb-3"><label className="text-[9px] sm:text-[10px] font-black uppercase text-slate-400 block font-bold">Analista Responsável</label><button type="button" onClick={() => {const a = prompt("Nome do Novo Analista:"); if(a) setAllExtAnalysts([...allExtAnalysts, a])}} className="text-[#397394] hover:scale-110 transition-transform"><Icon name="plus-circle" size={16} className="sm:w-[18px] sm:h-[18px]"/></button></div>
                                             <select name="analyst" defaultValue={editingExternal?.analyst || allExtAnalysts[0]} className="w-full bg-slate-50 border-none rounded-xl p-4 sm:p-5 font-black outline-none shadow-sm text-sm">{allExtAnalysts.map(a => <option key={a} value={a}>{a}</option>)}</select>
                                         </div>
-                                        <div><label className="text-[9px] sm:text-[10px] font-black uppercase text-slate-400 mb-2 block italic font-bold">Objetivo (Camada PMM)</label><input name="objective" defaultValue={editingExternal?.objective} required className="w-full bg-slate-50 border-none rounded-xl p-4 sm:p-5 font-bold outline-none shadow-sm text-sm" placeholder="Propósito da mensagem" /></div>
+                                        
+                                        <div>
+                                            <label className="text-[9px] sm:text-[10px] font-black uppercase text-slate-400 mb-2 block italic font-bold">Objetivo (Camada PMM)</label>
+                                            <SmartTextArea name="objective" defaultValue={editingExternal?.objective} rows={3} placeholder="Propósito da mensagem, links de referência..." />
+                                        </div>
                                         
                                         <div>
                                             <label className="text-[9px] sm:text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold">Link da Comunicação</label>
@@ -1877,7 +2341,9 @@
                                             </div>
                                         </div>
 
-                                        <button type="submit" className="w-full py-5 sm:py-8 bg-black text-white rounded-[1.5rem] sm:rounded-[2.5rem] font-black uppercase text-[10px] sm:text-xs tracking-[0.2em] sm:tracking-[0.4em] active:scale-[0.98] shadow-2xl italic text-center">REGISTRAR OUTBOUND</button>
+                                        <button type="submit" disabled={isSavingExt} className={`w-full py-5 sm:py-8 rounded-[1.5rem] sm:rounded-[2.5rem] font-black uppercase text-[10px] sm:text-xs tracking-[0.2em] sm:tracking-[0.4em] active:scale-[0.98] shadow-2xl italic text-center flex items-center justify-center gap-2 transition-all ${isSavingExt ? 'bg-slate-400 text-white cursor-not-allowed' : 'bg-black text-white hover:bg-slate-800'}`}>
+                                            {isSavingExt ? <><div className="spinner"></div> SALVANDO...</> : 'REGISTRAR OUTBOUND'}
+                                        </button>
                                     </div>
                                 </form>
                             </div>
@@ -1935,7 +2401,10 @@
                                                 </div>
                                             </div>
 
-                                            <div><label className="text-[9px] sm:text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold">Descrição / Briefing</label><textarea name="description" defaultValue={editingAgenda?.description} rows="3" className="w-full bg-slate-50 border-none rounded-xl sm:rounded-2xl p-4 sm:p-5 font-bold outline-none shadow-sm resize-none text-xs sm:text-sm"></textarea></div>
+                                            <div>
+                                                <label className="text-[9px] sm:text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold">Descrição / Briefing</label>
+                                                <SmartTextArea name="description" defaultValue={editingAgenda?.description} rows={4} placeholder="Descreva o briefing, adicione links e espaçamentos..." />
+                                            </div>
                                             
                                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
                                                 <div><label className="text-[9px] sm:text-[10px] font-black uppercase text-slate-400 mb-2 block font-bold">Data Prevista</label><input name="date" type="date" defaultValue={editingAgenda?.date} required className="w-full bg-slate-50 border-none rounded-xl p-3 sm:p-4 font-bold outline-none shadow-sm text-xs sm:text-sm" /></div>
@@ -1989,7 +2458,6 @@
                                                                             <button type="button" onClick={() => {
                                                                                 const n = localVendors.filter((_, idx) => idx !== i);
                                                                                 setLocalVendors(n);
-                                                                                // Atualiza os indices marcados removendo o deletado e shiftando os maiores
                                                                                 let newIndices = selectedVendorIndices.filter(idx => idx !== i);
                                                                                 newIndices = newIndices.map(idx => idx > i ? idx - 1 : idx);
                                                                                 setSelectedVendorIndices(newIndices);
@@ -2090,7 +2558,9 @@
                                         )}
                                     </div>
 
-                                    <button type="submit" className="w-full mt-2 sm:mt-4 py-5 sm:py-6 bg-black text-white rounded-[1.5rem] sm:rounded-[2rem] font-black uppercase text-[10px] sm:text-xs tracking-[0.2em] sm:tracking-[0.4em] active:scale-[0.98] shadow-2xl italic text-center">SALVAR PLANEJAMENTO</button>
+                                    <button type="submit" disabled={isSavingAgenda} className={`w-full mt-2 sm:mt-4 py-5 sm:py-6 rounded-[1.5rem] sm:rounded-[2rem] font-black uppercase text-[10px] sm:text-xs tracking-[0.2em] sm:tracking-[0.4em] active:scale-[0.98] shadow-2xl italic text-center flex items-center justify-center gap-2 transition-all ${isSavingAgenda ? 'bg-slate-400 text-white cursor-not-allowed' : 'bg-black text-white hover:bg-slate-800'}`}>
+                                        {isSavingAgenda ? <><div className="spinner"></div> SALVANDO...</> : 'SALVAR PLANEJAMENTO'}
+                                    </button>
                                 </form>
                             </div>
                         </div>
